@@ -9,7 +9,7 @@ const links = [
   { label: "Programs",      href: "/#programs" },
   { label: "Camps/Clinic",  href: "/events" },
   { label: "Tournaments",   href: "/tournaments" },
-  { label: "Tryouts",        href: "/tryout" },
+  { label: "Youth Tryout",    href: "/tryout" },
   { label: "Youth Coaches", href: "/youth-coaches" },
   { label: "HS Coaches",    href: "/high-school-coaches" },
   { label: "Merch",         href: "/merch" },

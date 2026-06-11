@@ -1,0 +1,80 @@
+import { NextRequest, NextResponse } from "next/server";
+import { saveContact } from "@/lib/contacts";
+import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
+
+const SQ_BASE =
+  process.env.SQUARE_ENVIRONMENT === "production"
+    ? "https://connect.squareup.com/v2"
+    : "https://connect.squareupsandbox.com/v2";
+
+export async function POST(req: NextRequest) {
+  try {
+    const {
+      sourceId, total: clientTotal, quantity,
+      parentName, email, phone,
+      playerName, grade, session,
+      voucherCode,
+    } = await req.json();
+
+    // ── Server-side voucher validation ──────────────────────────────────────
+    let total: number = typeof clientTotal === "number" ? clientTotal : 0;
+    let voucherApplied = false;
+    if (voucherCode && typeof clientTotal === "number") {
+      const check = await validateVoucher(voucherCode, "tryout", clientTotal);
+      if (check.valid && check.voucher) {
+        total = check.finalTotal!;
+        voucherApplied = true;
+      }
+    }
+
+    if (!sourceId || !total || !parentName || !email) {
+      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    }
+
+    // Free registration — skip Square
+    let paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
+    if (sourceId !== "FREE" && total > 0) {
+      const sqRes = await fetch(`${SQ_BASE}/payments`, {
+        method:  "POST",
+        headers: {
+          "Authorization":  `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
+          "Content-Type":   "application/json",
+          "Square-Version": "2024-10-17",
+        },
+        body: JSON.stringify({
+          source_id:       sourceId,
+          idempotency_key: crypto.randomUUID(),
+          amount_money:    { amount: Math.round(total * 100), currency: "USD" },
+          location_id:     process.env.SQUARE_LOCATION_ID,
+          buyer_email_address: email,
+          note: `Tryout Reg — ${playerName || ""} | ${grade || ""} | ${session || ""}`,
+        }),
+      });
+      const sqData = await sqRes.json();
+      if (!sqRes.ok || sqData.errors) {
+        const msg = sqData.errors?.[0]?.detail || "Payment failed.";
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+      paymentId = sqData.payment?.id || paymentId;
+    }
+
+    // ── Redeem voucher ───────────────────────────────────────────────────────
+    if (voucherCode && voucherApplied) {
+      try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
+    }
+
+    // Save to contacts
+    await saveContact({
+      name:   parentName,
+      email,
+      phone,
+      source: "tryout" as any,
+      notes:  `Player: ${playerName} | Grade: ${grade} | Session: ${session} | Qty: ${quantity}`,
+    });
+
+    return NextResponse.json({ success: true, paymentId });
+  } catch (err: any) {
+    console.error("tryout-payment error:", err);
+    return NextResponse.json({ error: "Server error. Please try again." }, { status: 500 });
+  }
+}

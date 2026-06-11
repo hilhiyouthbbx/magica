@@ -464,8 +464,8 @@ export default function RegisterPage() {
                         <Field label="Gender" required>
                           <select value={camper.gender} onChange={e => updateCamper(i, "gender", e.target.value)} className={inputCls}>
                             <option value="" disabled>Select gender</option>
-                            <option value="male">Boy</option>
-                            <option value="female">Girl</option>
+                            <option value="Boys">Boys</option>
+                            <option value="Girls">Girls</option>
                             <option value="other">Other / Prefer not to say</option>
                           </select>
                         </Field>
@@ -668,7 +668,7 @@ export default function RegisterPage() {
                             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-black text-white">{i+1}</div>
                             <div className="flex-1">
                               <div className="font-semibold text-white text-sm">{c.firstName} {c.lastName}</div>
-                              <div className="text-gray-400 text-xs">{c.grade} Grade · {c.gender === "male" ? "Boy" : c.gender === "female" ? "Girl" : "Other"} · {c.jerseySize}</div>
+                              <div className="text-gray-400 text-xs">{c.grade} Grade · {c.gender === "Boys" ? "Boys" : c.gender === "Girls" ? "Girls" : c.gender || "—"} · {c.jerseySize}</div>
                             </div>
                           </div>
                         ))}

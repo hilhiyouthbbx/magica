@@ -1563,7 +1563,6 @@ export default function AdminPage() {
                   { label: "Phone", key: "phone" },
                   { label: "Camper Name", key: "camperName" },
                   { label: "Grade", key: "grade" },
-                  { label: "Gender", key: "gender" },
                   { label: "Shirt Size", key: "shirtSize" },
                   { label: "Emergency Contact", key: "emergencyContact" },
                   { label: "Emergency Phone", key: "emergencyPhone" },
@@ -1579,6 +1578,18 @@ export default function AdminPage() {
                     />
                   </div>
                 ))}
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Gender</label>
+                  <select
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                    value={(editPatch.gender ?? editingContact.gender ?? "") as string}
+                    onChange={e => setEditPatch(p => ({ ...p, gender: e.target.value }))}
+                  >
+                    <option value="">Select</option>
+                    <option value="Boys">Boys</option>
+                    <option value="Girls">Girls</option>
+                  </select>
+                </div>
                 <div className="sm:col-span-2">
                   <label className="block text-gray-400 text-xs font-semibold mb-1">Notes</label>
                   <textarea rows={3}

@@ -24,10 +24,15 @@ interface Contact {
   source: string; notes?: string;
   tournamentName?: string; teamName?: string; division?: string;
   date: string;
-  // Camp-specific
+  // Camper info
   camperName?: string; grade?: string; gender?: string;
   shirtSize?: string; emergencyContact?: string; emergencyPhone?: string;
-  amountPaid?: string; orderNumber?: string;
+  // Wix order / payment fields
+  amountPaid?: string; orderNumber?: string; orderDate?: string;
+  ticketType?: string; ticketNum?: string; ticketPrice?: string;
+  benefit?: string; coupon?: string; tax?: string;
+  wixServiceFee?: string; ticketRevenue?: string;
+  paymentStatus?: string; checkedIn?: string; seatInfo?: string;
 }
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
@@ -944,6 +949,7 @@ export default function AdminPage() {
   const [sourceFilter,  setSourceFilter]  = useState("all");
   const [tournFilter,   setTournFilter]   = useState("all");
   const [contactsLoaded,setContactsLoaded]= useState(false);
+  const [expandedContact, setExpandedContact] = useState<string|null>(null);
 
   // Tournaments
   const [tournaments,   setTournaments]   = useState<TournamentConfig[]>([]);
@@ -998,15 +1004,21 @@ export default function AdminPage() {
 
   // Derived contact data
   const tournamentNames = [...new Set(contacts.filter(c=>c.source==="tournament"&&c.tournamentName).map(c=>c.tournamentName!))];
+  const isCampSource = (src: string) =>
+    src === "registration" || src.includes("Camp") || src.includes("Summer");
+
   const filtered = contacts.filter(c => {
-    if (sourceFilter !== "all" && c.source !== sourceFilter) return false;
+    if (sourceFilter !== "all") {
+      // "2026 Youth Summer Camp" filter matches all camp-type sources
+      if (isCampSource(sourceFilter) ? !isCampSource(c.source) : c.source !== sourceFilter) return false;
+    }
     if (tournFilter !== "all" && c.tournamentName !== tournFilter) return false;
     return true;
   });
 
   const stats = {
     total:      contacts.length,
-    reg:        contacts.filter(c=>c.source==="registration").length,
+    reg:        contacts.filter(c=>c.source==="registration"||c.source.includes("Camp")||c.source.includes("Summer")).length,
     tournament: contacts.filter(c=>c.source==="tournament").length,
     merch:      contacts.filter(c=>c.source==="merch-order").length,
   };
@@ -1143,7 +1155,7 @@ export default function AdminPage() {
               <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}
                 className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none">
                 <option value="all" className="bg-gray-900">All Sources</option>
-                <option value="registration" className="bg-gray-900">2026 Youth Summer Camp</option>
+                <option value="2026 Youth Summer Camp" className="bg-gray-900">2026 Youth Summer Camp</option>
                 <option value="tournament"   className="bg-gray-900">Tournament</option>
                 <option value="merch-order"  className="bg-gray-900">Merch Orders</option>
                 <option value="import"       className="bg-gray-900">Imports</option>
@@ -1176,46 +1188,74 @@ export default function AdminPage() {
 
             {/* Table */}
             <div className="glass rounded-2xl border border-white/10 overflow-x-auto">
-              {sourceFilter === "registration" ? (
+              {(sourceFilter === "all" ? false : isCampSource(sourceFilter)) ? (
                 /* ── Camp Registration Table ── */
                 <table className="w-full text-sm min-w-[900px]">
                   <thead className="border-b border-white/10">
                     <tr className="text-gray-500 text-xs uppercase tracking-wider">
-                      {["Parent","Email","Phone","Camper Name","Grade","Gender","Shirt","Emergency Contact","Emergency Phone","Amount","Order #","Date",""].map(h => (
-                        <th key={h} className="text-left px-4 py-3 font-semibold whitespace-nowrap">{h}</th>
+                      {["","Parent / Contact","Email","Phone","Camper","Grade","Gender","Shirt","Payment","Order #","Registered",""].map(h => (
+                        <th key={h} className="text-left px-3 py-3 font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {filtered.length === 0 && (
-                      <tr><td colSpan={13} className="px-4 py-8 text-center text-gray-600">No camp registrations found.</td></tr>
+                      <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-600">No camp registrations found.</td></tr>
                     )}
                     {filtered.map(c => (
-                      <tr key={c.id} className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-3 text-white font-semibold whitespace-nowrap">{c.name}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">{c.email}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{c.phone}</td>
-                        <td className="px-4 py-3 text-blue-300 font-semibold whitespace-nowrap">{c.camperName||"—"}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 whitespace-nowrap">{c.grade||"—"}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.gender==="Boys" ? "bg-blue-500/20 text-blue-300" : c.gender==="Girls" ? "bg-pink-500/20 text-pink-300" : "bg-white/10 text-gray-400"}`}>{c.gender||"—"}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300">{c.shirtSize||"—"}</span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{c.emergencyContact||"—"}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{c.emergencyPhone||"—"}</td>
-                        <td className="px-4 py-3 text-green-400 font-bold text-xs whitespace-nowrap">{c.amountPaid ? `$${c.amountPaid}` : "—"}</td>
-                        <td className="px-4 py-3 text-gray-500 text-xs font-mono whitespace-nowrap">{c.orderNumber||"—"}</td>
-                        <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{new Date(c.date).toLocaleDateString()}</td>
-                        <td className="px-4 py-3">
-                          <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
+                      <>
+                        <tr key={c.id} className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setExpandedContact(expandedContact === c.id ? null : c.id)}>
+                          {/* Expand toggle */}
+                          <td className="px-3 py-3 text-gray-500 text-xs w-6">
+                            <span className="text-xs">{expandedContact === c.id ? "▲" : "▶"}</span>
+                          </td>
+                          <td className="px-3 py-3 text-white font-semibold whitespace-nowrap">{c.name}</td>
+                          <td className="px-3 py-3 text-gray-400 text-xs">{c.email}</td>
+                          <td className="px-3 py-3 text-gray-400 text-xs whitespace-nowrap">{c.phone}</td>
+                          <td className="px-3 py-3 text-blue-300 font-semibold whitespace-nowrap">{c.camperName||"—"}</td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 whitespace-nowrap">{c.grade||"—"}</span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.gender==="Boys" ? "bg-blue-500/20 text-blue-300" : c.gender==="Girls" ? "bg-pink-500/20 text-pink-300" : "bg-white/10 text-gray-400"}`}>{c.gender||"—"}</span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300">{c.shirtSize||"—"}</span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.paymentStatus==="Paid" ? "bg-green-500/20 text-green-400" : c.paymentStatus ? "bg-yellow-500/20 text-yellow-300" : "bg-white/10 text-gray-400"}`}>
+                              {c.paymentStatus || (c.amountPaid ? "Paid" : "—")}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-gray-500 text-xs font-mono whitespace-nowrap">{c.orderNumber||"—"}</td>
+                          <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{c.orderDate || new Date(c.date).toLocaleDateString()}</td>
+                          <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedContact === c.id && (
+                          <tr key={c.id+"-detail"}>
+                            <td colSpan={12} className="bg-white/5 px-6 py-4 border-b border-white/10">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
+                                <div><span className="text-gray-500 text-xs">Ticket Type</span><div className="text-white">{c.ticketType||"—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Ticket #</span><div className="text-white font-mono">{c.ticketNum||"—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Ticket Price</span><div className="text-white">{c.ticketPrice ? `$${c.ticketPrice}` : "—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Total Amount</span><div className="text-green-400 font-bold">{c.amountPaid ? `$${c.amountPaid}` : "—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Tax</span><div className="text-white">{c.tax ? `$${c.tax}` : "—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Wix Service Fee</span><div className="text-white">{c.wixServiceFee ? `$${c.wixServiceFee}` : "—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Ticket Revenue</span><div className="text-white">{c.ticketRevenue ? `$${c.ticketRevenue}` : "—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Benefit / Coupon</span><div className="text-white">{[c.benefit, c.coupon].filter(Boolean).join(", ") || "—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Emergency Contact</span><div className="text-white">{c.emergencyContact||"—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Emergency Phone</span><div className="text-white">{c.emergencyPhone||"—"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Checked In</span><div className={c.checkedIn==="Yes" ? "text-green-400 font-bold" : "text-gray-400"}>{c.checkedIn||"No"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Seat Info</span><div className="text-white">{c.seatInfo||"—"}</div></div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))}
                   </tbody>
                 </table>

@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star } from "lucide-react";
+import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy } from "lucide-react";
 
 import type { TournamentConfig } from "@/lib/tournament-client";
 import { TOURNAMENT_DEFAULTS } from "@/lib/tournament-client";
@@ -955,6 +955,7 @@ export default function AdminPage() {
   const [tournaments,   setTournaments]   = useState<TournamentConfig[]>([]);
   const [editingTourn,  setEditingTourn]  = useState<TournamentConfig | null>(null);
   const [addingTourn,   setAddingTourn]   = useState(false);
+  const [copyTemplate,  setCopyTemplate]  = useState<TournamentConfig | null>(null);
   const [tournLoaded,   setTournLoaded]   = useState(false);
 
   const adminKey = password || "hilhi-admin";
@@ -992,6 +993,17 @@ export default function AdminPage() {
     if (!confirm("Delete this tournament?")) return;
     await fetch(`/api/tournament?key=${adminKey}&id=${id}`, { method:"DELETE" });
     setTournaments(prev => prev.filter(t => t.id !== id));
+  }
+
+  function copyTournament(t: TournamentConfig) {
+    setCopyTemplate({
+      ...t,
+      id:      "",
+      name:    "Copy of " + t.name,
+      enabled: false,
+    });
+    setAddingTourn(true);
+    setEditingTourn(null);
   }
 
   function handleTournSaved(saved: TournamentConfig) {
@@ -1361,9 +1373,9 @@ export default function AdminPage() {
             {/* Add new form */}
             {addingTourn && (
               <TournamentForm
-                initial={{ ...TOURNAMENT_DEFAULTS, id:"" }}
-                onSave={handleTournSaved}
-                onCancel={() => setAddingTourn(false)}
+                initial={copyTemplate ? { ...copyTemplate } : { ...TOURNAMENT_DEFAULTS, id:"" }}
+                onSave={(saved) => { setCopyTemplate(null); handleTournSaved(saved); }}
+                onCancel={() => { setAddingTourn(false); setCopyTemplate(null); }}
                 adminKey={adminKey}
               />
             )}
@@ -1403,10 +1415,13 @@ export default function AdminPage() {
                             : <><ToggleLeft  className="w-7 h-7 text-gray-500" /><span className="text-gray-500 text-xs font-bold">OFF</span></>
                           }
                         </button>
-                        <button onClick={() => setEditingTourn(t)} className="p-2 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-lg transition-all">
+                        <button onClick={() => setEditingTourn(t)} title="Edit" className="p-2 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-lg transition-all">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteTournamentAdmin(t.id)} className="p-2 glass border border-white/15 hover:border-red-500/40 text-gray-400 hover:text-red-400 rounded-lg transition-all">
+                        <button onClick={() => copyTournament(t)} title="Copy / Duplicate" className="p-2 glass border border-white/15 hover:border-purple-500/40 text-gray-400 hover:text-purple-400 rounded-lg transition-all">
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => deleteTournamentAdmin(t.id)} title="Delete" className="p-2 glass border border-white/15 hover:border-red-500/40 text-gray-400 hover:text-red-400 rounded-lg transition-all">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>

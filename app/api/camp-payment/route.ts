@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
+import { campConfirmationHtml, campAdminNotificationHtml } from "@/lib/email";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -85,11 +86,21 @@ export async function POST(req: NextRequest) {
         phone:  parentInfo.phone || "",
         source: "registration",
         notes:  `Camp (${quantity} camper${quantity > 1 ? "s" : ""}): ${(campers || []).map((c: Camper) => `${c.firstName} ${c.lastName} (${c.grade})`).join(", ")} | $${total.toFixed(2)} | Square: ${paymentId ?? "n/a"}`,
+        camperName:       (campers || []).map(c => `${c.firstName} ${c.lastName}`).join(", "),
+        grade:            (campers || []).map(c => c.grade).join(", "),
+        gender:           (campers || []).map(c => c.gender).join(", "),
+        shirtSize:        (campers || []).map(c => c.jerseySize).join(", "),
+        emergencyContact: parentInfo.emergencyName,
+        emergencyPhone:   parentInfo.emergencyPhone,
+        amountPaid:       total.toFixed(2),
+        paymentStatus:    "Paid",
       });
     } catch { /* non-fatal */ }
 
     // ── Send emails ───────────────────────────────────────────────────────────
-    try { await sendEmails(parentInfo, campers, quantity, total, paymentId, medical); } catch (e) {
+    try {
+      await sendEmails(parentInfo, campers, total, paymentId, medical);
+    } catch (e) {
       console.error("Camp email send failed:", e);
     }
 
@@ -103,95 +114,70 @@ export async function POST(req: NextRequest) {
 async function sendEmails(
   parentInfo: ParentInfo,
   campers:    Camper[],
-  quantity:   number,
   total:      number,
   paymentId?: string,
   medical?:   MedicalInfo,
 ) {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    console.warn("SMTP not configured — skipping confirmation email.");
+    return;
+  }
+
   const transporter = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   Number(process.env.SMTP_PORT),
+    host:   smtpHost,
+    port:   Number(process.env.SMTP_PORT || 587),
     secure: false,
-    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    auth:   { user: smtpUser, pass: smtpPass },
   });
 
-  const camperRows = (campers || []).map(c =>
-    `<tr style="border-bottom:1px solid #e5e7eb">
-       <td style="padding:8px 12px">${c.firstName} ${c.lastName}</td>
-       <td style="padding:8px 12px;text-align:center">${c.grade} Grade</td>
-       <td style="padding:8px 12px;text-align:center">${c.gender === "male" ? "Boy" : c.gender === "female" ? "Girl" : "Other"}</td>
-       <td style="padding:8px 12px;text-align:center">${c.jerseySize}</td>
-     </tr>`
-  ).join("");
+  const parentFirstName = parentInfo.guardianName.split(" ")[0];
 
-  const tableHtml = `
-    <table border="0" cellpadding="0" cellspacing="0" width="100%"
-           style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin:16px 0">
-      <tr style="background:#f1f5f9">
-        <th style="padding:8px 12px;text-align:left">Camper</th>
-        <th style="padding:8px 12px">Grade</th>
-        <th style="padding:8px 12px">Gender</th>
-        <th style="padding:8px 12px">Jersey Size</th>
-      </tr>
-      ${camperRows}
-      <tr style="background:#dbeafe;font-weight:700">
-        <td colspan="3" style="padding:12px">TOTAL PAID</td>
-        <td style="padding:12px;text-align:right;font-size:16px">$${total.toFixed(2)}</td>
-      </tr>
-    </table>`;
+  // Build camper array for email template
+  const camperList = (campers || []).map(c => ({
+    name:      `${c.firstName} ${c.lastName}`,
+    grade:     c.grade,
+    gender:    c.gender === "male" ? "Boy" : c.gender === "female" ? "Girl" : c.gender,
+    shirtSize: c.jerseySize,
+  }));
+
+  // Beautiful customer receipt
+  const customerHtml = campConfirmationHtml({
+    parentFirstName,
+    campers:  camperList,
+    total:    total.toFixed(2),
+    paymentId,
+  });
+
+  // Admin notification with full details
+  const adminHtml = campAdminNotificationHtml({
+    parentName:       parentInfo.guardianName,
+    parentEmail:      parentInfo.email,
+    parentPhone:      parentInfo.phone,
+    campers:          camperList,
+    total:            total.toFixed(2),
+    paymentId,
+    emergencyContact: parentInfo.emergencyName,
+    emergencyPhone:   parentInfo.emergencyPhone,
+  });
 
   await Promise.allSettled([
     // Admin notification
     transporter.sendMail({
-      from:    process.env.SMTP_USER,
+      from:    smtpUser,
       to:      "info@hilhiyouthbbx.com",
-      subject: `✅ Camp Registration — ${parentInfo.guardianName} — ${quantity} camper${quantity > 1 ? "s" : ""} — $${total.toFixed(2)}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:600px">
-          <h2 style="color:#1e40af">New Camp Registration — Payment Received ✅</h2>
-          <p><strong>Square Payment ID:</strong> ${paymentId ?? "N/A"}</p>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0"/>
-          <h3>Parent / Guardian</h3>
-          <p><strong>${parentInfo.guardianName}</strong> (${parentInfo.relationship})<br/>
-          ${parentInfo.email} · ${parentInfo.phone}</p>
-          <p>Address: ${parentInfo.address}, ${parentInfo.city}, ${parentInfo.state} ${parentInfo.zip}</p>
-          <p>Emergency: ${parentInfo.emergencyName} (${parentInfo.emergencyRelationship}) — ${parentInfo.emergencyPhone}</p>
-          <h3>Registered Campers</h3>
-          ${tableHtml}
-          ${medical ? `
-          <h3>Medical Notes</h3>
-          <p>Allergies: ${medical.allergies || "None"}</p>
-          <p>Medications: ${medical.medications || "None"}</p>
-          <p>Conditions: ${medical.conditions || "None"}</p>
-          <p>Doctor: ${medical.doctorName || "—"} ${medical.doctorPhone || ""}</p>
-          <p>Waiver signed by: ${medical.waiverName} | Photo release: ${medical.photoRelease ? "Yes" : "No"}</p>
-          ` : ""}
-        </div>`,
+      subject: `✅ New Camp Registration — ${parentInfo.guardianName} — ${camperList.length} camper${camperList.length > 1 ? "s" : ""} — $${total.toFixed(2)}`,
+      html:    adminHtml,
     }),
     // Customer receipt
-    transporter.sendMail({
-      from:    process.env.SMTP_USER,
+    parentInfo.email ? transporter.sendMail({
+      from:    smtpUser,
       to:      parentInfo.email,
-      subject: "Your Camp Registration is Confirmed! 🏀",
-      html: `
-        <div style="font-family:sans-serif;max-width:600px">
-          <h2 style="color:#1e40af">Camp Registration Confirmed! 🏀</h2>
-          <p>Hi ${parentInfo.guardianName.split(" ")[0]},</p>
-          <p>Your payment of <strong>$${total.toFixed(2)}</strong> has been received for the <strong>2026 Hilhi Youth Basketball Camp</strong>.</p>
-          ${tableHtml}
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:16px 0">
-            <strong style="color:#15803d">Camp Details</strong><br/>
-            📅 June 22–25, 2026<br/>
-            ⏰ 9AM–3PM (Drop-off at 8AM)<br/>
-            📍 Hillsboro High School<br/>
-            👕 Free T-shirt included
-          </div>
-          <p style="color:#6b7280;font-size:14px">
-            Questions? Email <a href="mailto:info@hilhiyouthbbx.com">info@hilhiyouthbbx.com</a>
-            or call <a href="tel:9715630552">971-563-0552</a>.
-          </p>
-          <p>— Hilhi Youth Basketball 🏀</p>
-        </div>`,
-    }),
+      subject: "🏀 Your Camp Registration is Confirmed!",
+      html:    customerHtml,
+    }) : Promise.resolve(),
   ]);
 }

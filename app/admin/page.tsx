@@ -1226,8 +1226,8 @@ export default function AdminPage() {
                 <table className="w-full text-sm min-w-[900px]">
                   <thead className="border-b border-white/10">
                     <tr className="text-gray-500 text-xs uppercase tracking-wider">
-                      {["","Parent / Contact","Email","Phone","Camper","Grade","Gender","Shirt","Payment","Order #","Registered",""].map(h => (
-                        <th key={h} className="text-left px-3 py-3 font-semibold whitespace-nowrap">{h}</th>
+                      {["","Parent / Contact","Email","Phone","Camper","Grade","Gender","Shirt","Payment","Order #","Registered",""].map((h, i) => (
+                        <th key={i} className="text-left px-3 py-3 font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>

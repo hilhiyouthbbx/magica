@@ -113,7 +113,7 @@ function EventSummary({ quantity, step, appliedVoucher }: { quantity: number; st
           <span className="text-gray-400">Camp Registration × {quantity}</span>
           <span className="text-white">${(CAMP_BASE * quantity).toFixed(2)}</span>
         </div>
-        {!isFree && (
+        {appliedVoucher === null && (
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Service fee × {quantity}</span>
           <span className="text-white">${(CAMP_FEE * quantity).toFixed(2)}</span>

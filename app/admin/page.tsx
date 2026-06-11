@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash } from "lucide-react";
+import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash, RotateCcw } from "lucide-react";
 
 import type { TournamentConfig } from "@/lib/tournament-client";
 import { TOURNAMENT_DEFAULTS } from "@/lib/tournament-client";
@@ -305,6 +305,16 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
     setVouchers(prev => prev.filter(v => v.id !== id));
   }
 
+  async function resetUsage(v: Voucher) {
+    if (!confirm(`Reset usage count for "${v.code}" back to 0?`)) return;
+    const updated = { ...v, usedCount: 0 };
+    await fetch(`/api/vouchers?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    });
+    setVouchers(prev => prev.map(x => x.id === v.id ? updated : x));
+  }
+
   async function toggle(v: Voucher) {
     const updated = { ...v, enabled: !v.enabled };
     await fetch(`/api/vouchers?key=${adminKey}`, {
@@ -505,6 +515,11 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Reset Usage */}
+                    <button onClick={() => resetUsage(v)} title="Reset usage count to 0"
+                      className="p-2 glass border border-white/15 hover:border-yellow-500/40 text-gray-400 hover:text-yellow-400 rounded-lg transition-all">
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
                     {/* Toggle */}
                     <button onClick={() => toggle(v)} title={v.enabled ? "Disable" : "Enable"}
                       className="p-2 glass border border-white/15 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 rounded-lg transition-all">

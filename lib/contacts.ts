@@ -28,7 +28,7 @@ export interface Contact {
   name:            string;
   email:           string;
   phone:           string;
-  source:          "registration" | "merch-order" | "import" | "tournament" | "tryout";
+  source:          string;  // e.g. "registration", "2026 Youth Summer Camp", "tournament"
   notes?:          string;
   tournamentName?: string;
   teamName?:       string;
@@ -99,7 +99,7 @@ export async function deleteContact(id: string): Promise<void> {
 }
 
 // ── Import contacts from CSV text ──────────────────────────────────────────
-export async function importContactsCSV(csv: string): Promise<number> {
+export async function importContactsCSV(csv: string, source = "import"): Promise<number> {
   const lines = csv.trim().split("\n").filter(Boolean);
   let imported = 0;
   for (const line of lines) {
@@ -111,7 +111,7 @@ export async function importContactsCSV(csv: string): Promise<number> {
     const name  = cols.slice(0, emailIdx).join(" ").trim() || "Unknown";
     const phone = cols[emailIdx + 1] || "";
     if (email.toLowerCase() === "email") continue;
-    await saveContact({ name, email, phone, source: "import" });
+    await saveContact({ name, email, phone, source });
     imported++;
   }
   return imported;

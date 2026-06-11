@@ -533,6 +533,58 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
 
 // PagesTab — Full CMS for all website pages
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Pages tab sub-components — defined at MODULE LEVEL so React never remounts
+// them on keystroke (avoids input focus loss)
+// ─────────────────────────────────────────────────────────────────────────────
+function SaveBtn({ k, save, saving, saved }: {
+  k: string;
+  save: (k: string, patch: object) => void;
+  saving: string | null;
+  saved: string | null;
+}) {
+  return (
+    <button onClick={() => save(k, {})} disabled={saving===k}
+      className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#006aff] to-[#00aaff] hover:brightness-110 text-white font-bold rounded-xl text-sm transition-all disabled:opacity-50">
+      {saving===k ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : saved===k ? <><CheckCircle className="w-3.5 h-3.5" /> Saved!</> : <><Save className="w-3.5 h-3.5" /> Save</>}
+    </button>
+  );
+}
+
+function Section({ id, title, badge, children, openId, setOpenId }: {
+  id: string; title: string; badge?: string; children: React.ReactNode;
+  openId: string | null; setOpenId: (id: string | null) => void;
+}) {
+  return (
+    <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+      <button onClick={() => setOpenId(openId===id ? null : id)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition-colors">
+        <div className="flex items-center gap-3">
+          <span className="text-white font-bold text-sm">{title}</span>
+          {badge && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold">{badge}</span>}
+        </div>
+        {openId===id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+      </button>
+      {openId===id && <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">{children}</div>}
+    </div>
+  );
+}
+
+function Toggle({ label, checked, onChange, desc }: { label:string; checked:boolean; onChange:(v:boolean)=>void; desc?:string }) {
+  return (
+    <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+      <div>
+        <div className="text-white font-semibold text-sm">{label}</div>
+        {desc && <div className="text-gray-500 text-xs mt-0.5">{desc}</div>}
+      </div>
+      <button type="button" onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? "bg-blue-600" : "bg-white/20"}`}>
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
+      </button>
+    </div>
+  );
+}
+
 function PagesTab({ adminKey }: { adminKey: string }) {
   const [content,    setContent]   = useState<SiteContent | null>(null);
   const [section,    setSection]   = useState<string | null>("tryout");
@@ -556,39 +608,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
 
   if (!content) return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" /></div>;
 
-  const SaveBtn = ({ k }: { k:string }) => (
-    <button onClick={() => save(k, {})} disabled={saving===k}
-      className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#006aff] to-[#00aaff] hover:brightness-110 text-white font-bold rounded-xl text-sm transition-all disabled:opacity-50">
-      {saving===k ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : saved===k ? <><CheckCircle className="w-3.5 h-3.5" /> Saved!</> : <><Save className="w-3.5 h-3.5" /> Save</>}
-    </button>
-  );
-
-  const Section = ({ id, title, badge, children }: { id:string; title:string; badge?:string; children:React.ReactNode }) => (
-    <div className="glass rounded-2xl border border-white/10 overflow-hidden">
-      <button onClick={() => setSection(s => s===id ? null : id)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition-colors">
-        <div className="flex items-center gap-3">
-          <span className="text-white font-bold text-sm">{title}</span>
-          {badge && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold">{badge}</span>}
-        </div>
-        {section===id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-      </button>
-      {section===id && <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">{children}</div>}
-    </div>
-  );
-
-  const Toggle = ({ label, checked, onChange, desc }: { label:string; checked:boolean; onChange:(v:boolean)=>void; desc?:string }) => (
-    <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-      <div>
-        <div className="text-white font-semibold text-sm">{label}</div>
-        {desc && <div className="text-gray-500 text-xs mt-0.5">{desc}</div>}
-      </div>
-      <button type="button" onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? "bg-blue-600" : "bg-white/20"}`}>
-        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
-      </button>
-    </div>
-  );
+  // SaveBtn, Section, Toggle are defined at module level to avoid remount on keystroke
 
   // Shortcut setters
   const setN = (k: keyof SiteContent["navbar"]) => (v: unknown) =>
@@ -660,7 +680,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
       </div>
 
       {/* ── Tryout Page ──────────────────────────────────────────────────── */}
-      <Section id="tryout" title="🏀 Tryout Page" badge={t.enabled ? "Live" : "Hidden"}>
+      <Section openId={section} setOpenId={setSection} id="tryout" title="🏀 Tryout Page" badge={t.enabled ? "Live" : "Hidden"}>
         <Toggle
           label="Show Tryout Page"
           desc="When OFF, visitors see a 'Coming Soon' message instead."
@@ -715,11 +735,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             ))}
           </div>
         </div>
-        <div className="flex justify-end"><SaveBtn k="tryout" /></div>
+        <div className="flex justify-end"><SaveBtn k="tryout" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Navbar ───────────────────────────────────────────────────────── */}
-      <Section id="navbar" title="🔗 Navigation Bar">
+      <Section openId={section} setOpenId={setSection} id="navbar" title="🔗 Navigation Bar">
         <div className="grid sm:grid-cols-2 gap-3">
           <IF label="Site Name"  value={n.siteName} onChange={setN("siteName") as (v:string)=>void} ph="HILHI" />
           <IF label="Tagline"    value={n.tagline}  onChange={setN("tagline")  as (v:string)=>void} ph="Youth Basketball" />
@@ -730,11 +750,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           checked={n.showTryouts}
           onChange={v => { setN("showTryouts")(v); save("navbar", { navbar: { ...n, showTryouts: v } }); }}
         />
-        <div className="flex justify-end"><SaveBtn k="navbar" /></div>
+        <div className="flex justify-end"><SaveBtn k="navbar" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Home Hero ────────────────────────────────────────────────────── */}
-      <Section id="home" title="🏠 Home Page — Hero & About">
+      <Section openId={section} setOpenId={setSection} id="home" title="🏠 Home Page — Hero & About">
         <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Hero Banner</div>
         <div className="space-y-3">
           <IF label="Badge Text"    value={h.heroBadge}    onChange={setH("heroBadge")    as (v:string)=>void} ph="Hillsboro Youth Basketball" />
@@ -800,11 +820,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             </div>
           ))}
         </div>
-        <div className="flex justify-end"><SaveBtn k="home" /></div>
+        <div className="flex justify-end"><SaveBtn k="home" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Contact ──────────────────────────────────────────────────────── */}
-      <Section id="contact" title="📞 Contact Info & Social Links">
+      <Section openId={section} setOpenId={setSection} id="contact" title="📞 Contact Info & Social Links">
         <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Contact Details</div>
         <div className="grid sm:grid-cols-2 gap-3">
           <IF label="Email"   value={c.email}   onChange={setC("email")}   type="email" ph="info@hilhiyouthbbx.com" />
@@ -821,11 +841,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             <IF label="X / Twitter URL" value={c.twitter} onChange={setC("twitter")}  ph="https://x.com/hilhiyouthbbx" />
           </div>
         </div>
-        <div className="flex justify-end"><SaveBtn k="contact" /></div>
+        <div className="flex justify-end"><SaveBtn k="contact" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Camps & Clinics ──────────────────────────────────────────────── */}
-      <Section id="camps" title="⚡ Events & Camps Page">
+      <Section openId={section} setOpenId={setSection} id="camps" title="⚡ Events & Camps Page">
         <div className="grid sm:grid-cols-2 gap-3 mb-4">
           <IF label="Page Title"    value={content.camps.pageTitle}    onChange={v => setContent(p => p ? {...p, camps:{...p.camps,pageTitle:v}} : p)} />
           <IF label="Page Subtitle" value={content.camps.pageSubtitle} onChange={v => setContent(p => p ? {...p, camps:{...p.camps,pageSubtitle:v}} : p)} />
@@ -855,11 +875,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           className="w-full py-2.5 glass border border-dashed border-white/20 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> Add Camp / Clinic
         </button>
-        <div className="flex justify-end mt-2"><SaveBtn k="camps" /></div>
+        <div className="flex justify-end mt-2"><SaveBtn k="camps" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Merch Page ───────────────────────────────────────────────────── */}
-      <Section id="merch" title="👕 Merch Page">
+      <Section openId={section} setOpenId={setSection} id="merch" title="👕 Merch Page">
         <div className="grid sm:grid-cols-2 gap-3">
           <IF label="Page Title"    value={m.pageTitle}    onChange={setM("pageTitle")    as (v:string)=>void} ph="Official Merchandise" />
           <IF label="Page Subtitle" value={m.pageSubtitle} onChange={setM("pageSubtitle") as (v:string)=>void} ph="Rep your team with official apparel." />
@@ -902,11 +922,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             <Plus className="w-4 h-4" /> Add Product
           </button>
         </div>
-        <div className="flex justify-end mt-2"><SaveBtn k="merch" /></div>
+        <div className="flex justify-end mt-2"><SaveBtn k="merch" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Film Room ───────────────────────────────────────────────────── */}
-      <Section id="videoRoom" title="🎬 Team Film Room">
+      <Section openId={section} setOpenId={setSection} id="videoRoom" title="🎬 Team Film Room">
         <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs mb-3">
           Players access this page at <strong>/film-room</strong> using the team password below.
         </div>
@@ -951,11 +971,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             <Plus className="w-4 h-4" /> Add Video / Stream
           </button>
         </div>
-        <div className="flex justify-end mt-2"><SaveBtn k="videoRoom" /></div>
+        <div className="flex justify-end mt-2"><SaveBtn k="videoRoom" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Youth Coaches ────────────────────────────────────────────────── */}
-      <Section id="youthCoaches" title="🏀 Youth Coaches Page">
+      <Section openId={section} setOpenId={setSection} id="youthCoaches" title="🏀 Youth Coaches Page">
         <TF label="Intro Text" value={content.youthCoaches.intro} onChange={v => setContent(p => p ? {...p, youthCoaches:{...p.youthCoaches,intro:v}} : p)} rows={2} />
         <div className="space-y-3 mb-3">
           {content.youthCoaches.coaches.map(coach => (
@@ -976,11 +996,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           className="w-full py-2.5 glass border border-dashed border-white/20 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" /> Add Youth Coach
         </button>
-        <div className="flex justify-end mt-2"><SaveBtn k="youthCoaches" /></div>
+        <div className="flex justify-end mt-2"><SaveBtn k="youthCoaches" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── HS Coaches ───────────────────────────────────────────────────── */}
-      <Section id="hsCoaches" title="🎓 High School Coaches Page">
+      <Section openId={section} setOpenId={setSection} id="hsCoaches" title="🎓 High School Coaches Page">
         <TF label="Intro Text" value={content.hsCoaches.intro} onChange={v => setContent(p => p ? {...p, hsCoaches:{...p.hsCoaches,intro:v}} : p)} rows={2} />
 
         {/* ── Featured (Head) Coach ── */}
@@ -1093,7 +1113,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           </button>
         </div>
 
-        <div className="flex justify-end mt-2"><SaveBtn k="hsCoaches" /></div>
+        <div className="flex justify-end mt-2"><SaveBtn k="hsCoaches" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── Modal: Edit Camp ─────────────────────────────────────────────── */}

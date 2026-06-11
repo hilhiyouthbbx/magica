@@ -19,17 +19,17 @@
     "programCards": [
       {
         "id": "prog-1",
-        "icon": "👥",
+        "icon": "\ud83d\udc65",
         "title": "Youth Teams",
         "subtitle": "All Skill Levels",
         "desc": "Structured teams for youth players at every level. Learn fundamentals, compete in leagues, and grow as a player and teammate.",
-        "tag": "Ages 5–14",
+        "tag": "Ages 5\u201314",
         "link": "/join",
         "highlight": true
       },
       {
         "id": "prog-2",
-        "icon": "📅",
+        "icon": "\ud83d\udcc5",
         "title": "Events & Camps",
         "subtitle": "Register Today",
         "desc": "Stay up to date with all youth camps, league games, practice schedules, and important events throughout the season.",
@@ -39,7 +39,7 @@
       },
       {
         "id": "prog-3",
-        "icon": "⭐",
+        "icon": "\u2b50",
         "title": "HS Calendar",
         "subtitle": "High School Events",
         "desc": "High school basketball events, tryouts, and elite training opportunities for advanced players looking to compete at the next level.",
@@ -49,10 +49,10 @@
       },
       {
         "id": "prog-4",
-        "icon": "🛒",
+        "icon": "\ud83d\uded2",
         "title": "Merchandise",
         "subtitle": "Official Gear",
-        "desc": "Rep your team with official Hilhi Youth Basketball apparel. New arrivals available — jerseys, hoodies, and more.",
+        "desc": "Rep your team with official Hilhi Youth Basketball apparel. New arrivals available \u2014 jerseys, hoodies, and more.",
         "tag": "New Arrivals",
         "link": "/merch",
         "highlight": false
@@ -68,7 +68,7 @@
     "phone": "971-563-0552",
     "address": "3285 SE Rood Bridge Rd.\nHillsboro, OR 97123",
     "facebook": "https://www.facebook.com/hilhiyouthbbx",
-    "instagram": "https://www.instagram.com/hilhiyouthbbx",
+    "instagram": "https://www.instagram.com/hilhispartansmbb",
     "youtube": "https://www.youtube.com/@hilhiyouthbbx",
     "tiktok": "https://www.tiktok.com/@hilhiyouthbbx",
     "twitter": "https://x.com/hilhiyouthbbx"
@@ -81,35 +81,35 @@
         "id": "camp-2026",
         "enabled": true,
         "title": "2026 Hilhi Youth Basketball Camp",
-        "date": "June 22–25, 2026",
+        "date": "June 22\u201325, 2026",
         "price": "$150 per camper (+$4.50 service fee)",
-        "description": "Get ready to level up your game this summer at the Hilhi Youth Basketball Camp! Join our awesome coaching staff for four days of skills, drills, fun competitions, and teamwork. Whether you're a beginner learning the basics or a returning player looking to sharpen your game for next season, this camp is designed to help you shine — both on and off the court!",
+        "description": "Get ready to level up your game this summer at the Hilhi Youth Basketball Camp! Join our awesome coaching staff for four days of skills, drills, fun competitions, and teamwork. Whether you're a beginner learning the basics or a returning player looking to sharpen your game for next season, this camp is designed to help you shine \u2014 both on and off the court!",
         "imageUrl": "https://galaxy-prod.tlcdn.com/view/user_34cYMUBillHvO8MzqYYaa9tzVg5/7634f012657a4144882b4e25112250e9.jpg"
       }
     ]
   },
   "tryout": {
     "enabled": false,
-    "title": "2026–2027 Youth Competitive Basketball Tryouts",
+    "title": "2026\u20132027 Youth Competitive Basketball Tryouts",
     "subtitle": "BBX Youth Tryout",
     "imageUrl": "https://static.wixstatic.com/media/458ec6_20a6707efcad4b06aedba93cfa6938cc~mv2.jpg/v1/fill/w_979,h_552,fp_0.50_0.50,q_85,usm_0.66_1.00_0.01,enc_auto/458ec6_20a6707efcad4b06aedba93cfa6938cc~mv2.jpg",
     "location": "Hillsboro High School",
     "address": "3285 SE Rood Bridge Rd, Hillsboro, OR 97123",
-    "gradeLevels": "3rd – 8th Grade",
+    "gradeLevels": "3rd \u2013 8th Grade",
     "gender": "Boys",
     "sessions": [
       {
         "id": "s1",
         "label": "Sunday (Date TBD)",
-        "time": "4:00 PM – 5:30 PM"
+        "time": "4:00 PM \u2013 5:30 PM"
       },
       {
         "id": "s2",
         "label": "Monday (Date TBD)",
-        "time": "6:30 PM – 8:00 PM"
+        "time": "6:30 PM \u2013 8:00 PM"
       }
     ],
-    "aboutText": "The youth basketball tryouts for the 2026-2027 season will be held at Hillsboro High School. Registration is open for boys in 3rd–8th grade. Players should come prepared to show their skills in dribbling, passing, shooting, and team play.\n\nCoaches will evaluate each player's fundamentals, athleticism, coachability, and overall fit for competitive team play. All players will receive feedback regardless of outcome.",
+    "aboutText": "The youth basketball tryouts for the 2026-2027 season will be held at Hillsboro High School. Registration is open for boys in 3rd\u20138th grade. Players should come prepared to show their skills in dribbling, passing, shooting, and team play.\n\nCoaches will evaluate each player's fundamentals, athleticism, coachability, and overall fit for competitive team play. All players will receive feedback regardless of outcome.",
     "financialNote": "If you need financial assistance for Winter Basketball Registration, please contact us at info@hilhiyouthbbx.com.",
     "price": 350,
     "serviceFee": 6.25,
@@ -121,7 +121,7 @@
       {
         "id": "yc-coach-1",
         "name": "Jorge Diaz",
-        "title": "Head Coach — 8th Grade A",
+        "title": "Head Coach \u2014 8th Grade A",
         "imageUrl": "",
         "email": "",
         "bio": "Coach Jorge brings intensity and discipline to the Hilhi 8th Grade A program. With a focus on developing fundamental skills and competitive team chemistry, he prepares players for high school basketball and beyond. Jorge emphasizes leadership both on and off the court, challenging each athlete to reach their full potential.",
@@ -142,10 +142,10 @@
       {
         "id": "yc-coach-2",
         "name": "Christian Hidalgo",
-        "title": "Head Coach — 7th Grade A",
+        "title": "Head Coach \u2014 7th Grade A",
         "imageUrl": "",
         "email": "",
-        "bio": "Coach Christian leads the 7th Grade A squad with a passion for the game and a commitment to player growth. He focuses on building a strong IQ for basketball — teaching spacing, communication, and team defense. Christian creates a high-energy environment where players thrive through hard work and accountability.",
+        "bio": "Coach Christian leads the 7th Grade A squad with a passion for the game and a commitment to player growth. He focuses on building a strong IQ for basketball \u2014 teaching spacing, communication, and team defense. Christian creates a high-energy environment where players thrive through hard work and accountability.",
         "roster": [
           "Raymond Vo",
           "Adrian Avramuta",
@@ -163,10 +163,10 @@
       {
         "id": "yc-coach-3",
         "name": "Andrew Castillo",
-        "title": "Head Coach — 6th Grade",
+        "title": "Head Coach \u2014 6th Grade",
         "imageUrl": "",
         "email": "",
-        "bio": "Coach Andrew brings patience and positivity to the 6th Grade program. He focuses on building the foundational skills — ball handling, footwork, and team concepts — that every young player needs to grow. Andrew creates a fun, competitive environment that keeps players engaged and hungry to improve every session.",
+        "bio": "Coach Andrew brings patience and positivity to the 6th Grade program. He focuses on building the foundational skills \u2014 ball handling, footwork, and team concepts \u2014 that every young player needs to grow. Andrew creates a fun, competitive environment that keeps players engaged and hungry to improve every session.",
         "roster": [
           "Benaiah Tiah",
           "Aazawn Khan",
@@ -183,7 +183,7 @@
       {
         "id": "yc-coach-4",
         "name": "Jordan Alexander",
-        "title": "Head Coach — 7th Grade B",
+        "title": "Head Coach \u2014 7th Grade B",
         "imageUrl": "",
         "email": "",
         "bio": "Coach Jordan connects with players through energy and enthusiasm. His 7th Grade B team is built on hustle, trust, and executing together as a unit. Jordan emphasizes that every player on the roster has a role and that winning is a team effort.",
@@ -201,7 +201,7 @@
       {
         "id": "yc-coach-5",
         "name": "Dylan Kem",
-        "title": "Head Coach — 3rd / 4th / 5th Grade",
+        "title": "Head Coach \u2014 3rd / 4th / 5th Grade",
         "imageUrl": "",
         "email": "",
         "bio": "Coach Dylan works with Hilhi's youngest competitive players and focuses on building a genuine love for the game. He introduces teamwork, sportsmanship, and the fundamentals in an encouraging, age-appropriate setting.",
@@ -260,17 +260,17 @@
     ],
     "featuredCoach": {
       "name": "Samedy Kem",
-      "title": "Boys Varsity Head Coach — Hillsboro High School",
+      "title": "Boys Varsity Head Coach \u2014 Hillsboro High School",
       "photo": "/uploads/coach-kem.jpg",
       "bioParas": [
-        "With over three decades of basketball coaching and player development experience, Coach Kem has dedicated his career to teaching the game the right way — through fundamentals, teamwork, and discipline.",
-        "Currently in his fifth year as the Head Boys Varsity Basketball Coach at Hillsboro High School, Coach Kem has built a program centered on hard work, accountability, and community. Under his leadership, the Hillsboro Youth Basketball Program has experienced tremendous growth — doubling in size since his first year.",
+        "With over three decades of basketball coaching and player development experience, Coach Kem has dedicated his career to teaching the game the right way \u2014 through fundamentals, teamwork, and discipline.",
+        "Currently in his fifth year as the Head Boys Varsity Basketball Coach at Hillsboro High School, Coach Kem has built a program centered on hard work, accountability, and community. Under his leadership, the Hillsboro Youth Basketball Program has experienced tremendous growth \u2014 doubling in size since his first year.",
         "A proud Aloha High School alumnus, Class of 1989, Coach Kem was a member of the only basketball team in Aloha High School history to be inducted into the Aloha High School Hall of Fame.",
         "Before taking over the boys program, Coach Kem spent six years with Hillsboro High School Girls Basketball, serving as both Assistant Varsity Coach and Head Junior Varsity Coach.",
-        "From 2014 to 2016, he also led Hillsboro's Girls Youth Program for grades 3–8, coaching teams that emphasized fundamentals, sportsmanship, and teamwork — culminating in a 1st Place finish at the Seaside Youth Tournament.",
+        "From 2014 to 2016, he also led Hillsboro's Girls Youth Program for grades 3\u20138, coaching teams that emphasized fundamentals, sportsmanship, and teamwork \u2014 culminating in a 1st Place finish at the Seaside Youth Tournament.",
         "Earlier in his career, from 2011 to 2014, Coach Kem served as the Freshman Boys Head Coach and Assistant Varsity Coach at Aloha High School.",
         "In addition to his basketball career, Coach Kem is a State of Oregon Certified General Contractor with over 30 years of experience in construction and architectural design.",
-        "Today, Coach Kem continues to lead with passion and purpose — developing student-athletes who compete with integrity, play for each other, and carry the values of teamwork, respect, and perseverance both on and off the court."
+        "Today, Coach Kem continues to lead with passion and purpose \u2014 developing student-athletes who compete with integrity, play for each other, and carry the values of teamwork, respect, and perseverance both on and off the court."
       ],
       "stats": [
         {
@@ -300,84 +300,84 @@
     "products": [
       {
         "id": "wh-rb-hood",
-        "name": "White Head – Royal Blue Hoodie",
+        "name": "White Head \u2013 Royal Blue Hoodie",
         "price": 30,
         "cat": "hoodie",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_9feb392cb05a400696ecda0f4aea25db~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "wh-rb-ls",
-        "name": "White Head – Royal Blue Long Sleeve",
+        "name": "White Head \u2013 Royal Blue Long Sleeve",
         "price": 25,
         "cat": "long-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_e8b6b5b5bf534b0ca373b6f6547ac58a~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "wh-rb-ss",
-        "name": "White Head – Royal Blue Short Sleeve",
+        "name": "White Head \u2013 Royal Blue Short Sleeve",
         "price": 20,
         "cat": "short-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_916d4a4fb23040ee8e5c4680ab7df6dd~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "bh-w-hood",
-        "name": "Blue Head – White Hoodie",
+        "name": "Blue Head \u2013 White Hoodie",
         "price": 30,
         "cat": "hoodie",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_4072be1145a14bb9ace04af6b5fca89b~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "bh-w-ls",
-        "name": "Blue Head – White Long Sleeve",
+        "name": "Blue Head \u2013 White Long Sleeve",
         "price": 25,
         "cat": "long-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_e5b218f93a604fc58643bba5758c8175~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "bh-w-ss",
-        "name": "Blue Head – White Short Sleeve",
+        "name": "Blue Head \u2013 White Short Sleeve",
         "price": 20,
         "cat": "short-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_9854d3c6934c401c8277c7ab2dc490f4~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "24-r-hood",
-        "name": "2024 Hilhi – Red Hoodie",
+        "name": "2024 Hilhi \u2013 Red Hoodie",
         "price": 30,
         "cat": "hoodie",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_2d9df852f82541ef9ccbf46ede7afc3f~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "24-r-ls",
-        "name": "2024 Hilhi – Red Long Sleeve",
+        "name": "2024 Hilhi \u2013 Red Long Sleeve",
         "price": 25,
         "cat": "long-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_7ddab8fd6a90494ca1476e417816dac4~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "24-r-ss",
-        "name": "2024 Hilhi – Red Short Sleeve",
+        "name": "2024 Hilhi \u2013 Red Short Sleeve",
         "price": 20,
         "cat": "short-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_b0df413e121e4e0e9261b65f34094289~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "ws-rb-hood",
-        "name": "White Splash – Royal Blue Hoodie",
+        "name": "White Splash \u2013 Royal Blue Hoodie",
         "price": 30,
         "cat": "hoodie",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_705936ec0edb4b7f95904f28ac6d1b0f~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "ws-rb-ls",
-        "name": "White Splash – Royal Blue Long Sleeve",
+        "name": "White Splash \u2013 Royal Blue Long Sleeve",
         "price": 25,
         "cat": "long-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_253c69adc5a64186be78611929842f21~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"
       },
       {
         "id": "ws-rb-ss",
-        "name": "White Splash – Royal Blue Short Sleeve",
+        "name": "White Splash \u2013 Royal Blue Short Sleeve",
         "price": 20,
         "cat": "short-sleeve",
         "imageUrl": "https://static.wixstatic.com/media/458ec6_445d64bd353541859b96ec30777f09a3~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png"

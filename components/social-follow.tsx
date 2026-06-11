@@ -11,7 +11,8 @@ interface SocialContent {
 
 export function SocialFollow({ content }: { content?: SocialContent }) {
   const c = content ?? {};
-  const instagramUrl = c.instagram || "https://www.instagram.com/hilhiyouthbbx";
+  const instagramUrl = c.instagram || "https://www.instagram.com/hilhispartansmbb";
+  const instagramHandle = "@" + instagramUrl.replace(/\/$/, "").split("/").pop();
   const youtubeUrl   = c.youtube   || "https://www.youtube.com/@hilhiyouthbbx";
 
   return (
@@ -50,7 +51,7 @@ export function SocialFollow({ content }: { content?: SocialContent }) {
             <div className="text-5xl">📸</div>
             <div>
               <div className="font-black text-white text-xl mb-1">Instagram</div>
-              <div className="text-gray-500 text-sm">@hilhiyouthbbx</div>
+              <div className="text-gray-500 text-sm">{instagramHandle}</div>
             </div>
             <div className="mt-auto inline-flex items-center gap-2 text-pink-400 font-bold text-sm group-hover:text-pink-300 transition-colors">
               Follow Us →

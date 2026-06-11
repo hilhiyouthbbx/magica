@@ -43,39 +43,80 @@ type Tab = "contacts" | "tournaments" | "pages";
 // Sub-component: image field with upload
 // ─────────────────────────────────────────────────────────────────────────────
 function ImageField({ label, value, onChange, adminKey }: { label:string; value:string; onChange:(v:string)=>void; adminKey:string; }) {
-  const ref     = useRef<HTMLInputElement>(null);
-  const [busy,  setBusy]  = useState(false);
-  const [error, setError] = useState("");
+  const ref        = useRef<HTMLInputElement>(null);
+  const [busy,     setBusy]     = useState(false);
+  const [error,    setError]    = useState("");
+  const [success,  setSuccess]  = useState(false);
+  const [dragging, setDragging] = useState(false);
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return;
-    setBusy(true); setError("");
+  async function doUpload(file: File) {
+    if (!file) return;
+    setBusy(true); setError(""); setSuccess(false);
     try {
       const fd = new FormData(); fd.append("file", file);
-      const res = await fetch(`/api/upload?key=${adminKey}`, { method:"POST", body:fd });
+      const res  = await fetch(`/api/upload?key=${adminKey}`, { method:"POST", body:fd });
       const data = await res.json();
-      if (data.url) onChange(data.url); else setError(data.error || "Upload failed.");
-    } catch { setError("Upload failed."); }
+      if (data.url) { onChange(data.url); setSuccess(true); setTimeout(() => setSuccess(false), 3000); }
+      else setError(data.error || "Upload failed. On live site, add BLOB_READ_WRITE_TOKEN in Vercel → Storage.");
+    } catch { setError("Upload failed. Check your connection and try again."); }
     setBusy(false);
+  }
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (file) doUpload(file);
+    e.target.value = "";          // allow re-selecting same file
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) doUpload(file);
   }
 
   return (
     <div>
       <label className="block text-gray-400 text-xs font-semibold mb-1">{label}</label>
+
+      {/* URL input + upload button row */}
       <div className="flex gap-2">
-        <input value={value} onChange={e => onChange(e.target.value)} placeholder="https://... or upload →"
+        <input value={value} onChange={e => onChange(e.target.value)}
+          placeholder="Paste image URL  —or—  drag & drop / click Upload"
           className="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors" />
         <button type="button" onClick={() => ref.current?.click()} disabled={busy}
-          className="px-3 py-2.5 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap">
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload
+          className="px-3 py-2.5 bg-blue-600/80 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap shadow">
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+          {busy ? "Uploading…" : "Upload Photo"}
         </button>
       </div>
-      {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+
+      {/* Drag-and-drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => ref.current?.click()}
+        className={`mt-2 border-2 border-dashed rounded-xl px-4 py-3 text-center text-xs cursor-pointer transition-all select-none
+          ${dragging ? "border-blue-500 bg-blue-500/10 text-blue-300" : "border-white/15 text-gray-600 hover:border-white/30 hover:text-gray-400"}`}
+      >
+        {busy ? "Uploading, please wait…" : "Drag & drop an image here, or click to browse"}
+      </div>
+
+      {/* Status messages */}
+      {error   && <p className="text-red-400 text-xs mt-1.5 leading-snug">⚠ {error}</p>}
+      {success && <p className="text-green-400 text-xs mt-1.5">✓ Photo uploaded successfully — click Save below to apply.</p>}
+
+      {/* Preview */}
       {value && (
-        <div className="mt-2 rounded-lg overflow-hidden h-24 bg-white/5 border border-white/10">
-          <img src={value} alt="preview" className="w-full h-full object-cover" onError={e => (e.currentTarget.style.display = "none")} />
+        <div className="mt-2 rounded-xl overflow-hidden bg-white/5 border border-white/10 relative group" style={{height:"110px"}}>
+          <img src={value} alt="preview" className="w-full h-full object-cover"
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+          <button type="button" onClick={() => onChange("")}
+            className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white/60 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
+
       <input ref={ref} type="file" accept="image/*" className="hidden" onChange={handleFile} />
     </div>
   );
@@ -326,6 +367,20 @@ function PagesTab({ adminKey }: { adminKey: string }) {
   return (
     <div className="space-y-3">
       <p className="text-gray-500 text-sm">Edit content across every page of your website. All changes go live immediately after saving.</p>
+
+      {/* ── Upload setup notice ── */}
+      <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 text-sm space-y-1">
+        <p className="text-blue-300 font-bold text-xs uppercase tracking-wider mb-1">📸 Photo Upload Setup</p>
+        <p className="text-gray-400 text-xs leading-relaxed">
+          To upload photos from this admin page on the live site, add a <span className="text-white font-semibold">Vercel Blob</span> store:
+        </p>
+        <ol className="text-gray-400 text-xs space-y-0.5 list-decimal list-inside leading-relaxed">
+          <li>Go to your <span className="text-white">Vercel dashboard → Storage → Create Store → Blob</span></li>
+          <li>Connect it to this project — Vercel will auto-add <span className="font-mono text-blue-300">BLOB_READ_WRITE_TOKEN</span></li>
+          <li>Redeploy once — uploads will then work on the live site</li>
+        </ol>
+        <p className="text-gray-600 text-xs mt-1">Until then, paste any public image URL directly into the image field.</p>
+      </div>
 
       {/* ── Tryout Page ──────────────────────────────────────────────────── */}
       <Section id="tryout" title="🏀 Tryout Page" badge={t.enabled ? "Live" : "Hidden"}>

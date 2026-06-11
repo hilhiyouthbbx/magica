@@ -244,8 +244,16 @@ export function campAdminNotificationHtml(opts: {
 <body style="margin:0;padding:20px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto">
 
+  <!-- Top Banner -->
+  <tr><td style="background:linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24);padding:14px 24px;text-align:center;border-radius:12px 12px 0 0">
+    <div style="font-size:13px;font-weight:900;color:#1c1917;letter-spacing:2px;text-transform:uppercase;line-height:1.6">
+      🏀 NEW CAMPER REGISTRATION 🏀<br/>
+      <span style="font-size:14px;letter-spacing:1px;color:#7c2d12">CONGRATULATIONS — WE ARE EXCITED TO SEE YOU AT CAMP!</span>
+    </div>
+  </td></tr>
+
   <!-- Header -->
-  <tr><td style="background:linear-gradient(135deg,#0f172a,#1d4ed8);border-radius:12px 12px 0 0;padding:24px 28px">
+  <tr><td style="background:linear-gradient(135deg,#0f172a,#1d4ed8);padding:24px 28px">
     <table cellpadding="0" cellspacing="0">
       <tr>
         <td style="padding-right:14px;vertical-align:middle">

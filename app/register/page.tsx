@@ -16,6 +16,7 @@ import {
   FileText, CreditCard, Plus, Trash2, Calendar, MapPin, Clock, Shirt,
   AlertCircle, Lock, Loader2, CheckCircle, ArrowLeft,
 } from "lucide-react";
+import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
 // ─── Square config ────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
@@ -152,6 +153,7 @@ export default function RegisterPage() {
   const [retryCount,   setRetryCount]   = useState(0);
   const [paid,         setPaid]         = useState(false);
   const [paymentId,    setPaymentId]    = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
 
   // ── Init Square card when Step 5 is active ────────────────────────────────
   useEffect(() => {
@@ -247,17 +249,18 @@ export default function RegisterPage() {
         setPaying(false);
         return;
       }
-      const total = CAMP_TOTAL * quantity;
+      const chargeTotal = appliedVoucher?.finalTotal ?? (CAMP_TOTAL * quantity);
       const res = await fetch("/api/camp-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceId:   result.token,
-          total,
+          sourceId:    result.token,
+          total:       chargeTotal,
           quantity,
           campers,
           parentInfo,
           medical,
+          voucherCode: appliedVoucher?.code ?? null,
         }),
       });
       const data = await res.json();
@@ -289,7 +292,7 @@ export default function RegisterPage() {
               <CheckCircle className="w-10 h-10 text-green-400" />
             </div>
             <h2 className="text-3xl font-black text-white mb-3">Registration Complete!</h2>
-            <p className="text-gray-400 mb-2">Your payment of <strong className="text-white">${total.toFixed(2)}</strong> was successful.</p>
+            <p className="text-gray-400 mb-2">Your payment of <strong className="text-white">${(appliedVoucher?.finalTotal ?? total).toFixed(2)}</strong> was successful.</p>
             <p className="text-gray-400 mb-6">A confirmation has been sent to <strong className="text-blue-400">{parentInfo.email}</strong>.</p>
             {paymentId && <p className="text-gray-600 text-xs mb-4">Payment ref: {paymentId}</p>}
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 text-left space-y-1.5">
@@ -669,6 +672,14 @@ export default function RegisterPage() {
                       </div>
                     </div>
 
+                    {/* ── Voucher / Promo Code ── */}
+                    <VoucherInput
+                      event="camp"
+                      subtotal={total}
+                      onApply={setAppliedVoucher}
+                      applied={appliedVoucher}
+                    />
+
                     {/* ── Square Card Form ── */}
                     <div className="mb-5">
                       <div className="flex items-center gap-2 mb-3">
@@ -713,7 +724,7 @@ export default function RegisterPage() {
                       {paying ? (
                         <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</>
                       ) : (
-                        <><Lock className="w-5 h-5" /> Pay ${total.toFixed(2)} Securely</>
+                        <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? total).toFixed(2)} Securely</>
                       )}
                     </button>
                     <p className="text-center text-xs text-gray-500 mt-3 flex items-center justify-center gap-1.5">

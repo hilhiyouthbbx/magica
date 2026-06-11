@@ -1,7 +1,19 @@
 "use client";
 import { motion } from "framer-motion";
 
-export function SocialFollow() {
+interface SocialContent {
+  instagram?: string;
+  facebook?:  string;
+  youtube?:   string;
+  tiktok?:    string;
+  twitter?:   string;
+}
+
+export function SocialFollow({ content }: { content?: SocialContent }) {
+  const c = content ?? {};
+  const instagramUrl = c.instagram || "https://www.instagram.com/hilhiyouthbbx";
+  const youtubeUrl   = c.youtube   || "https://www.youtube.com/@hilhiyouthbbx";
+
   return (
     <section className="py-20 bg-[#060B14]">
       <div className="max-w-7xl mx-auto px-6">
@@ -13,7 +25,7 @@ export function SocialFollow() {
             </h2>
           </div>
           <a
-            href="https://www.instagram.com/hilhiyouthbbx"
+            href={instagramUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-2 text-sm font-bold text-orange-400 hover:text-orange-300 transition-colors border-b border-orange-500/40 pb-0.5"
@@ -26,7 +38,7 @@ export function SocialFollow() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {/* Instagram */}
           <motion.a
-            href="https://www.instagram.com/hilhiyouthbbx"
+            href={instagramUrl}
             target="_blank"
             rel="noopener noreferrer"
             initial={{ opacity: 0, y: 20 }}
@@ -66,9 +78,9 @@ export function SocialFollow() {
             </a>
           </motion.div>
 
-          {/* YouTube / Media */}
+          {/* YouTube */}
           <motion.a
-            href="https://www.youtube.com/@hilhiyouthbbx"
+            href={youtubeUrl}
             target="_blank"
             rel="noopener noreferrer"
             initial={{ opacity: 0, y: 20 }}

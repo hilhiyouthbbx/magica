@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
+import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -22,13 +23,25 @@ const ERROR_MESSAGES: Record<string, string> = {
 export async function POST(req: NextRequest) {
   try {
     const {
-      sourceId, total, quantity,
+      sourceId, total: clientTotal, quantity,
       tournamentId, tournamentName,
       orgName, coachName, coachEmail, coachPhone,
       division, players, notes,
+      voucherCode,
     } = await req.json();
 
-    if (!sourceId || typeof total !== "number" || !coachEmail || !orgName) {
+    // ── Server-side voucher validation ──────────────────────────────────────
+    let total: number = typeof clientTotal === "number" ? clientTotal : 0;
+    let voucherApplied = false;
+    if (voucherCode && typeof clientTotal === "number") {
+      const check = await validateVoucher(voucherCode, "tournament", clientTotal);
+      if (check.valid && check.voucher) {
+        total = check.finalTotal!;
+        voucherApplied = true;
+      }
+    }
+
+    if (!sourceId || typeof clientTotal !== "number" || !coachEmail || !orgName) {
       return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 
@@ -59,6 +72,11 @@ export async function POST(req: NextRequest) {
     }
 
     const paymentId = sqData.payment?.id as string | undefined;
+
+    // ── Redeem voucher ───────────────────────────────────────────────────────
+    if (voucherCode && voucherApplied) {
+      try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
+    }
 
     // ── Save registration to tournament-register API ─────────────────────────
     try {

@@ -27,7 +27,7 @@ export default async function Home() {
       <ActionStrip />
       <Programs />
       <MerchPreview />
-      <SocialFollow />
+      <SocialFollow content={content.contact} />
       <Quote />
       <Contact        content={content.contact} />
       <Footer />

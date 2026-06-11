@@ -10,6 +10,7 @@ import {
   AlertCircle, Lock,
 } from "lucide-react";
 import type { SiteContent } from "@/lib/content";
+import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
 type TryoutData  = SiteContent["tryout"];
 type ContactData = SiteContent["contact"];
@@ -80,6 +81,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [paymentId,   setPaymentId]  = useState("");
   const [sqReady,     setSqReady]    = useState(false);
   const [retryCount,  setRetryCount] = useState(0);
+  const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
   const sqCardRef = useRef<any>(null);
   const sqRef     = useRef<any>(null);
 
@@ -147,11 +149,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceId:   result.token,
-          total:      total * qty,
-          quantity:   qty,
+          sourceId:    result.token,
+          total:       appliedVoucher?.finalTotal ?? (total * qty),
+          quantity:    qty,
           parentName, email, phone,
           playerName, grade, session,
+          voucherCode: appliedVoucher?.code ?? null,
         }),
       });
       const data = await res.json();
@@ -404,6 +407,14 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     </div>
                   </div>
 
+                  {/* Voucher / Promo Code */}
+                  <VoucherInput
+                    event="tryout"
+                    subtotal={total * qty}
+                    onApply={setAppliedVoucher}
+                    applied={appliedVoucher}
+                  />
+
                   {/* Square card */}
                   <div>
                     <label className="block text-gray-300 text-sm font-semibold mb-2">Card Details</label>
@@ -424,7 +435,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
 
                   <button type="submit" disabled={loading || !sqReady}
                     className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
-                    {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</> : <><Lock className="w-5 h-5" /> Pay ${(total * qty).toFixed(2)}</>}
+                    {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</> : <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</>}
                   </button>
 
                   <button type="button" onClick={() => { setStep("info"); setPayError(""); }}

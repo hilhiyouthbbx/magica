@@ -9,6 +9,9 @@ interface ContactContent {
   address?:   string;
   facebook?:  string;
   instagram?: string;
+  youtube?:   string;
+  tiktok?:    string;
+  twitter?:   string;
 }
 
 const DEFAULTS: ContactContent = {
@@ -19,11 +22,11 @@ const DEFAULTS: ContactContent = {
   instagram: "https://www.instagram.com/hilhiyouthbbx",
 };
 
-const BASE_SOCIALS = [
-  { name: "YouTube", href: "https://www.youtube.com/@hilhiyouthbbx",  icon: "▶️", color: "hover:border-red-500/50 hover:bg-red-500/10" },
-  { name: "TikTok",  href: "https://www.tiktok.com/@hilhiyouthbbx",   icon: "🎵", color: "hover:border-cyan-500/50 hover:bg-cyan-500/10" },
-  { name: "X (Twitter)", href: "https://x.com/hilhiyouthbbx",         icon: "𝕏", color: "hover:border-gray-400/50 hover:bg-gray-500/10" },
-];
+const SOCIAL_DEFAULTS = {
+  youtube: "https://www.youtube.com/@hilhiyouthbbx",
+  tiktok:  "https://www.tiktok.com/@hilhiyouthbbx",
+  twitter: "https://x.com/hilhiyouthbbx",
+};
 
 export function Contact({ content }: { content?: ContactContent }) {
   const [email, setEmail] = useState("");
@@ -31,12 +34,14 @@ export function Contact({ content }: { content?: ContactContent }) {
 
   const c = { ...DEFAULTS, ...content };
 
-  // Build dynamic socials (Instagram + Facebook from CMS, rest hardcoded)
+  // Build dynamic socials — all from CMS with fallback defaults
   const dynamicSocials = [
-    c.instagram ? { name: "Instagram", href: c.instagram, icon: "📸", color: "hover:border-pink-500/50 hover:bg-pink-500/10" } : null,
-    c.facebook  ? { name: "Facebook",  href: c.facebook,  icon: "👥", color: "hover:border-blue-500/50 hover:bg-blue-500/10"  } : null,
-    ...BASE_SOCIALS,
-  ].filter(Boolean) as typeof BASE_SOCIALS;
+    { name: "Instagram",  href: c.instagram || DEFAULTS.instagram!, icon: "📸", color: "hover:border-pink-500/50 hover:bg-pink-500/10" },
+    { name: "Facebook",   href: c.facebook  || DEFAULTS.facebook!,  icon: "👥", color: "hover:border-blue-500/50 hover:bg-blue-500/10"  },
+    { name: "YouTube",    href: c.youtube   || SOCIAL_DEFAULTS.youtube,  icon: "▶️", color: "hover:border-red-500/50 hover:bg-red-500/10" },
+    { name: "TikTok",     href: c.tiktok    || SOCIAL_DEFAULTS.tiktok,   icon: "🎵", color: "hover:border-cyan-500/50 hover:bg-cyan-500/10" },
+    { name: "X (Twitter)",href: c.twitter   || SOCIAL_DEFAULTS.twitter,  icon: "𝕏", color: "hover:border-gray-400/50 hover:bg-gray-500/10" },
+  ];
 
   // Address lines
   const addressLines = (c.address || "").split("\n").filter(Boolean);

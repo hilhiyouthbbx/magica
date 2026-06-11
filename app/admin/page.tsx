@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy } from "lucide-react";
+import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash } from "lucide-react";
 
 import type { TournamentConfig } from "@/lib/tournament-client";
 import { TOURNAMENT_DEFAULTS } from "@/lib/tournament-client";
@@ -37,7 +37,7 @@ interface Contact {
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 
-type Tab = "contacts" | "tournaments" | "pages";
+type Tab = "contacts" | "tournaments" | "pages" | "vouchers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-component: image field with upload
@@ -254,6 +254,283 @@ function TournamentForm({ initial, onSave, onCancel, adminKey }: {
 // Pages CMS section
 // ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// VouchersTab — Create and manage discount promo codes
+// ─────────────────────────────────────────────────────────────────────────────
+type VoucherEvent = "camp" | "tournament" | "tryout";
+interface Voucher {
+  id: string; code: string; description: string;
+  type: "percent" | "fixed"; amount: number;
+  events: VoucherEvent[]; maxUses: number | null; usedCount: number;
+  expiresAt: string | null; minOrderAmount: number;
+  enabled: boolean; createdAt: string;
+}
+const BLANK_VOUCHER: Omit<Voucher,"id"|"usedCount"|"createdAt"> = {
+  code:"", description:"", type:"percent", amount:10,
+  events:["camp","tournament","tryout"], maxUses:null,
+  expiresAt:null, minOrderAmount:0, enabled:true,
+};
+
+function VouchersTab({ adminKey }: { adminKey: string }) {
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [loaded,   setLoaded]   = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [msg,      setMsg]      = useState("");
+  const [editing,  setEditing]  = useState<Partial<Voucher> | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/vouchers?key=${adminKey}`)
+      .then(r => r.json()).then(d => { setVouchers(d); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [adminKey]);
+
+  async function save() {
+    if (!editing) return;
+    if (!editing.code?.trim()) { setMsg("Code is required."); return; }
+    if (!editing.amount || editing.amount <= 0) { setMsg("Amount must be > 0."); return; }
+    if (!editing.events?.length) { setMsg("Select at least one event."); return; }
+    setSaving(true); setMsg("");
+    const res = await fetch(`/api/vouchers?key=${adminKey}`, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(editing)
+    });
+    const v = await res.json();
+    setVouchers(prev => editing.id ? prev.map(x => x.id===v.id ? v : x) : [...prev, v]);
+    setEditing(null); setSaving(false); setMsg("Saved!");
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this voucher?")) return;
+    await fetch(`/api/vouchers?key=${adminKey}&id=${id}`, { method:"DELETE" });
+    setVouchers(prev => prev.filter(v => v.id !== id));
+  }
+
+  async function toggle(v: Voucher) {
+    const updated = { ...v, enabled: !v.enabled };
+    await fetch(`/api/vouchers?key=${adminKey}`, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(updated)
+    });
+    setVouchers(prev => prev.map(x => x.id===v.id ? updated : x));
+  }
+
+  function voucherStatus(v: Voucher) {
+    if (!v.enabled) return { label:"Disabled", cls:"bg-gray-500/20 text-gray-400 border-gray-500/30" };
+    if (v.expiresAt && new Date(v.expiresAt) < new Date()) return { label:"Expired", cls:"bg-red-500/20 text-red-400 border-red-500/30" };
+    if (v.maxUses !== null && v.usedCount >= v.maxUses) return { label:"Used Up", cls:"bg-yellow-500/20 text-yellow-400 border-yellow-500/30" };
+    return { label:"Active", cls:"bg-green-500/20 text-green-400 border-green-500/30" };
+  }
+
+  if (!loaded) return <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Loading vouchers…</div>;
+
+  return (
+    <div className="space-y-5 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-white font-black text-xl">Discount Vouchers</h2>
+          <p className="text-gray-500 text-sm mt-0.5">Create promo codes for camp, tournament, and tryout registrations.</p>
+        </div>
+        <button onClick={() => setEditing({ ...BLANK_VOUCHER })}
+          className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-sm font-bold transition-colors">
+          <Plus className="w-4 h-4" /> New Voucher
+        </button>
+      </div>
+      {msg && <p className="text-green-400 text-sm font-semibold">{msg}</p>}
+
+      {/* ── Edit / Create form ── */}
+      {editing !== null && (
+        <div className="glass rounded-2xl border border-orange-500/30 bg-orange-500/5 p-6 space-y-4">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-white font-bold text-base">{editing.id ? "Edit Voucher" : "Create New Voucher"}</h3>
+            <button onClick={() => setEditing(null)}><X className="w-5 h-5 text-gray-400 hover:text-white" /></button>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {/* Code */}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">Promo Code *</label>
+              <input value={editing.code ?? ""} onChange={e => setEditing(p => ({...p, code:e.target.value.toUpperCase().replace(/\s/g,"")}))}
+                placeholder="e.g. CAMP2026" maxLength={20}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm font-mono uppercase tracking-widest focus:outline-none focus:border-orange-500 transition-colors" />
+              <p className="text-gray-600 text-xs mt-1">No spaces. Shown to customers (e.g. CAMP2026, TEAM10)</p>
+            </div>
+            {/* Description */}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">Label / Description *</label>
+              <input value={editing.description ?? ""} onChange={e => setEditing(p => ({...p, description:e.target.value}))}
+                placeholder="e.g. Early Bird Camp Discount"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            {/* Type */}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">Discount Type</label>
+              <div className="flex gap-2">
+                {(["percent","fixed"] as const).map(t => (
+                  <button key={t} type="button"
+                    onClick={() => setEditing(p => ({...p, type:t}))}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${editing.type===t ? "bg-orange-500 border-orange-400 text-white" : "bg-white/5 border-white/15 text-gray-400 hover:text-white"}`}>
+                    {t==="percent" ? <Percent className="w-3.5 h-3.5" /> : <DollarSign className="w-3.5 h-3.5" />}
+                    {t==="percent" ? "%" : "$"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Amount */}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">
+                Amount {editing.type==="percent" ? "(% off)" : "($ off)"}
+              </label>
+              <input type="number" min={1} max={editing.type==="percent" ? 100 : 9999} step={editing.type==="percent" ? 1 : 0.01}
+                value={editing.amount ?? ""} onChange={e => setEditing(p => ({...p, amount:parseFloat(e.target.value)||0}))}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+            </div>
+            {/* Min order */}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">Min. Order ($)</label>
+              <input type="number" min={0} step={1}
+                value={editing.minOrderAmount ?? 0} onChange={e => setEditing(p => ({...p, minOrderAmount:parseFloat(e.target.value)||0}))}
+                placeholder="0 = none"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            {/* Max uses */}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">Max Uses</label>
+              <input type="number" min={1}
+                value={editing.maxUses ?? ""} onChange={e => setEditing(p => ({...p, maxUses:e.target.value ? parseInt(e.target.value) : null}))}
+                placeholder="Leave blank = unlimited"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+            </div>
+            {/* Expires */}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">Expiry Date</label>
+              <input type="date"
+                value={editing.expiresAt ? editing.expiresAt.slice(0,10) : ""}
+                onChange={e => setEditing(p => ({...p, expiresAt:e.target.value ? new Date(e.target.value+"T23:59:59").toISOString() : null}))}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+            </div>
+            {/* Enabled */}
+            <div className="flex items-end">
+              <label className="flex items-center gap-3 cursor-pointer py-2.5">
+                <div onClick={() => setEditing(p => ({...p, enabled:!p?.enabled}))}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${editing.enabled ? "bg-orange-500" : "bg-gray-700"}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${editing.enabled ? "translate-x-5" : ""}`} />
+                </div>
+                <span className="text-gray-300 text-sm font-semibold">Voucher Active</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Applies to */}
+          <div>
+            <label className="block text-gray-400 text-xs font-semibold mb-2 uppercase tracking-wider">Applies To</label>
+            <div className="flex gap-3">
+              {(["camp","tournament","tryout"] as VoucherEvent[]).map(ev => {
+                const on = (editing.events ?? []).includes(ev);
+                return (
+                  <button key={ev} type="button"
+                    onClick={() => setEditing(p => {
+                      const evs = p?.events ?? [];
+                      return { ...p, events: on ? evs.filter(e => e!==ev) : [...evs, ev] };
+                    })}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold capitalize border transition-all ${on ? "bg-orange-500/20 border-orange-500/60 text-orange-300" : "bg-white/5 border-white/15 text-gray-500 hover:text-gray-300"}`}>
+                    {ev==="camp" ? "🏕️" : ev==="tournament" ? "🏆" : "📋"} {ev}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-gray-600 text-xs mt-1">Select which registration types this code is valid for.</p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-2 border-t border-white/10">
+            <button onClick={save} disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-colors">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? "Saving…" : "Save Voucher"}
+            </button>
+            <button onClick={() => setEditing(null)}
+              className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-gray-300 rounded-xl text-sm font-semibold transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Voucher list ── */}
+      {vouchers.length === 0 ? (
+        <div className="glass rounded-2xl border border-white/10 p-10 text-center">
+          <Tag className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-400 font-semibold">No vouchers yet</p>
+          <p className="text-gray-600 text-sm mt-1">Click "New Voucher" to create your first promo code.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {vouchers.map(v => {
+            const { label, cls } = voucherStatus(v);
+            return (
+              <div key={v.id} className="glass rounded-2xl border border-white/10 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap mb-1">
+                      <span className="font-mono font-black text-white text-lg tracking-widest">{v.code}</span>
+                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${cls}`}>{label}</span>
+                      <span className="text-xs text-orange-400 font-bold bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 rounded-full">
+                        {v.type==="percent" ? `${v.amount}% OFF` : `$${v.amount.toFixed(2)} OFF`}
+                      </span>
+                    </div>
+                    <p className="text-gray-300 text-sm mb-2">{v.description}</p>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500">
+                      <span className="flex items-center gap-1.5">
+                        <Hash className="w-3 h-3" />
+                        {v.usedCount} used{v.maxUses ? ` / ${v.maxUses} max` : " (unlimited)"}
+                      </span>
+                      {v.expiresAt && (
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" />
+                          Expires {new Date(v.expiresAt).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })}
+                        </span>
+                      )}
+                      {v.minOrderAmount > 0 && (
+                        <span>Min. order ${v.minOrderAmount.toFixed(2)}</span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        {v.events.map(e => e==="camp" ? "🏕️" : e==="tournament" ? "🏆" : "📋").join(" ")}
+                        {" "}{v.events.join(", ")}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Toggle */}
+                    <button onClick={() => toggle(v)} title={v.enabled ? "Disable" : "Enable"}
+                      className="p-2 glass border border-white/15 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 rounded-lg transition-all">
+                      {v.enabled ? <ToggleRight className="w-4 h-4 text-green-400" /> : <ToggleLeft className="w-4 h-4" />}
+                    </button>
+                    {/* Edit */}
+                    <button onClick={() => setEditing({...v})}
+                      className="p-2 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-lg transition-all">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    {/* Delete */}
+                    <button onClick={() => remove(v.id)}
+                      className="p-2 glass border border-white/15 hover:border-red-500/40 text-gray-400 hover:text-red-400 rounded-lg transition-all">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // PagesTab — Full CMS for all website pages
 // ─────────────────────────────────────────────────────────────────────────────
 function PagesTab({ adminKey }: { adminKey: string }) {
@@ -1223,6 +1500,7 @@ export default function AdminPage() {
           {([
             { id:"contacts",    icon:<Users   className="w-4 h-4"/>, label:"Contacts"    },
             { id:"tournaments", icon:<Trophy  className="w-4 h-4"/>, label:"Tournaments" },
+            { id:"vouchers",    icon:<Tag     className="w-4 h-4"/>, label:"Vouchers"    },
             { id:"pages",       icon:<FileText className="w-4 h-4"/>,label:"Pages"       },
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -1489,6 +1767,7 @@ export default function AdminPage() {
         )}
 
         {/* ── PAGES TAB ── */}
+        {tab === "vouchers" && <VouchersTab adminKey={adminKey} />}
         {tab === "pages" && <PagesTab adminKey={adminKey} />}
       </div>
     </main>

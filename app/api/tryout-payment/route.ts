@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveContact } from "@/lib/contacts";
+import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -9,10 +10,22 @@ const SQ_BASE =
 export async function POST(req: NextRequest) {
   try {
     const {
-      sourceId, total, quantity,
+      sourceId, total: clientTotal, quantity,
       parentName, email, phone,
       playerName, grade, session,
+      voucherCode,
     } = await req.json();
+
+    // ── Server-side voucher validation ──────────────────────────────────────
+    let total: number = typeof clientTotal === "number" ? clientTotal : 0;
+    let voucherApplied = false;
+    if (voucherCode && typeof clientTotal === "number") {
+      const check = await validateVoucher(voucherCode, "tryout", clientTotal);
+      if (check.valid && check.voucher) {
+        total = check.finalTotal!;
+        voucherApplied = true;
+      }
+    }
 
     if (!sourceId || !total || !parentName || !email) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
@@ -43,6 +56,11 @@ export async function POST(req: NextRequest) {
     }
 
     const paymentId = sqData.payment?.id || crypto.randomUUID();
+
+    // ── Redeem voucher ───────────────────────────────────────────────────────
+    if (voucherCode && voucherApplied) {
+      try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
+    }
 
     // Save to contacts
     await saveContact({

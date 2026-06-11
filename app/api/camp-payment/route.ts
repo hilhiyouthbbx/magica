@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
 import { campConfirmationHtml, campAdminNotificationHtml } from "@/lib/email";
+import { validateVoucher, redeemVoucher, calcDiscount } from "@/lib/vouchers";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -37,16 +38,32 @@ interface MedicalInfo {
 
 export async function POST(req: NextRequest) {
   try {
-    const { sourceId, total, quantity, campers, parentInfo, medical } = await req.json() as {
+    const { sourceId, total: clientTotal, quantity, campers, parentInfo, medical, voucherCode } = await req.json() as {
       sourceId: string;
       total: number;
       quantity: number;
       campers: Camper[];
       parentInfo: ParentInfo;
       medical: MedicalInfo;
+      voucherCode?: string | null;
     };
 
-    if (!sourceId || typeof total !== "number" || !parentInfo?.guardianName) {
+    // ── Server-side voucher validation ──────────────────────────────────────
+    const CAMP_BASE  = 150;
+    const CAMP_FEE   = Math.round(CAMP_BASE * 0.03 * 100) / 100;
+    const baseTotal  = (CAMP_BASE + CAMP_FEE) * quantity;
+    let total = baseTotal;
+    let voucherApplied = false;
+
+    if (voucherCode) {
+      const check = await validateVoucher(voucherCode, "camp", baseTotal);
+      if (check.valid && check.voucher) {
+        total = check.finalTotal!;
+        voucherApplied = true;
+      }
+    }
+
+    if (!sourceId || typeof clientTotal !== "number" || !parentInfo?.guardianName) {
       return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 
@@ -77,6 +94,11 @@ export async function POST(req: NextRequest) {
     }
 
     const paymentId = sqData.payment?.id as string | undefined;
+
+    // ── Redeem voucher ───────────────────────────────────────────────────────
+    if (voucherCode && voucherApplied) {
+      try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
+    }
 
     // ── Save contact ─────────────────────────────────────────────────────────
     try {

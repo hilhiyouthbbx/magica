@@ -8,6 +8,7 @@ import { Calendar, MapPin, ChevronDown, ChevronUp, Share2, Loader2, CheckCircle,
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { TournamentConfig } from "@/lib/tournament";
+import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
 // ─── Square config ────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
@@ -58,6 +59,7 @@ export default function TournamentDetailPage({ params }: Params) {
   const [paying,       setPaying]       = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [retryCount,   setRetryCount]   = useState(0);
+  const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
 
   useEffect(() => {
     fetch(`/api/tournament?id=${id}`)
@@ -154,7 +156,7 @@ export default function TournamentDetailPage({ params }: Params) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceId:       result.token,
-          total,
+          total:          appliedVoucher?.finalTotal ?? total,
           quantity:       qty,
           tournamentId:   t.id,
           tournamentName: t.name,
@@ -165,6 +167,7 @@ export default function TournamentDetailPage({ params }: Params) {
           division,
           players,
           notes: regNotes,
+          voucherCode:    appliedVoucher?.code ?? null,
         }),
       });
       const data = await res.json();
@@ -481,6 +484,14 @@ export default function TournamentDetailPage({ params }: Params) {
                             </div>
                           </div>
 
+                          {/* Voucher / Promo Code */}
+                          <VoucherInput
+                            event="tournament"
+                            subtotal={total}
+                            onApply={setAppliedVoucher}
+                            applied={appliedVoucher}
+                          />
+
                           {/* Card form */}
                           {squareError ? (
                             <div className="space-y-3">
@@ -516,7 +527,7 @@ export default function TournamentDetailPage({ params }: Params) {
                             className="w-full py-3.5 bg-gradient-to-r from-[#006aff] to-[#00aaff] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-all flex items-center justify-center gap-2">
                             {paying
                               ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
-                              : <><Lock className="w-4 h-4" /> Pay ${total.toFixed(2)} Securely</>
+                              : <><Lock className="w-4 h-4" /> Pay ${(appliedVoucher?.finalTotal ?? total).toFixed(2)} Securely</>
                             }
                           </button>
 

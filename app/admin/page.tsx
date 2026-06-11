@@ -1040,42 +1040,75 @@ export default function AdminPage() {
     }
   }
 
+    function esc(v: unknown) { return `"${String(v ?? "").replace(/"/g, '""')}"`; }
+
     function downloadCSV() {
-    const today = new Date().toISOString().slice(0,10);
-    let headers: string;
-    let rows: string[];
-    let filename: string;
+      const today = new Date().toISOString().slice(0,10);
+      let headers: string;
+      let rows: string[];
+      let filename: string;
 
-    if (sourceFilter === "registration") {
-      headers  = "Parent Name,Email,Phone,Camper Name,Grade,Gender,Shirt Size,Emergency Contact,Emergency Phone,Amount Paid,Order Number,Date";
-      rows     = filtered.map(c => [
-        c.name, c.email, c.phone,
-        c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
-        c.emergencyContact||"", c.emergencyPhone||"",
-        c.amountPaid||"", c.orderNumber||"", c.date,
-      ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
-      filename = `2026-youth-summer-camp-registrations-${today}.csv`;
-    } else if (sourceFilter === "tournament") {
-      headers  = "Name,Email,Phone,Tournament,Team Name,Division,Notes,Date";
-      rows     = filtered.map(c => [c.name,c.email,c.phone,c.tournamentName||"",c.teamName||"",c.division||"",c.notes||"",c.date].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
-      filename = tournFilter !== "all"
-        ? `${tournFilter.toLowerCase().replace(/\s+/g,"-")}-registrations-${today}.csv`
-        : `tournament-registrations-${today}.csv`;
-    } else if (sourceFilter === "merch-order") {
-      headers  = "Name,Email,Phone,Notes,Date";
-      rows     = filtered.map(c => [c.name,c.email,c.phone,c.notes||"",c.date].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
-      filename = `merch-orders-${today}.csv`;
-    } else {
-      headers  = "Name,Email,Phone,Source,Tournament,Team Name,Division,Notes,Date";
-      rows     = filtered.map(c => [c.name,c.email,c.phone,SOURCE_LABELS[c.source]||c.source,c.tournamentName||"",c.teamName||"",c.division||"",c.notes||"",c.date].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
-      filename = `hilhi-all-contacts-${today}.csv`;
+      if (isCampSource(sourceFilter) && sourceFilter !== "all") {
+        // ── Full Wix camp export — every field in its own column ──
+        headers = [
+          "Order Number","Order Date","Ticket Number","Ticket Type",
+          "Camper Name","Grade","Gender","Shirt Size",
+          "Parent Name","Email","Phone",
+          "Emergency Contact","Emergency Phone",
+          "Ticket Price","Total Amount","Tax","Wix Service Fee","Ticket Revenue",
+          "Payment Status","Checked In","Seat Info","Benefit","Coupon",
+          "Registered Date",
+        ].join(",");
+        rows = filtered.map(c => [
+          c.orderNumber||"", c.orderDate||"", c.ticketNum||"", c.ticketType||"",
+          c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
+          c.name, c.email, c.phone,
+          c.emergencyContact||"", c.emergencyPhone||"",
+          c.ticketPrice||"", c.amountPaid||"", c.tax||"", c.wixServiceFee||"", c.ticketRevenue||"",
+          c.paymentStatus||"", c.checkedIn||"", c.seatInfo||"", c.benefit||"", c.coupon||"",
+          c.date ? new Date(c.date).toLocaleDateString() : "",
+        ].map(esc).join(","));
+        filename = `2026-youth-summer-camp-${today}.csv`;
+
+      } else if (sourceFilter === "tournament") {
+        headers = "Name,Email,Phone,Tournament,Team Name,Division,Notes,Date";
+        rows    = filtered.map(c => [c.name,c.email,c.phone,c.tournamentName||"",c.teamName||"",c.division||"",c.notes||"",c.date].map(esc).join(","));
+        filename = tournFilter !== "all"
+          ? `${tournFilter.toLowerCase().replace(/\s+/g,"-")}-registrations-${today}.csv`
+          : `tournament-registrations-${today}.csv`;
+
+      } else if (sourceFilter === "merch-order") {
+        headers = "Name,Email,Phone,Notes,Date";
+        rows    = filtered.map(c => [c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
+        filename = `merch-orders-${today}.csv`;
+
+      } else {
+        // All sources — full columns
+        headers = [
+          "Source","Order Number","Order Date",
+          "Camper Name","Grade","Gender","Shirt Size",
+          "Parent Name","Email","Phone",
+          "Emergency Contact","Emergency Phone",
+          "Total Amount","Payment Status","Checked In",
+          "Tournament","Team","Division","Date",
+        ].join(",");
+        rows    = filtered.map(c => [
+          c.source, c.orderNumber||"", c.orderDate||"",
+          c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
+          c.name, c.email, c.phone,
+          c.emergencyContact||"", c.emergencyPhone||"",
+          c.amountPaid||"", c.paymentStatus||"", c.checkedIn||"",
+          c.tournamentName||"", c.teamName||"", c.division||"",
+          c.date ? new Date(c.date).toLocaleDateString() : "",
+        ].map(esc).join(","));
+        filename = `hilhi-all-contacts-${today}.csv`;
+      }
+
+      const csv = [headers, ...rows].join("\n");
+      const a   = document.createElement("a");
+      a.href     = URL.createObjectURL(new Blob(["\uFEFF"+csv], {type:"text/csv"}));
+      a.download = filename; a.click();
     }
-
-    const csv = [headers, ...rows].join("\n");
-    const a   = document.createElement("a");
-    a.href     = URL.createObjectURL(new Blob([csv], {type:"text/csv"}));
-    a.download = filename; a.click();
-  }
 
   // ── Login screen ─────────────────────────────────────────────────────────
   if (!authed) return (

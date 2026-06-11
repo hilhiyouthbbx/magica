@@ -1,0 +1,40 @@
+[
+  {
+    "enabled": true,
+    "name": "Hillsboro President Day Classic",
+    "tagline": "Youth Basketball Tournament",
+    "gender": "Boys & Girls",
+    "grades": "3rd–8th Grade",
+    "dates": "Feb 21–22, 2026",
+    "dayTime": "Saturday–Sunday · Times TBD",
+    "registrationDeadline": "February 7, 2026",
+    "venue": "Hillsboro High School",
+    "address": "3285 SE Rood Bridge Rd, Hillsboro, OR 97123",
+    "entryFee": 250,
+    "serviceFee": 6.25,
+    "divisions": [
+      "3rd/4th Grade Boys",
+      "3rd/4th Grade Girls",
+      "5th/6th Grade Boys",
+      "5th/6th Grade Girls",
+      "7th Grade Boys",
+      "7th Grade Girls",
+      "8th Grade Boys",
+      "8th Grade Girls"
+    ],
+    "format": "",
+    "gamesGuaranteed": "3",
+    "maxTeams": "16",
+    "imageUrl": "https://static.wixstatic.com/media/458ec6_e684622bf9c1444e835900f8dfcb2de8~mv2.jpg/v1/fill/w_844,h_476,fp_0.50_0.50,q_85,enc_auto/458ec6_e684622bf9c1444e835900f8dfcb2de8~mv2.jpg",
+    "isStateQualifier": true,
+    "stateQualifierText": "The Hillsboro Youth Basketball Events are Official State Qualifiers for the 2026 Oregon Middle School Basketball Championship to be held in Bend/Redmond and Sisters on March 6–8 (GIRLS) and March 13–15 (BOYS). Top finishing teams in each division will qualify for the State Championship to battle top school teams from towns throughout Oregon. www.statebasketballchampionship.com/oregon",
+    "description": "Join us for the Hillsboro President Day Classic — one of the premier youth basketball tournaments in the Portland metro area. Competitive divisions for boys and girls in grades 3–8 with a 3-game guarantee for every team.",
+    "accommodationsNote": "Please notify us of accommodations upon registration. If you need further accommodations AFTER the schedule is released, it will be $50 per accommodation to GUARANTEE your accommodation is met.",
+    "refundPolicy": "If registration is cancelled 14 days or MORE before the tournament start date, a FULL refund will be issued. If registration is cancelled between 8–13 days before the tournament start date, a 50% reimbursement will be issued. If registration is cancelled within 7 days of the tournament start date, NO refund will be issued.",
+    "rules": "OSAA rules apply. Each team must have a minimum of 8 players and a maximum of 12. Coaches must be present at all games. Players must bring proof of grade level.",
+    "notes": "",
+    "contactEmail": "info@hilhiyouthbbx.com",
+    "contactPhone": "971-563-0552",
+    "id": "1781086080104-init"
+  }
+]

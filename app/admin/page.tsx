@@ -1011,7 +1011,24 @@ export default function AdminPage() {
     merch:      contacts.filter(c=>c.source==="merch-order").length,
   };
 
-  function downloadCSV() {
+
+  async function importCSV(file: File) {
+    const text = await file.text();
+    const res = await fetch(`/api/admin/contacts?key=${adminKey}&action=import`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: text,
+    });
+    const data = await res.json();
+    if (data.imported !== undefined) {
+      alert(`Successfully imported ${data.imported} contacts!`);
+      fetch(`/api/admin/contacts?key=${adminKey}`).then(r=>r.json()).then(d => { setContacts(Array.isArray(d) ? d : (d.contacts ?? [])); setContactsLoaded(true); });
+    } else {
+      alert(data.error || "Import failed");
+    }
+  }
+
+    function downloadCSV() {
     const today = new Date().toISOString().slice(0,10);
     let headers: string;
     let rows: string[];
@@ -1148,6 +1165,13 @@ export default function AdminPage() {
                  sourceFilter === "merch-order"  ? "Export Merch CSV" :
                  "Export All CSV"}
               </button>
+              <>
+                <input type="file" accept=".csv" id="csv-import" className="hidden" onChange={e => { if (e.target.files?.[0]) { importCSV(e.target.files[0]); (e.target as HTMLInputElement).value=""; } }} />
+                <label htmlFor="csv-import" className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  Import CSV
+                </label>
+              </>
             </div>
 
             {/* Table */}

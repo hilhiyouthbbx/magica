@@ -15,6 +15,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const action = req.nextUrl.searchParams.get("action");
+
+  // Handle plain-text CSV import (from file upload button)
+  if (action === "import") {
+    const csv = await req.text();
+    const count = await importContactsCSV(csv);
+    return NextResponse.json({ imported: count });
+  }
+
+  // Handle JSON body actions
   const body = await req.json();
 
   if (body.action === "delete" && body.id) {

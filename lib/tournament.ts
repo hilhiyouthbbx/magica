@@ -8,16 +8,22 @@ import { TournamentConfig, TOURNAMENT_DEFAULTS } from "./tournament-client";
 const FILE   = path.join(process.cwd(), "data", "tournament.json");
 const KV_KEY = "hilhi_tournaments";
 
-const hasKV = () =>
-  !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+// ── Supports both @vercel/kv vars AND @upstash/redis (Upstash marketplace) vars ──
+const getRedisUrl   = () => process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL   || "";
+const getRedisToken = () => process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
+const hasKV         = () => !!(getRedisUrl() && getRedisToken());
 
+async function getRedis() {
+  const { Redis } = await import("@upstash/redis");
+  return new Redis({ url: getRedisUrl(), token: getRedisToken() });
+}
 async function kvGet<T>(key: string): Promise<T | null> {
-  const { kv } = await import("@vercel/kv");
-  return kv.get<T>(key);
+  const redis = await getRedis();
+  return redis.get<T>(key);
 }
 async function kvSet(key: string, value: unknown): Promise<void> {
-  const { kv } = await import("@vercel/kv");
-  await kv.set(key, value);
+  const redis = await getRedis();
+  await redis.set(key, value);
 }
 
 function makeId(): string {

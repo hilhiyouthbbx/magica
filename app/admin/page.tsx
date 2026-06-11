@@ -1302,6 +1302,9 @@ export default function AdminPage() {
   const [tournFilter,   setTournFilter]   = useState("all");
   const [contactsLoaded,setContactsLoaded]= useState(false);
   const [expandedContact, setExpandedContact] = useState<string|null>(null);
+  const [editingContact,  setEditingContact]  = useState<Contact|null>(null);
+  const [editPatch,       setEditPatch]       = useState<Partial<Contact>>({});
+  const [editSaving,      setEditSaving]      = useState(false);
 
   // Tournaments
   const [tournaments,   setTournaments]   = useState<TournamentConfig[]>([]);
@@ -1329,6 +1332,20 @@ export default function AdminPage() {
       fetch(`/api/tournament?key=${adminKey}`).then(r=>r.json()).then(d => { setTournaments(d); setTournLoaded(true); });
     }
   }, [authed, tab]);
+
+  async function saveContactEdit() {
+    if (!editingContact) return;
+    setEditSaving(true);
+    await fetch(`/api/admin/contacts?key=${adminKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", id: editingContact.id, patch: editPatch }),
+    });
+    setContacts(prev => prev.map(c => c.id === editingContact.id ? { ...c, ...editPatch } : c));
+    setEditSaving(false);
+    setEditingContact(null);
+    setEditPatch({});
+  }
 
   async function deleteContact(id: string) {
     await fetch(`/api/admin/contacts?key=${adminKey}`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ action:"delete", id }) });
@@ -1531,6 +1548,60 @@ export default function AdminPage() {
         </div>
 
         {/* ── CONTACTS TAB ── */}
+        {/* ── Edit Contact Modal ── */}
+        {editingContact && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingContact(null)}>
+            <div className="glass rounded-2xl border border-white/15 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-5 border-b border-white/10">
+                <h3 className="text-white font-black text-lg">Edit Registration</h3>
+                <button onClick={() => setEditingContact(null)} className="text-gray-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {([
+                  { label: "Parent / Guardian Name", key: "name" },
+                  { label: "Email", key: "email" },
+                  { label: "Phone", key: "phone" },
+                  { label: "Camper Name", key: "camperName" },
+                  { label: "Grade", key: "grade" },
+                  { label: "Gender", key: "gender" },
+                  { label: "Shirt Size", key: "shirtSize" },
+                  { label: "Emergency Contact", key: "emergencyContact" },
+                  { label: "Emergency Phone", key: "emergencyPhone" },
+                  { label: "Payment Status", key: "paymentStatus" },
+                  { label: "Amount Paid", key: "amountPaid" },
+                ] as { label: string; key: keyof Contact }[]).map(({ label, key }) => (
+                  <div key={key}>
+                    <label className="block text-gray-400 text-xs font-semibold mb-1">{label}</label>
+                    <input
+                      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                      value={(editPatch[key] ?? editingContact[key] ?? "") as string}
+                      onChange={e => setEditPatch(p => ({ ...p, [key]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+                <div className="sm:col-span-2">
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Notes</label>
+                  <textarea rows={3}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                    value={(editPatch.notes ?? editingContact.notes ?? "") as string}
+                    onChange={e => setEditPatch(p => ({ ...p, notes: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 p-5 border-t border-white/10">
+                <button onClick={saveContactEdit} disabled={editSaving}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                  {editSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Changes</>}
+                </button>
+                <button onClick={() => setEditingContact(null)}
+                  className="px-5 py-2.5 border border-white/20 text-gray-300 hover:text-white hover:border-white/40 font-semibold rounded-xl transition-all">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {tab === "contacts" && (
           <div className="space-y-6">
             {/* Stats */}
@@ -1628,9 +1699,14 @@ export default function AdminPage() {
                           <td className="px-3 py-3 text-gray-500 text-xs font-mono whitespace-nowrap">{c.orderNumber||"—"}</td>
                           <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{c.orderDate || new Date(c.date).toLocaleDateString()}</td>
                           <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => { setEditingContact(c); setEditPatch({}); }} className="text-gray-600 hover:text-blue-400 transition-colors" title="Edit">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors" title="Delete">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                         {expandedContact === c.id && (
@@ -1689,9 +1765,14 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-gray-400 text-xs">{c.division||"—"}</td>
                         <td className="px-4 py-3 text-gray-500 text-xs">{new Date(c.date).toLocaleDateString()}</td>
                         <td className="px-4 py-3">
-                          <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => { setEditingContact(c); setEditPatch({}); }} className="text-gray-600 hover:text-blue-400 transition-colors" title="Edit">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors" title="Delete">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

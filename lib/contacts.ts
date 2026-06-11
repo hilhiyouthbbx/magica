@@ -124,6 +124,16 @@ export async function saveContact(
   await persistContacts(contacts);
 }
 
+// ── Update a contact ───────────────────────────────────────────────────────
+export async function updateContact(id: string, patch: Partial<Omit<Contact, "id" | "date">>): Promise<boolean> {
+  const contacts = await getContacts();
+  const idx = contacts.findIndex(c => c.id === id);
+  if (idx === -1) return false;
+  contacts[idx] = { ...contacts[idx], ...patch };
+  await persistContacts(contacts);
+  return true;
+}
+
 // ── Delete a contact ───────────────────────────────────────────────────────
 export async function deleteContact(id: string): Promise<void> {
   const contacts = (await getContacts()).filter(c => c.id !== id);

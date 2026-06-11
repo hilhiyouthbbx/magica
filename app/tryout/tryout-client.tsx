@@ -161,6 +161,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
         body: JSON.stringify({
           sourceId,
           total:       chargeTotal,
+          basePrice:   t.price * qty,
           quantity:    qty,
           parentName, email, phone,
           playerName, grade, session,
@@ -355,7 +356,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <div className="text-white font-bold text-sm">{t.title.split(" ").slice(0,3).join(" ")} Reg.</div>
                       <div className="text-white font-black">${t.price.toFixed(2)}</div>
                     </div>
-                    {!isFree && !voucherFree(appliedVoucher) && (
+                    {!isFree && appliedVoucher === null && (
                     <div className="flex justify-between items-center">
                       <div className="text-gray-500 text-xs">Service fee (3%)</div>
                       <div className="text-gray-400 text-xs">${fee.toFixed(2)}</div>
@@ -409,7 +410,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <span>Base price × {qty}</span>
                       <span>${(t.price * qty).toFixed(2)}</span>
                     </div>
-                    {!isFree && !voucherFree(appliedVoucher) && (
+                    {!isFree && appliedVoucher === null && (
                     <div className="flex justify-between text-xs text-blue-300/70">
                       <span>Service fee (3%)</span>
                       <span>${(fee * qty).toFixed(2)}</span>
@@ -424,7 +425,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   {/* Voucher / Promo Code */}
                   <VoucherInput
                     event="tryout"
-                    subtotal={total * qty}
+                    subtotal={t.price * qty}
                     onApply={setAppliedVoucher}
                     applied={appliedVoucher}
                   />

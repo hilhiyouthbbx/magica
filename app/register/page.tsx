@@ -303,8 +303,8 @@ export default function RegisterPage() {
 
   const slide = { initial: { opacity: 0, x: 30 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -30 }, transition: { duration: 0.25 } };
   const total        = CAMP_TOTAL * quantity;
-  const isFree       = appliedVoucher !== null && (appliedVoucher.finalTotal ?? total) === 0;
-  const displayTotal = appliedVoucher?.finalTotal ?? total;
+  const isFree       = appliedVoucher !== null && (appliedVoucher.finalTotal ?? Infinity) === 0;
+  const displayTotal = appliedVoucher !== null ? (appliedVoucher.finalTotal ?? total) : total;
 
   // ── Registration Success ───────────────────────────────────────────────────
   if (paid) {
@@ -689,7 +689,7 @@ export default function RegisterPage() {
                         <span className="text-gray-300">Camp Registration × {quantity}</span>
                         <span className="text-white">${(CAMP_BASE * quantity).toFixed(2)}</span>
                       </div>
-                      {!(appliedVoucher !== null && (appliedVoucher.finalTotal === 0)) && (
+                      {appliedVoucher === null && (
                       <div className="flex justify-between text-sm mb-3">
                         <span className="text-gray-300">Service fee × {quantity}</span>
                         <span className="text-white">${(CAMP_FEE * quantity).toFixed(2)}</span>
@@ -704,7 +704,7 @@ export default function RegisterPage() {
                     {/* ── Voucher / Promo Code ── */}
                     <VoucherInput
                       event="camp"
-                      subtotal={total}
+                      subtotal={CAMP_BASE * quantity}
                       onApply={setAppliedVoucher}
                       applied={appliedVoucher}
                     />

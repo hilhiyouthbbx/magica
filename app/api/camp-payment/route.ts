@@ -11,14 +11,15 @@ const SQ_BASE =
 
 const ERROR_MESSAGES: Record<string, string> = {
   CARD_DECLINED:                "Your card was declined. Please try a different card.",
-  CARD_DECLINED_CALL_ISSUER:   "Your card was declined. Please contact your bank.",
+  CARD_DECLINED_CALL_ISSUER:   "Your card was declined. Please contact your bank or try a different card.",
   CVV_FAILURE:                  "The security code (CVV) was incorrect. Please check and try again.",
   ADDRESS_VERIFICATION_FAILURE: "Address verification failed. Please check your billing ZIP code.",
   INSUFFICIENT_FUNDS:           "Insufficient funds on this card. Please use a different card.",
   CARD_EXPIRED:                 "This card has expired. Please use a different card.",
   INVALID_CARD:                 "The card information is invalid. Please check and try again.",
   TRANSACTION_LIMIT:            "This transaction exceeds your card limit.",
-  TEMPORARY_ERROR:              "A temporary error occurred with the payment processor. Please try again.",
+  TEMPORARY_ERROR:              "A temporary error occurred. Please try again in a moment.",
+  UNAUTHORIZED:                 "Payment could not be authorized. Please re-enter your card details and try again.",
 };
 
 interface Camper {
@@ -49,16 +50,18 @@ export async function POST(req: NextRequest) {
     };
 
     // ── Server-side voucher validation ──────────────────────────────────────
+    // Vouchers apply to BASE price only; fee is waived when a voucher is used
     const CAMP_BASE  = 150;
     const CAMP_FEE   = Math.round(CAMP_BASE * 0.03 * 100) / 100;
-    const baseTotal  = (CAMP_BASE + CAMP_FEE) * quantity;
-    let total = baseTotal;
+    const baseOnly   = CAMP_BASE * quantity;          // $150 per camper
+    const fullTotal  = (CAMP_BASE + CAMP_FEE) * quantity; // $154.50 per camper
+    let total = fullTotal;
     let voucherApplied = false;
 
     if (voucherCode) {
-      const check = await validateVoucher(voucherCode, "camp", baseTotal);
+      const check = await validateVoucher(voucherCode, "camp", baseOnly);
       if (check.valid && check.voucher) {
-        total = check.finalTotal!;
+        total = check.finalTotal!;   // discounted base, fee waived
         voucherApplied = true;
       }
     }

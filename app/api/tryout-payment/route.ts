@@ -10,30 +10,31 @@ const SQ_BASE =
 export async function POST(req: NextRequest) {
   try {
     const {
-      sourceId, total: clientTotal, quantity,
+      sourceId, total: clientTotal, basePrice: clientBase, quantity,
       parentName, email, phone,
       playerName, grade, session,
       voucherCode,
     } = await req.json();
 
-    // ── Server-side voucher validation ──────────────────────────────────────
+    // ── Server-side voucher validation (against BASE price, fee waived with voucher) ──
+    const baseOnly = typeof clientBase === "number" ? clientBase : (typeof clientTotal === "number" ? clientTotal : 0);
     let total: number = typeof clientTotal === "number" ? clientTotal : 0;
     let voucherApplied = false;
-    if (voucherCode && typeof clientTotal === "number") {
-      const check = await validateVoucher(voucherCode, "tryout", clientTotal);
+    if (voucherCode && baseOnly > 0) {
+      const check = await validateVoucher(voucherCode, "tryout", baseOnly);
       if (check.valid && check.voucher) {
-        total = check.finalTotal!;
+        total = check.finalTotal!;   // discounted base, no fee
         voucherApplied = true;
       }
     }
 
-    if (!sourceId || !total || !parentName || !email) {
+    if (!sourceId || !parentName || !email) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
     // Free registration — skip Square
     let paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
-    if (sourceId !== "FREE" && total > 0) {
+    if (sourceId !== "FREE" && total > 0) {  // skip Square for free
       const sqRes = await fetch(`${SQ_BASE}/payments`, {
         method:  "POST",
         headers: {

@@ -178,6 +178,7 @@ export default function TournamentDetailPage({ params }: Params) {
         body: JSON.stringify({
           sourceId,
           total:          chargeTotal,
+          basePrice:      entryFee * qty,
           quantity:       qty,
           tournamentId:   t.id,
           tournamentName: t.name,
@@ -402,7 +403,7 @@ export default function TournamentDetailPage({ params }: Params) {
                     <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Entry Fee</div>
                     <div className="flex items-baseline gap-2 mb-2">
                       <span className="text-white font-black text-3xl">${t.entryFee}</span>
-                      {!isFree && !voucherFree && <span className="text-gray-500 text-sm">+ ${serviceFee.toFixed(2)} service fee (3%)</span>}
+                      {!isFree && appliedVoucher === null && <span className="text-gray-500 text-sm">+ ${serviceFee.toFixed(2)} service fee (3%)</span>}
                     </div>
                     {t.registrationDeadline && (
                       <div className="flex items-center gap-1.5 text-yellow-400 text-xs font-semibold">
@@ -503,7 +504,7 @@ export default function TournamentDetailPage({ params }: Params) {
                               <span>{orgName} — {division}</span>
                             </div>
                             <div className="flex justify-between text-xs">
-                              <span className="text-gray-400">{qty} team{qty > 1 ? "s" : ""} × ${(isFree || voucherFree ? entryFee : entryFee + serviceFee).toFixed(2)}</span>
+                              <span className="text-gray-400">{qty} team{qty > 1 ? "s" : ""} × ${(isFree || appliedVoucher !== null ? entryFee : entryFee + serviceFee).toFixed(2)}</span>
                               <span className="text-white font-black">${chargeTotal.toFixed(2)}</span>
                             </div>
                           </div>

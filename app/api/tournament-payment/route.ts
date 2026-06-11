@@ -130,7 +130,7 @@ async function sendEmails(data: {
   await Promise.allSettled([
     // Admin notification
     transporter.sendMail({
-      from:    process.env.SMTP_USER,
+      from:    `"Hilhi Youth Basketball" <${process.env.SMTP_USER}>`,
       to:      "info@hilhiyouthbbx.com",
       subject: `✅ Tournament Registration — ${orgName} — ${tournamentName} — $${total.toFixed(2)}`,
       html: `
@@ -153,7 +153,7 @@ async function sendEmails(data: {
     }),
     // Coach receipt
     transporter.sendMail({
-      from:    process.env.SMTP_USER,
+      from:    `"Hilhi Youth Basketball" <${process.env.SMTP_USER}>`,
       to:      coachEmail,
       subject: `Tournament Registration Confirmed — ${tournamentName} 🏀`,
       html: `

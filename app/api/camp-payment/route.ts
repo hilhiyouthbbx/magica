@@ -194,14 +194,14 @@ async function sendEmails(
   await Promise.allSettled([
     // Admin notification
     transporter.sendMail({
-      from:    smtpUser,
+      from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
       to:      "info@hilhiyouthbbx.com",
       subject: `✅ New Camp Registration — ${parentInfo.guardianName} — ${camperList.length} camper${camperList.length > 1 ? "s" : ""} — $${total.toFixed(2)}`,
       html:    adminHtml,
     }),
     // Customer receipt
     parentInfo.email ? transporter.sendMail({
-      from:    smtpUser,
+      from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
       to:      parentInfo.email,
       subject: "🏀 Your Camp Registration is Confirmed!",
       html:    customerHtml,

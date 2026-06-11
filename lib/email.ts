@@ -46,6 +46,14 @@ export function campConfirmationHtml(opts: {
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.12)">
 
+  <!-- ── TOP BANNER ── -->
+  <tr><td style="background:linear-gradient(90deg,#fbbf24,#f59e0b,#fbbf24);padding:16px 24px;text-align:center">
+    <div style="font-size:13px;font-weight:900;color:#1c1917;letter-spacing:2px;text-transform:uppercase;line-height:1.5">
+      🏀 NEW CAMPER REGISTRATION 🏀<br/>
+      <span style="font-size:15px;letter-spacing:1px;color:#7c2d12">CONGRATULATIONS — WE ARE EXCITED TO SEE YOU AT CAMP!</span>
+    </div>
+  </td></tr>
+
   <!-- ── HEADER ── -->
   <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1d4ed8 60%,#4f46e5 100%);padding:0;position:relative">
     <!-- Top bar -->

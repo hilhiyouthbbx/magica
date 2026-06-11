@@ -71,6 +71,7 @@ export default function TournamentDetailPage({ params }: Params) {
   // ── Init Square card when payment step is active ─────────────────────────
   useEffect(() => {
     if (regStep !== "pay" || !showForm) return;
+    if ((appliedVoucher?.finalTotal ?? Infinity) === 0) return; // free — no card needed
 
     let destroyed = false;
     setCardLoading(true);
@@ -100,6 +101,22 @@ export default function TournamentDetailPage({ params }: Params) {
         const payments = (window as any).Square.payments(SQ_APP_ID, SQ_LOC_ID);
         const card     = await payments.card({ style: SQ_STYLE });
         if (destroyed) { card.destroy().catch(() => {}); return; }
+
+        // Wait for the DOM element to exist (may be delayed by animation)
+        let domWait = 0;
+        while (!document.getElementById("sq-tournament-card") && domWait < 3000) {
+          await new Promise(r => setTimeout(r, 100));
+          domWait += 100;
+        }
+        if (destroyed) { card.destroy().catch(() => {}); return; }
+        const container = document.getElementById("sq-tournament-card");
+        if (!container) {
+          card.destroy().catch(() => {});
+          setSquareError("Card form container not found. Please try again.");
+          setCardLoading(false);
+          return;
+        }
+        container.innerHTML = "";
         await card.attach("#sq-tournament-card");
         if (!destroyed) {
           sqCardRef.current = card;
@@ -127,7 +144,7 @@ export default function TournamentDetailPage({ params }: Params) {
       const el = document.getElementById("sq-tournament-card");
       if (el) el.innerHTML = "";
     };
-  }, [regStep, showForm, retryCount]);
+  }, [regStep, showForm, retryCount, appliedVoucher]);
 
   // ── Advance to payment step ───────────────────────────────────────────────
   function handleFormNext(e: React.FormEvent) {
@@ -140,23 +157,27 @@ export default function TournamentDetailPage({ params }: Params) {
   // ── Square payment + registration ─────────────────────────────────────────
   async function handlePay() {
     if (!t) return;
-    if (!sqCardRef.current) { setPaymentError("Card form not ready — please wait a moment."); return; }
+    const isFreeReg = chargeTotal === 0;
+    if (!isFreeReg && !sqCardRef.current) { setPaymentError("Card form not ready — please wait a moment."); return; }
     setPaying(true);
     setPaymentError("");
     try {
-      const result = await sqCardRef.current.tokenize();
-      if (result.status !== "OK") {
-        setPaymentError(result.errors?.map((e: any) => e.message).join(" ") || "Card validation failed. Please check your details.");
-        setPaying(false);
-        return;
+      let sourceId = "FREE";
+      if (!isFreeReg) {
+        const result = await sqCardRef.current.tokenize();
+        if (result.status !== "OK") {
+          setPaymentError(result.errors?.map((e: any) => e.message).join(" ") || "Card validation failed. Please check your details.");
+          setPaying(false);
+          return;
+        }
+        sourceId = result.token;
       }
-      // use outer-scope fee variables
       const res = await fetch("/api/tournament-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceId:       result.token,
-          total:          appliedVoucher?.finalTotal ?? total,
+          sourceId,
+          total:          chargeTotal,
           quantity:       qty,
           tournamentId:   t.id,
           tournamentName: t.name,
@@ -207,7 +228,10 @@ export default function TournamentDetailPage({ params }: Params) {
 
   const entryFee = t.entryFee;
   const serviceFee = Math.round(entryFee * 0.03 * 100) / 100;
-  const total = (entryFee + serviceFee) * qty;
+  const total       = (entryFee + serviceFee) * qty;
+  const isFree      = entryFee === 0;
+  const voucherFree = appliedVoucher !== null && (appliedVoucher.finalTotal ?? total) === 0;
+  const chargeTotal = appliedVoucher?.finalTotal ?? total;
   const inputCls = "w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors";
 
   return (
@@ -378,7 +402,7 @@ export default function TournamentDetailPage({ params }: Params) {
                     <div className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-1">Entry Fee</div>
                     <div className="flex items-baseline gap-2 mb-2">
                       <span className="text-white font-black text-3xl">${t.entryFee}</span>
-                      <span className="text-gray-500 text-sm">+ ${serviceFee.toFixed(2)} service fee (3%)</span>
+                      {!isFree && !voucherFree && <span className="text-gray-500 text-sm">+ ${serviceFee.toFixed(2)} service fee (3%)</span>}
                     </div>
                     {t.registrationDeadline && (
                       <div className="flex items-center gap-1.5 text-yellow-400 text-xs font-semibold">
@@ -479,8 +503,8 @@ export default function TournamentDetailPage({ params }: Params) {
                               <span>{orgName} — {division}</span>
                             </div>
                             <div className="flex justify-between text-xs">
-                              <span className="text-gray-400">{qty} team{qty > 1 ? "s" : ""} × ${(entryFee + serviceFee).toFixed(2)}</span>
-                              <span className="text-white font-black">${total.toFixed(2)}</span>
+                              <span className="text-gray-400">{qty} team{qty > 1 ? "s" : ""} × ${(isFree || voucherFree ? entryFee : entryFee + serviceFee).toFixed(2)}</span>
+                              <span className="text-white font-black">${chargeTotal.toFixed(2)}</span>
                             </div>
                           </div>
 
@@ -493,7 +517,11 @@ export default function TournamentDetailPage({ params }: Params) {
                           />
 
                           {/* Card form */}
-                          {squareError ? (
+                          {chargeTotal === 0 ? (
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3 text-center">
+                              <p className="text-green-400 font-semibold text-sm">🎉 No payment required — this registration is free!</p>
+                            </div>
+                          ) : squareError ? (
                             <div className="space-y-3">
                               <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
                                 <p className="text-red-400 text-sm">{squareError}</p>
@@ -523,11 +551,13 @@ export default function TournamentDetailPage({ params }: Params) {
                           )}
 
                           <button onClick={handlePay}
-                            disabled={paying || cardLoading || !!squareError}
+                            disabled={paying || (chargeTotal > 0 && (cardLoading || !!squareError))}
                             className="w-full py-3.5 bg-gradient-to-r from-[#006aff] to-[#00aaff] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-all flex items-center justify-center gap-2">
                             {paying
                               ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
-                              : <><Lock className="w-4 h-4" /> Pay ${(appliedVoucher?.finalTotal ?? total).toFixed(2)} Securely</>
+                              : chargeTotal === 0
+                                ? <>✓ Complete Free Registration</>
+                                : <><Lock className="w-4 h-4" /> Pay ${chargeTotal.toFixed(2)} Securely</>
                             }
                           </button>
 

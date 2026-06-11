@@ -11,9 +11,15 @@ interface SocialContent {
 
 export function SocialFollow({ content }: { content?: SocialContent }) {
   const c = content ?? {};
-  const instagramUrl = c.instagram || "https://www.instagram.com/hilhispartansmbb";
+  function ensureHttps(url: string) {
+    if (!url) return url;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    if (url.startsWith("@")) return "https://www.instagram.com/" + url.slice(1);
+    return "https://" + url;
+  }
+  const instagramUrl = ensureHttps(c.instagram || "https://www.instagram.com/hilhispartansmbb");
   const instagramHandle = "@" + instagramUrl.replace(/\/$/, "").split("/").pop();
-  const youtubeUrl   = c.youtube   || "https://www.youtube.com/@hilhiyouthbbx";
+  const youtubeUrl   = ensureHttps(c.youtube   || "https://www.youtube.com/@hilhiyouthbbx");
 
   return (
     <section className="py-20 bg-[#060B14]">

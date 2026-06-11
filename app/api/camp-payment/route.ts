@@ -67,33 +67,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 
-    // ── Charge via Square ────────────────────────────────────────────────────
-    const sqRes = await fetch(`${SQ_BASE}/payments`, {
-      method: "POST",
-      headers: {
-        "Content-Type":   "application/json",
-        "Authorization":  `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
-        "Square-Version": "2024-10-17",
-      },
-      body: JSON.stringify({
-        source_id:           sourceId,
-        idempotency_key:     crypto.randomUUID(),
-        amount_money:        { amount: Math.round(total * 100), currency: "USD" },
-        location_id:         process.env.SQUARE_LOCATION_ID,
-        note:                `Hilhi Youth BBX Camp — ${parentInfo.guardianName} (${quantity} camper${quantity > 1 ? "s" : ""})`,
-        buyer_email_address: parentInfo.email || undefined,
-      }),
-    });
-
-    const sqData = await sqRes.json();
-
-    if (!sqRes.ok || sqData.errors?.length) {
-      const code = sqData.errors?.[0]?.code as string | undefined;
-      const msg  = ERROR_MESSAGES[code ?? ""] || sqData.errors?.[0]?.detail || "Payment was declined. Please try a different card.";
-      return NextResponse.json({ success: false, error: msg }, { status: 400 });
+    // ── Charge via Square (skip when free) ───────────────────────────────────
+    let paymentId: string | undefined;
+    if (sourceId !== "FREE" && total > 0) {
+      const sqRes = await fetch(`${SQ_BASE}/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type":   "application/json",
+          "Authorization":  `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
+          "Square-Version": "2024-10-17",
+        },
+        body: JSON.stringify({
+          source_id:           sourceId,
+          idempotency_key:     crypto.randomUUID(),
+          amount_money:        { amount: Math.round(total * 100), currency: "USD" },
+          location_id:         process.env.SQUARE_LOCATION_ID,
+          note:                `Hilhi Youth BBX Camp — ${parentInfo.guardianName} (${quantity} camper${quantity > 1 ? "s" : ""})`,
+          buyer_email_address: parentInfo.email || undefined,
+        }),
+      });
+      const sqData = await sqRes.json();
+      if (!sqRes.ok || sqData.errors?.length) {
+        const code = sqData.errors?.[0]?.code as string | undefined;
+        const msg  = ERROR_MESSAGES[code ?? ""] || sqData.errors?.[0]?.detail || "Payment was declined. Please try a different card.";
+        return NextResponse.json({ success: false, error: msg }, { status: 400 });
+      }
+      paymentId = sqData.payment?.id as string | undefined;
+    } else {
+      paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
     }
-
-    const paymentId = sqData.payment?.id as string | undefined;
 
     // ── Redeem voucher ───────────────────────────────────────────────────────
     if (voucherCode && voucherApplied) {

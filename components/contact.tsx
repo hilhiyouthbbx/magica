@@ -28,6 +28,13 @@ const SOCIAL_DEFAULTS = {
   twitter: "https://x.com/hilhiyouthbbx",
 };
 
+function ensureHttps(url: string) {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("@")) return "https://www.instagram.com/" + url.slice(1);
+  return "https://" + url;
+}
+
 export function Contact({ content }: { content?: ContactContent }) {
   const [email, setEmail] = useState("");
   const [done,  setDone]  = useState(false);
@@ -36,11 +43,11 @@ export function Contact({ content }: { content?: ContactContent }) {
 
   // Build dynamic socials — all from CMS with fallback defaults
   const dynamicSocials = [
-    { name: "Instagram",  href: c.instagram || DEFAULTS.instagram!, icon: "📸", color: "hover:border-pink-500/50 hover:bg-pink-500/10" },
-    { name: "Facebook",   href: c.facebook  || DEFAULTS.facebook!,  icon: "👥", color: "hover:border-blue-500/50 hover:bg-blue-500/10"  },
-    { name: "YouTube",    href: c.youtube   || SOCIAL_DEFAULTS.youtube,  icon: "▶️", color: "hover:border-red-500/50 hover:bg-red-500/10" },
-    { name: "TikTok",     href: c.tiktok    || SOCIAL_DEFAULTS.tiktok,   icon: "🎵", color: "hover:border-cyan-500/50 hover:bg-cyan-500/10" },
-    { name: "X (Twitter)",href: c.twitter   || SOCIAL_DEFAULTS.twitter,  icon: "𝕏", color: "hover:border-gray-400/50 hover:bg-gray-500/10" },
+    { name: "Instagram",  href: ensureHttps(c.instagram || DEFAULTS.instagram!), icon: "📸", color: "hover:border-pink-500/50 hover:bg-pink-500/10" },
+    { name: "Facebook",   href: ensureHttps(c.facebook  || DEFAULTS.facebook!),  icon: "👥", color: "hover:border-blue-500/50 hover:bg-blue-500/10"  },
+    { name: "YouTube",    href: ensureHttps(c.youtube   || SOCIAL_DEFAULTS.youtube),  icon: "▶️", color: "hover:border-red-500/50 hover:bg-red-500/10" },
+    { name: "TikTok",     href: ensureHttps(c.tiktok    || SOCIAL_DEFAULTS.tiktok),   icon: "🎵", color: "hover:border-cyan-500/50 hover:bg-cyan-500/10" },
+    { name: "X (Twitter)",href: ensureHttps(c.twitter   || SOCIAL_DEFAULTS.twitter),  icon: "𝕏", color: "hover:border-gray-400/50 hover:bg-gray-500/10" },
   ];
 
   // Address lines

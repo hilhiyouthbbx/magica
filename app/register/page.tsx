@@ -191,6 +191,22 @@ export default function RegisterPage() {
         const payments = (window as any).Square.payments(SQ_APP_ID, SQ_LOC_ID);
         const card     = await payments.card({ style: SQ_STYLE });
         if (destroyed) { card.destroy().catch(() => {}); return; }
+
+        // Wait for the DOM element to exist (may be delayed by animation)
+        let domWait = 0;
+        while (!document.getElementById("sq-camp-card") && domWait < 3000) {
+          await new Promise(r => setTimeout(r, 100));
+          domWait += 100;
+        }
+        if (destroyed) { card.destroy().catch(() => {}); return; }
+        const container = document.getElementById("sq-camp-card");
+        if (!container) {
+          card.destroy().catch(() => {});
+          setSquareError("Card form container not found. Please try again.");
+          setCardLoading(false);
+          return;
+        }
+        container.innerHTML = "";
         await card.attach("#sq-camp-card");
         if (!destroyed) {
           sqCardRef.current = card;
@@ -243,22 +259,27 @@ export default function RegisterPage() {
 
   // ── Square payment handler ─────────────────────────────────────────────────
   const handlePay = async () => {
-    if (!sqCardRef.current) { setPaymentError("Card form not ready — please wait a moment."); return; }
+    const chargeTotal = appliedVoucher?.finalTotal ?? (CAMP_TOTAL * quantity);
+    const isFreeReg = chargeTotal === 0;
+    if (!isFreeReg && !sqCardRef.current) { setPaymentError("Card form not ready — please wait a moment."); return; }
     setPaying(true);
     setPaymentError("");
     try {
-      const result = await sqCardRef.current.tokenize();
-      if (result.status !== "OK") {
-        setPaymentError(result.errors?.map((e: any) => e.message).join(" ") || "Card validation failed. Please check your details.");
-        setPaying(false);
-        return;
+      let sourceId = "FREE";
+      if (!isFreeReg) {
+        const result = await sqCardRef.current.tokenize();
+        if (result.status !== "OK") {
+          setPaymentError(result.errors?.map((e: any) => e.message).join(" ") || "Card validation failed. Please check your details.");
+          setPaying(false);
+          return;
+        }
+        sourceId = result.token;
       }
-      const chargeTotal = appliedVoucher?.finalTotal ?? (CAMP_TOTAL * quantity);
       const res = await fetch("/api/camp-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceId:    result.token,
+          sourceId,
           total:       chargeTotal,
           quantity,
           campers,
@@ -281,7 +302,9 @@ export default function RegisterPage() {
   };
 
   const slide = { initial: { opacity: 0, x: 30 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -30 }, transition: { duration: 0.25 } };
-  const total = CAMP_TOTAL * quantity;
+  const total        = CAMP_TOTAL * quantity;
+  const isFree       = appliedVoucher !== null && (appliedVoucher.finalTotal ?? total) === 0;
+  const displayTotal = appliedVoucher?.finalTotal ?? total;
 
   // ── Registration Success ───────────────────────────────────────────────────
   if (paid) {
@@ -674,7 +697,7 @@ export default function RegisterPage() {
                       )}
                       <div className="border-t border-white/10 pt-3 flex justify-between">
                         <span className="font-black text-white text-lg">Total Due Today</span>
-                        <span className="font-black text-white text-2xl">${total.toFixed(2)}</span>
+                        <span className="font-black text-white text-2xl">${displayTotal.toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -687,35 +710,41 @@ export default function RegisterPage() {
                     />
 
                     {/* ── Square Card Form ── */}
-                    <div className="mb-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Lock className="w-4 h-4 text-green-400" />
-                        <span className="text-white font-bold text-sm">Secure Card Payment</span>
+                    {isFree ? (
+                      <div className="mb-5 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-4 text-center">
+                        <p className="text-green-400 font-semibold text-sm">🎉 No payment required — this registration is free!</p>
                       </div>
+                    ) : (
+                      <div className="mb-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Lock className="w-4 h-4 text-green-400" />
+                          <span className="text-white font-bold text-sm">Secure Card Payment</span>
+                        </div>
 
-                      {squareError ? (
-                        <div className="space-y-3">
-                          <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-                            <p className="text-red-400 text-sm">{squareError}</p>
-                          </div>
-                          <button onClick={() => { setSquareError(""); setRetryCount(c => c + 1); }}
-                            className="w-full py-2.5 border border-white/20 text-gray-300 hover:text-white hover:border-white/40 text-sm font-semibold rounded-xl transition-all">
-                            ↻ Retry Payment Form
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative rounded-xl overflow-hidden">
-                          {cardLoading && (
-                            <div className="absolute inset-0 bg-white flex items-center justify-center rounded-xl z-10 min-h-[120px]">
-                              <Loader2 className="w-5 h-5 animate-spin text-blue-500 mr-2" />
-                              <span className="text-gray-500 text-sm">Loading card form…</span>
+                        {squareError ? (
+                          <div className="space-y-3">
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                              <p className="text-red-400 text-sm">{squareError}</p>
                             </div>
-                          )}
-                          {/* Square injects its iframe card form here */}
-                          <div id="sq-camp-card" className="bg-white rounded-xl p-4 min-h-[120px]" />
-                        </div>
-                      )}
-                    </div>
+                            <button onClick={() => { setSquareError(""); setRetryCount(c => c + 1); }}
+                              className="w-full py-2.5 border border-white/20 text-gray-300 hover:text-white hover:border-white/40 text-sm font-semibold rounded-xl transition-all">
+                              ↻ Retry Payment Form
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="relative rounded-xl overflow-hidden">
+                            {cardLoading && (
+                              <div className="absolute inset-0 bg-white flex items-center justify-center rounded-xl z-10 min-h-[120px]">
+                                <Loader2 className="w-5 h-5 animate-spin text-blue-500 mr-2" />
+                                <span className="text-gray-500 text-sm">Loading card form…</span>
+                              </div>
+                            )}
+                            {/* Square injects its iframe card form here */}
+                            <div id="sq-camp-card" className="bg-white rounded-xl p-4 min-h-[120px]" />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {paymentError && (
                       <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm flex items-start gap-2">
@@ -725,12 +754,14 @@ export default function RegisterPage() {
                     )}
 
                     <button onClick={handlePay}
-                      disabled={paying || cardLoading || !!squareError}
+                      disabled={paying || (!isFree && (cardLoading || !!squareError))}
                       className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-black text-lg rounded-2xl transition-all hover:shadow-xl hover:shadow-blue-500/30 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                       {paying ? (
                         <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</>
+                      ) : isFree ? (
+                        <>✓ Complete Free Registration</>
                       ) : (
-                        <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? total).toFixed(2)} Securely</>
+                        <><Lock className="w-5 h-5" /> Pay ${displayTotal.toFixed(2)} Securely</>
                       )}
                     </button>
                     <p className="text-center text-xs text-gray-500 mt-3 flex items-center justify-center gap-1.5">

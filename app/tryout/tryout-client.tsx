@@ -61,7 +61,8 @@ function SF({ label, value, onChange, options, req = false }: {
 // Main client component
 // ─────────────────────────────────────────────────────────────────
 export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; contact: ContactData }) {
-  const fee        = Math.round(t.price * 0.03 * 100) / 100;
+  const isFree     = t.price === 0;
+  const fee        = isFree ? 0 : Math.round(t.price * 0.03 * 100) / 100;
   const total      = t.price + fee;
   const pageUrl    = typeof window !== "undefined" ? window.location.href : "https://www.hilhiyouthbbx.com";
   const shareText  = encodeURIComponent(`Check out this event. Hope to see you there!`);
@@ -140,17 +141,23 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
     e.preventDefault();
     setPayError(""); setLoading(true);
     try {
-      const result = await sqCardRef.current.tokenize();
-      if (result.status !== "OK") {
-        setPayError(result.errors?.[0]?.message || "Card tokenization failed.");
-        setLoading(false); return;
-      }
+      const chargeTotal = appliedVoucher?.finalTotal ?? (total * qty);
+      // Free registration — skip Square tokenization
+      const sourceId = chargeTotal === 0 ? "FREE" : await (async () => {
+        const result = await sqCardRef.current.tokenize();
+        if (result.status !== "OK") {
+          setPayError(result.errors?.[0]?.message || "Card tokenization failed.");
+          setLoading(false); return null;
+        }
+        return result.token;
+      })();
+      if (!sourceId) return;
       const res = await fetch("/api/tryout-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceId:    result.token,
-          total:       appliedVoucher?.finalTotal ?? (total * qty),
+          sourceId,
+          total:       chargeTotal,
           quantity:    qty,
           parentName, email, phone,
           playerName, grade, session,
@@ -345,10 +352,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <div className="text-white font-bold text-sm">{t.title.split(" ").slice(0,3).join(" ")} Reg.</div>
                       <div className="text-white font-black">${t.price.toFixed(2)}</div>
                     </div>
+                    {!isFree && (
                     <div className="flex justify-between items-center">
                       <div className="text-gray-500 text-xs">Service fee (3%)</div>
                       <div className="text-gray-400 text-xs">${fee.toFixed(2)}</div>
                     </div>
+                    )}
                   </div>
 
                   <IF label="Parent / Guardian Name" value={parentName} onChange={setParentName} ph="Full name" req />
@@ -397,10 +406,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <span>Base price × {qty}</span>
                       <span>${(t.price * qty).toFixed(2)}</span>
                     </div>
+                    {!isFree && (
                     <div className="flex justify-between text-xs text-blue-300/70">
                       <span>Service fee (3%)</span>
                       <span>${(fee * qty).toFixed(2)}</span>
                     </div>
+                    )}
                     <div className="flex justify-between items-center pt-1 border-t border-blue-500/20">
                       <span className="text-blue-300 text-sm font-semibold">Total due</span>
                       <span className="text-white font-black text-lg">${(total * qty).toFixed(2)}</span>
@@ -415,7 +426,8 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     applied={appliedVoucher}
                   />
 
-                  {/* Square card */}
+                  {/* Square card — hidden when free */}
+                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && (
                   <div>
                     <label className="block text-gray-300 text-sm font-semibold mb-2">Card Details</label>
                     <div id="sq-tryout-card" className="min-h-[120px] bg-white/5 rounded-xl border border-white/15 p-4" />
@@ -425,6 +437,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       </div>
                     )}
                   </div>
+                  )}
 
                   {payError && (
                     <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm">
@@ -433,9 +446,9 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     </div>
                   )}
 
-                  <button type="submit" disabled={loading || !sqReady}
+                  <button type="submit" disabled={loading || (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && !sqReady)}
                     className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
-                    {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</> : <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</>}
+                    {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</> : (appliedVoucher?.finalTotal ?? (total * qty)) === 0 ? <><CheckCircle className="w-5 h-5" /> Complete Free Registration</> : <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</>}
                   </button>
 
                   <button type="button" onClick={() => { setStep("info"); setPayError(""); }}

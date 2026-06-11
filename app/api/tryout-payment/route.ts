@@ -31,31 +31,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    // Charge Square
-    const sqRes = await fetch(`${SQ_BASE}/payments`, {
-      method:  "POST",
-      headers: {
-        "Authorization":  `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type":   "application/json",
-        "Square-Version": "2024-10-17",
-      },
-      body: JSON.stringify({
-        source_id:       sourceId,
-        idempotency_key: crypto.randomUUID(),
-        amount_money:    { amount: Math.round(total * 100), currency: "USD" },
-        location_id:     process.env.SQUARE_LOCATION_ID,
-        buyer_email_address: email,
-        note: `Tryout Reg — ${playerName || ""} | ${grade || ""} | ${session || ""}`,
-      }),
-    });
-
-    const sqData = await sqRes.json();
-    if (!sqRes.ok || sqData.errors) {
-      const msg = sqData.errors?.[0]?.detail || "Payment failed.";
-      return NextResponse.json({ error: msg }, { status: 400 });
+    // Free registration — skip Square
+    let paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
+    if (sourceId !== "FREE" && total > 0) {
+      const sqRes = await fetch(`${SQ_BASE}/payments`, {
+        method:  "POST",
+        headers: {
+          "Authorization":  `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
+          "Content-Type":   "application/json",
+          "Square-Version": "2024-10-17",
+        },
+        body: JSON.stringify({
+          source_id:       sourceId,
+          idempotency_key: crypto.randomUUID(),
+          amount_money:    { amount: Math.round(total * 100), currency: "USD" },
+          location_id:     process.env.SQUARE_LOCATION_ID,
+          buyer_email_address: email,
+          note: `Tryout Reg — ${playerName || ""} | ${grade || ""} | ${session || ""}`,
+        }),
+      });
+      const sqData = await sqRes.json();
+      if (!sqRes.ok || sqData.errors) {
+        const msg = sqData.errors?.[0]?.detail || "Payment failed.";
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+      paymentId = sqData.payment?.id || paymentId;
     }
-
-    const paymentId = sqData.payment?.id || crypto.randomUUID();
 
     // ── Redeem voucher ───────────────────────────────────────────────────────
     if (voucherCode && voucherApplied) {

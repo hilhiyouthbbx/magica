@@ -79,8 +79,10 @@ function Field({ label, children, required }: { label: string; children: React.R
 }
 
 // ─── Event Summary Sidebar ────────────────────────────────────────────────────
-function EventSummary({ quantity, step }: { quantity: number; step: number }) {
-  const total = (quantity * CAMP_TOTAL).toFixed(2);
+function EventSummary({ quantity, step, appliedVoucher }: { quantity: number; step: number; appliedVoucher: import("@/components/voucher-input").AppliedVoucher | null }) {
+  const baseTotal = quantity * CAMP_TOTAL;
+  const isFree = appliedVoucher !== null && (appliedVoucher.finalTotal === 0);
+  const total = (appliedVoucher?.finalTotal ?? baseTotal).toFixed(2);
   return (
     <div className="space-y-4">
       <div className="glass rounded-2xl overflow-hidden border border-white/10">
@@ -111,10 +113,12 @@ function EventSummary({ quantity, step }: { quantity: number; step: number }) {
           <span className="text-gray-400">Camp Registration × {quantity}</span>
           <span className="text-white">${(CAMP_BASE * quantity).toFixed(2)}</span>
         </div>
+        {!isFree && (
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Service fee × {quantity}</span>
           <span className="text-white">${(CAMP_FEE * quantity).toFixed(2)}</span>
         </div>
+        )}
         <div className="border-t border-white/10 pt-3 flex justify-between">
           <span className="font-black text-white">Total</span>
           <span className="font-black text-white text-lg">${total}</span>
@@ -662,10 +666,12 @@ export default function RegisterPage() {
                         <span className="text-gray-300">Camp Registration × {quantity}</span>
                         <span className="text-white">${(CAMP_BASE * quantity).toFixed(2)}</span>
                       </div>
+                      {!(appliedVoucher !== null && (appliedVoucher.finalTotal === 0)) && (
                       <div className="flex justify-between text-sm mb-3">
                         <span className="text-gray-300">Service fee × {quantity}</span>
                         <span className="text-white">${(CAMP_FEE * quantity).toFixed(2)}</span>
                       </div>
+                      )}
                       <div className="border-t border-white/10 pt-3 flex justify-between">
                         <span className="font-black text-white text-lg">Total Due Today</span>
                         <span className="font-black text-white text-2xl">${total.toFixed(2)}</span>
@@ -760,7 +766,7 @@ export default function RegisterPage() {
           {/* ── Sidebar ── */}
           <div className="hidden lg:block">
             <div className="sticky top-24">
-              <EventSummary quantity={quantity} step={step} />
+              <EventSummary quantity={quantity} step={step} appliedVoucher={appliedVoucher} />
             </div>
           </div>
         </div>

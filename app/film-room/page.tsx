@@ -140,8 +140,6 @@ function VideoModal({ item, onClose }: { item: VideoItem; onClose: () => void })
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-const SESSION_KEY      = "hilhi-filmroom-authed";
-const SESSION_NAME_KEY = "hilhi-filmroom-name";
 
 export default function FilmRoomPage() {
   const [authed,     setAuthed]     = useState(false);
@@ -158,14 +156,8 @@ export default function FilmRoomPage() {
   const [search,     setSearch]     = useState("");
   const [filter,     setFilter]     = useState<"all" | "video" | "stream">("all");
 
-  // Check session on load
+  // Always require fresh sign-in on every visit
   useEffect(() => {
-    const stored     = sessionStorage.getItem(SESSION_KEY);
-    const storedName = sessionStorage.getItem(SESSION_NAME_KEY);
-    if (stored === "1") {
-      setAuthed(true);
-      setViewerName(storedName || "");
-    }
     setLoading(false);
   }, []);
 
@@ -194,8 +186,6 @@ export default function FilmRoomPage() {
       if (!res.ok) {
         setPwError(data.error || "Incorrect password. Please try again.");
       } else {
-        sessionStorage.setItem(SESSION_KEY,      "1");
-        sessionStorage.setItem(SESSION_NAME_KEY, name.trim());
         setViewerName(name.trim());
         setAuthed(true);
       }

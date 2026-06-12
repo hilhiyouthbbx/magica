@@ -4,7 +4,6 @@ import { logVisitor } from "@/lib/filmroom";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_SMS_EMAIL = "9715630552@tmomail.net";
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,13 +52,28 @@ export async function POST(req: NextRequest) {
           auth: { user: smtpUser, pass: smtpPass },
         });
 
+        // 1 — Push notification via ntfy.sh (free, instant, no account needed)
+        try {
+          await fetch("https://ntfy.sh/hilhi-filmroom-alerts", {
+            method:  "POST",
+            headers: {
+              "Title":    "Film Room",
+              "Priority": "high",
+              "Tags":     "basketball",
+            },
+            body: `${name.trim()} just signed in (${visitWord}) - ${time}`,
+          });
+          console.log("ntfy push notification sent OK");
+        } catch (ntfyErr) {
+          console.error("ntfy notification failed:", ntfyErr);
+        }
+
         await Promise.allSettled([
 
-          // 1 — Admin email + SMS in one send (CC to T-Mobile gateway)
+          // 2 — Admin email notification
           transporter.sendMail({
             from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
             to:      "info@hilhiyouthbbx.com",
-            cc:      ADMIN_SMS_EMAIL,
             subject: `Film Room: ${name.trim()} signed in (${visitWord})`,
             text:    `Film Room: ${name.trim()} signed in (${visitWord}) - ${time}`,
             html: `<!DOCTYPE html>

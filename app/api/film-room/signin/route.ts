@@ -53,17 +53,20 @@ export async function POST(req: NextRequest) {
           auth: { user: smtpUser, pass: smtpPass },
         });
 
-        await Promise.allSettled([
-
-          // 1 — Text message (email-to-SMS via T-Mobile gateway)
-          transporter.sendMail({
-            from:    `"Hilhi" <${smtpUser}>`,
+        // 1 — Text message (email-to-SMS via T-Mobile gateway)
+        try {
+          await transporter.sendMail({
+            from:    smtpUser,
             to:      ADMIN_SMS_EMAIL,
-            subject: `Film Room`,
-            text:    `Film Room
-🎬 ${name.trim()} just signed in (${visitWord})
-${time}`,
-          }),
+            subject: "",
+            text:    `Film Room: ${name.trim()} signed in (${visitWord}) - ${time}`,
+          });
+          console.log("SMS sent to T-Mobile gateway OK");
+        } catch (smsErr) {
+          console.error("SMS to T-Mobile gateway failed:", smsErr);
+        }
+
+        await Promise.allSettled([
 
           // 2 — Full email notification
           transporter.sendMail({

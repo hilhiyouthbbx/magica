@@ -60,7 +60,9 @@ export async function POST(req: NextRequest) {
             from:    `"Hilhi" <${smtpUser}>`,
             to:      ADMIN_SMS_EMAIL,
             subject: `Film Room`,
-            text:    `🎬 ${name.trim()} just entered the Film Room (${visitWord})\n${time}`,
+            text:    `Film Room
+🎬 ${name.trim()} just signed in (${visitWord})
+${time}`,
           }),
 
           // 2 — Full email notification

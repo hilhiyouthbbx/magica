@@ -53,26 +53,15 @@ export async function POST(req: NextRequest) {
           auth: { user: smtpUser, pass: smtpPass },
         });
 
-        // 1 — Text message (email-to-SMS via T-Mobile gateway)
-        try {
-          await transporter.sendMail({
-            from:    smtpUser,
-            to:      ADMIN_SMS_EMAIL,
-            subject: "",
-            text:    `Film Room: ${name.trim()} signed in (${visitWord}) - ${time}`,
-          });
-          console.log("SMS sent to T-Mobile gateway OK");
-        } catch (smsErr) {
-          console.error("SMS to T-Mobile gateway failed:", smsErr);
-        }
-
         await Promise.allSettled([
 
-          // 2 — Full email notification
+          // 1 — Admin email + SMS in one send (CC to T-Mobile gateway)
           transporter.sendMail({
             from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
             to:      "info@hilhiyouthbbx.com",
-            subject: `🎬 Film Room — ${name.trim()} signed in (${visitWord})`,
+            cc:      ADMIN_SMS_EMAIL,
+            subject: `Film Room: ${name.trim()} signed in (${visitWord})`,
+            text:    `Film Room: ${name.trim()} signed in (${visitWord}) - ${time}`,
             html: `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/></head>
 <body style="margin:0;padding:20px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">

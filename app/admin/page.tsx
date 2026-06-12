@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash, RotateCcw } from "lucide-react";
+import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash, RotateCcw, Video, Mail as MailIcon } from "lucide-react";
 
 import type { TournamentConfig } from "@/lib/tournament-client";
 import { TOURNAMENT_DEFAULTS } from "@/lib/tournament-client";
@@ -37,7 +37,7 @@ interface Contact {
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 
-type Tab = "contacts" | "tournaments" | "pages" | "vouchers";
+type Tab = "contacts" | "tournaments" | "pages" | "vouchers" | "filmroom";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-component: image field with upload
@@ -255,6 +255,143 @@ function TournamentForm({ initial, onSave, onCancel, adminKey }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── FilmRoomTab — View who has accessed the Film Room ──────────────────────
+interface FilmVisitor { id: string; name: string; email: string; enteredAt: string; }
+interface FilmTally   { key: string; name: string; email: string; count: number; firstSeen: string; lastSeen: string; }
+
+function FilmRoomTab({ adminKey }: { adminKey: string }) {
+  const [visitors, setVisitors] = useState<FilmVisitor[]>([]);
+  const [tally,    setTally]    = useState<FilmTally[]>([]);
+  const [loaded,   setLoaded]   = useState(false);
+  const [view,     setView]     = useState<"tally"|"log">("tally");
+
+  useEffect(() => {
+    fetch(`/api/film-room/visitors?key=${adminKey}`)
+      .then(r => r.json())
+      .then(d => {
+        setVisitors(Array.isArray(d.visitors) ? d.visitors : []);
+        setTally(Array.isArray(d.tally) ? d.tally : []);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [adminKey]);
+
+  async function clearAll() {
+    if (!confirm("Clear all film room visitor logs and tallies?")) return;
+    await fetch(`/api/film-room/visitors?key=${adminKey}`, { method: "DELETE" });
+    setVisitors([]); setTally([]);
+  }
+
+  if (!loaded) return <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Loading…</div>;
+
+  const totalVisits   = tally.reduce((s, t) => s + t.count, 0);
+  const uniqueViewers = tally.length;
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-white font-black text-xl">🎬 Film Room Visitors</h2>
+          <p className="text-gray-500 text-sm mt-0.5">{uniqueViewers} unique viewer{uniqueViewers !== 1 ? "s" : ""} · {totalVisits} total visit{totalVisits !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex glass border border-white/10 rounded-xl p-1 gap-1">
+            <button onClick={() => setView("tally")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${view==="tally" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>Tally</button>
+            <button onClick={() => setView("log")}   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${view==="log"   ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>Full Log</button>
+          </div>
+          {(visitors.length > 0 || tally.length > 0) && (
+            <button onClick={clearAll} className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-red-500/40 text-gray-400 hover:text-red-400 rounded-xl text-sm font-semibold transition-all">
+              <Trash2 className="w-4 h-4" /> Clear All
+            </button>
+          )}
+        </div>
+      </div>
+
+      {tally.length === 0 ? (
+        <div className="glass rounded-2xl border border-white/10 p-10 text-center">
+          <Video className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-400 font-semibold">No visitors yet</p>
+          <p className="text-gray-600 text-sm mt-1">When someone signs into the Film Room, they will appear here.</p>
+        </div>
+      ) : view === "tally" ? (
+        /* ── Tally view ── */
+        <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/10 bg-white/5">
+                <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Viewer</th>
+                <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Visits</th>
+                <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Seen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tally.map((t, i) => (
+                <tr key={t.key} className={`border-b border-white/5 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm flex-shrink-0">
+                        {t.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-white font-semibold text-sm">{t.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    {t.email ? <a href={`mailto:${t.email}`} className="text-blue-400 hover:text-blue-300 text-sm">{t.email}</a> : <span className="text-gray-600 text-sm">—</span>}
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black ${t.count >= 5 ? "bg-yellow-500/20 text-yellow-400" : t.count >= 2 ? "bg-blue-500/20 text-blue-400" : "bg-white/10 text-gray-400"}`}>
+                      {t.count}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-gray-400 text-sm">
+                    {new Date(t.lastSeen).toLocaleString("en-US", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles" })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* ── Full log view ── */
+        <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/10 bg-white/5">
+                <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Signed In</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visitors.map((v, i) => (
+                <tr key={v.id} className={`border-b border-white/5 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm flex-shrink-0">
+                        {v.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-white font-semibold text-sm">{v.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    {v.email ? <a href={`mailto:${v.email}`} className="text-blue-400 text-sm">{v.email}</a> : <span className="text-gray-600 text-sm">—</span>}
+                  </td>
+                  <td className="px-5 py-3 text-gray-400 text-sm">
+                    {new Date(v.enteredAt).toLocaleString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles" })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
 type VoucherEvent = "camp" | "tournament" | "tryout";
@@ -1550,10 +1687,11 @@ export default function AdminPage() {
         {/* Tabs */}
         <div className="flex gap-1 mb-6 glass rounded-xl border border-white/10 p-1 w-fit">
           {([
-            { id:"contacts",    icon:<Users   className="w-4 h-4"/>, label:"Contacts"    },
-            { id:"tournaments", icon:<Trophy  className="w-4 h-4"/>, label:"Tournaments" },
-            { id:"vouchers",    icon:<Tag     className="w-4 h-4"/>, label:"Vouchers"    },
-            { id:"pages",       icon:<FileText className="w-4 h-4"/>,label:"Pages"       },
+            { id:"contacts",    icon:<Users    className="w-4 h-4"/>, label:"Contacts"    },
+            { id:"tournaments", icon:<Trophy   className="w-4 h-4"/>, label:"Tournaments" },
+            { id:"vouchers",    icon:<Tag      className="w-4 h-4"/>, label:"Vouchers"    },
+            { id:"filmroom",    icon:<Video    className="w-4 h-4"/>, label:"Film Room"   },
+            { id:"pages",       icon:<FileText className="w-4 h-4"/>, label:"Pages"       },
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${tab===t.id ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>
@@ -1894,8 +2032,9 @@ export default function AdminPage() {
         )}
 
         {/* ── PAGES TAB ── */}
-        {tab === "vouchers" && <VouchersTab adminKey={adminKey} />}
-        {tab === "pages" && <PagesTab adminKey={adminKey} />}
+        {tab === "vouchers"  && <VouchersTab  adminKey={adminKey} />}
+        {tab === "filmroom"  && <FilmRoomTab  adminKey={adminKey} />}
+        {tab === "pages"     && <PagesTab     adminKey={adminKey} />}
       </div>
     </main>
   );

@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Eye, EyeOff, Radio, Play, ExternalLink, Calendar, Search } from "lucide-react";
+import { Lock, Eye, EyeOff, Radio, Play, ExternalLink, Calendar, Search, User, Mail } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { SiteContent, VideoItem } from "@/lib/content";
@@ -11,23 +11,13 @@ import type { SiteContent, VideoItem } from "@/lib/content";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getEmbedUrl(url: string): string | null {
   if (!url) return null;
-
-  // YouTube: watch?v=ID or youtu.be/ID or already an embed URL
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
   if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1`;
-
-  // YouTube Live: youtube.com/live/ID
   const ytLive = url.match(/youtube\.com\/live\/([a-zA-Z0-9_-]{11})/);
   if (ytLive) return `https://www.youtube.com/embed/${ytLive[1]}?rel=0`;
-
-  // Vimeo
   const vimMatch = url.match(/vimeo\.com\/(\d+)/);
   if (vimMatch) return `https://player.vimeo.com/video/${vimMatch[1]}`;
-
-  // Direct .mp4 or video file — return as-is (we'll use <video> tag)
   if (url.match(/\.(mp4|webm|mov|m3u8)(\?.*)?$/i)) return url;
-
-  // Any other URL — try iframe embed
   return url;
 }
 
@@ -38,7 +28,6 @@ function isDirectVideo(url: string) {
 function VideoPlayer({ item }: { item: VideoItem }) {
   const embed = getEmbedUrl(item.url);
   if (!embed) return <div className="flex items-center justify-center h-full text-gray-500 text-sm">No video URL set.</div>;
-
   if (isDirectVideo(embed)) {
     return (
       <video controls className="w-full h-full" poster={item.thumbnail || undefined}>
@@ -47,18 +36,13 @@ function VideoPlayer({ item }: { item: VideoItem }) {
       </video>
     );
   }
-
   return (
-    <iframe
-      src={embed}
-      className="w-full h-full"
+    <iframe src={embed} className="w-full h-full"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-      allowFullScreen
-    />
+      allowFullScreen />
   );
 }
 
-// ── Video card ────────────────────────────────────────────────────────────────
 function VideoCard({ item, onClick }: { item: VideoItem; onClick: () => void }) {
   return (
     <motion.div
@@ -68,7 +52,6 @@ function VideoCard({ item, onClick }: { item: VideoItem; onClick: () => void }) 
       className={`glass rounded-2xl border overflow-hidden cursor-pointer group transition-all hover:scale-[1.02] hover:shadow-xl ${
         item.isLive ? "border-red-500/40 hover:border-red-400/60" : "border-white/10 hover:border-blue-500/40"
       }`}>
-      {/* Thumbnail */}
       <div className="relative aspect-video bg-[#0d1525] overflow-hidden">
         {item.thumbnail
           ? <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -78,13 +61,11 @@ function VideoCard({ item, onClick }: { item: VideoItem; onClick: () => void }) 
               </div>
             </div>
         }
-        {/* Play overlay */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-full flex items-center justify-center border border-white/30">
             <Play className="w-6 h-6 text-white fill-white" />
           </div>
         </div>
-        {/* Badges */}
         <div className="absolute top-3 left-3 flex gap-2">
           {item.isLive && (
             <span className="flex items-center gap-1.5 bg-red-600 text-white text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
@@ -98,7 +79,6 @@ function VideoCard({ item, onClick }: { item: VideoItem; onClick: () => void }) 
           )}
         </div>
       </div>
-      {/* Info */}
       <div className="p-4">
         <h3 className="font-bold text-white text-sm leading-snug mb-1 line-clamp-2">{item.title}</h3>
         {item.description && <p className="text-gray-500 text-xs leading-relaxed line-clamp-2">{item.description}</p>}
@@ -112,7 +92,6 @@ function VideoCard({ item, onClick }: { item: VideoItem; onClick: () => void }) 
   );
 }
 
-// ── Video modal ───────────────────────────────────────────────────────────────
 function VideoModal({ item, onClose }: { item: VideoItem; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -130,7 +109,6 @@ function VideoModal({ item, onClose }: { item: VideoItem; onClose: () => void })
           initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
           className="w-full max-w-4xl rounded-2xl overflow-hidden bg-[#0d1525] border border-white/10 shadow-2xl"
           onClick={e => e.stopPropagation()}>
-          {/* Header */}
           <div className="flex items-start justify-between p-4 border-b border-white/10">
             <div className="flex-1 mr-4">
               <div className="flex items-center gap-2 mb-1">
@@ -152,7 +130,6 @@ function VideoModal({ item, onClose }: { item: VideoItem; onClose: () => void })
               <button onClick={onClose} className="p-2 glass rounded-lg border border-white/15 text-gray-400 hover:text-white transition-colors text-xl leading-none font-bold">×</button>
             </div>
           </div>
-          {/* Player */}
           <div className="aspect-video bg-black">
             <VideoPlayer item={item} />
           </div>
@@ -163,23 +140,32 @@ function VideoModal({ item, onClose }: { item: VideoItem; onClose: () => void })
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-const SESSION_KEY = "hilhi-filmroom-authed";
+const SESSION_KEY      = "hilhi-filmroom-authed";
+const SESSION_NAME_KEY = "hilhi-filmroom-name";
 
 export default function FilmRoomPage() {
-  const [authed,   setAuthed]   = useState(false);
-  const [password, setPassword] = useState("");
-  const [pwError,  setPwError]  = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [loading,  setLoading]  = useState(true);
-  const [roomData, setRoomData] = useState<SiteContent["videoRoom"] | null>(null);
-  const [selected, setSelected] = useState<VideoItem | null>(null);
-  const [search,   setSearch]   = useState("");
-  const [filter,   setFilter]   = useState<"all" | "video" | "stream">("all");
+  const [authed,     setAuthed]     = useState(false);
+  const [viewerName, setViewerName] = useState("");
+  const [name,       setName]       = useState("");
+  const [email,      setEmail]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [pwError,    setPwError]    = useState("");
+  const [showPw,     setShowPw]     = useState(false);
+  const [signing,    setSigning]    = useState(false);
+  const [loading,    setLoading]    = useState(true);
+  const [roomData,   setRoomData]   = useState<SiteContent["videoRoom"] | null>(null);
+  const [selected,   setSelected]   = useState<VideoItem | null>(null);
+  const [search,     setSearch]     = useState("");
+  const [filter,     setFilter]     = useState<"all" | "video" | "stream">("all");
 
   // Check session on load
   useEffect(() => {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (stored === "1") setAuthed(true);
+    const stored     = sessionStorage.getItem(SESSION_KEY);
+    const storedName = sessionStorage.getItem(SESSION_NAME_KEY);
+    if (stored === "1") {
+      setAuthed(true);
+      setViewerName(storedName || "");
+    }
     setLoading(false);
   }, []);
 
@@ -192,48 +178,46 @@ export default function FilmRoomPage() {
       .catch(() => {});
   }, [authed]);
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!roomData && !authed) {
-      // Need to fetch to check password — do a quick fetch first
-      fetch("/api/content")
-        .then(r => r.json())
-        .then((data: SiteContent) => {
-          setRoomData(data.videoRoom ?? null);
-          const correctPw = data?.videoRoom?.password || "hilhi-team";
-          if (password === correctPw) {
-            sessionStorage.setItem(SESSION_KEY, "1");
-            setAuthed(true);
-            setPwError("");
-          } else {
-            setPwError("Incorrect password. Please try again.");
-          }
-        })
-        .catch(() => setPwError("Unable to verify. Please try again."));
-      return;
-    }
-    const correctPw = roomData?.password || "hilhi-team";
-    if (password === correctPw) {
-      sessionStorage.setItem(SESSION_KEY, "1");
-      setAuthed(true);
-      setPwError("");
-    } else {
-      setPwError("Incorrect password. Please try again.");
+    if (!name.trim()) { setPwError("Please enter your name."); return; }
+    if (!password.trim()) { setPwError("Please enter the team password."); return; }
+    setSigning(true);
+    setPwError("");
+    try {
+      const res  = await fetch("/api/film-room/signin", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ name: name.trim(), email: email.trim(), password: password.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPwError(data.error || "Incorrect password. Please try again.");
+      } else {
+        sessionStorage.setItem(SESSION_KEY,      "1");
+        sessionStorage.setItem(SESSION_NAME_KEY, name.trim());
+        setViewerName(name.trim());
+        setAuthed(true);
+      }
+    } catch {
+      setPwError("Unable to connect. Please try again.");
+    } finally {
+      setSigning(false);
     }
   }
 
-  const videos = (roomData?.videos ?? []).filter(v => v.enabled);
+  const videos  = (roomData?.videos ?? []).filter(v => v.enabled);
   const liveNow = videos.filter(v => v.isLive);
   const filtered = videos.filter(v => {
-    if (filter === "video" && v.type !== "video") return false;
+    if (filter === "video"  && v.type !== "video")  return false;
     if (filter === "stream" && v.type !== "stream") return false;
     if (search && !v.title.toLowerCase().includes(search.toLowerCase()) && !v.description.toLowerCase().includes(search.toLowerCase())) return false;
-    return !v.isLive; // live items shown separately
+    return !v.isLive;
   });
 
-  // ── Login screen ────────────────────────────────────────────────────────────
   if (loading) return <div className="min-h-screen bg-[#080D1A]" />;
 
+  // ── Sign-in screen ──────────────────────────────────────────────────────────
   if (!authed) {
     return (
       <main className="min-h-screen bg-[#080D1A] flex items-center justify-center px-4">
@@ -244,20 +228,54 @@ export default function FilmRoomPage() {
               <Lock className="w-8 h-8 text-blue-400" />
             </div>
             <h1 className="text-3xl font-black text-white mb-2">Team Film Room</h1>
-            <p className="text-gray-500 text-sm">Enter your team password to access videos and live streams.</p>
+            <p className="text-gray-500 text-sm">Sign in with your name and team password to access videos and live streams.</p>
           </div>
+
           <div className="glass rounded-2xl border border-white/15 p-8">
             <form onSubmit={handleLogin} className="space-y-4">
+
+              {/* Name */}
               <div>
-                <label className="block text-gray-400 text-xs font-semibold mb-1.5">Team Password</label>
+                <label className="block text-gray-400 text-xs font-semibold mb-1.5">Your Name <span className="text-red-400">*</span></label>
                 <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => { setName(e.target.value); setPwError(""); }}
+                    autoFocus
+                    placeholder="First and last name"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Email (optional) */}
+              <div>
+                <label className="block text-gray-400 text-xs font-semibold mb-1.5">Email <span className="text-gray-600 font-normal">(optional)</span></label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-gray-400 text-xs font-semibold mb-1.5">Team Password <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <input
                     type={showPw ? "text" : "password"}
                     value={password}
                     onChange={e => { setPassword(e.target.value); setPwError(""); }}
-                    autoFocus
-                    placeholder="Enter password"
-                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors pr-11"
+                    placeholder="Enter team password"
+                    className="w-full pl-10 pr-11 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors"
                   />
                   <button type="button" onClick={() => setShowPw(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
@@ -266,9 +284,14 @@ export default function FilmRoomPage() {
                 </div>
                 {pwError && <p className="text-red-400 text-xs mt-1.5">{pwError}</p>}
               </div>
-              <button type="submit"
-                className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-500/20">
-                Enter Film Room
+
+              <button type="submit" disabled={signing}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-60 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                {signing ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing In…</>
+                ) : (
+                  "Enter Film Room 🎬"
+                )}
               </button>
             </form>
           </div>
@@ -287,8 +310,15 @@ export default function FilmRoomPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(37,99,235,0.15),transparent_55%)]" />
         <div className="relative max-w-7xl mx-auto px-4">
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-semibold uppercase tracking-widest mb-4">
-              <Lock className="w-3.5 h-3.5" /> Team Only
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-semibold uppercase tracking-widest">
+                <Lock className="w-3.5 h-3.5" /> Team Only
+              </div>
+              {viewerName && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 text-xs font-semibold">
+                  <User className="w-3.5 h-3.5" /> Signed in as {viewerName}
+                </div>
+              )}
             </div>
             <h1 className="text-4xl sm:text-6xl font-black text-white mb-3">
               {roomData?.title ?? "Team Film Room"}
@@ -316,7 +346,6 @@ export default function FilmRoomPage() {
 
       {/* Library */}
       <section className="max-w-7xl mx-auto px-4 pb-24">
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -333,7 +362,6 @@ export default function FilmRoomPage() {
           </div>
         </div>
 
-        {/* No content */}
         {videos.length === 0 && (
           <div className="text-center py-24">
             <div className="text-6xl mb-4">🎬</div>
@@ -342,7 +370,6 @@ export default function FilmRoomPage() {
           </div>
         )}
 
-        {/* Grid */}
         {filtered.length > 0 && (
           <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map(v => (
@@ -356,9 +383,7 @@ export default function FilmRoomPage() {
         )}
       </section>
 
-      {/* Modal */}
       {selected && <VideoModal item={selected} onClose={() => setSelected(null)} />}
-
       <Footer />
     </main>
   );

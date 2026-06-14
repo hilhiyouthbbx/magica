@@ -3,35 +3,51 @@ import { useState, useEffect, useRef } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BASE_LINKS = [
-  { label: "Home",          href: "/" },
-  { label: "About",         href: "/#about" },
-  { label: "Programs",      href: "/#programs" },
-  {
-    label: "Camps/Clinic", href: "/events",
-    dropdown: [
-      { label: "📅 Camp Events",    href: "/events" },
-      { label: "🏀 Camp Schedule",  href: "/camp-schedule" },
-    ],
-  },
-  { label: "Tournaments",   href: "/tournaments" },
-  { label: "Youth Tryout",  href: "/tryout",              key: "showTryouts" },
-  { label: "Youth Coaches", href: "/youth-coaches" },
-  { label: "HS Coaches",    href: "/high-school-coaches" },
-  { label: "Merch",         href: "/merch" },
-  { label: "Film Room",     href: "/film-room" },
-  { label: "Contact",       href: "/#contact" },
-];
+// Default labels — overridden by admin settings when set
+const DEFAULTS: Record<string, string> = {
+  labelHome:         "Home",
+  labelAbout:        "About",
+  labelPrograms:     "Programs",
+  labelCamps:        "Camps/Clinic",
+  labelTournaments:  "Tournaments",
+  labelTryout:       "Youth Tryout",
+  labelYouthCoaches: "Youth Coaches",
+  labelHSCoaches:    "HS Coaches",
+  labelMerch:        "Merch",
+  labelFilmRoom:     "Film Room",
+  labelContact:      "Contact",
+};
 
 interface NavConfig {
-  showTryouts: boolean;
+  showTryouts:       boolean;
+  labelHome:         string;
+  labelAbout:        string;
+  labelPrograms:     string;
+  labelCamps:        string;
+  labelTournaments:  string;
+  labelTryout:       string;
+  labelYouthCoaches: string;
+  labelHSCoaches:    string;
+  labelMerch:        string;
+  labelFilmRoom:     string;
+  labelContact:      string;
+}
+
+function lbl(cfg: NavConfig, key: keyof NavConfig): string {
+  const val = cfg[key] as string;
+  return (val && val.trim()) ? val.trim() : (DEFAULTS[key as string] ?? "");
 }
 
 export function Navbar() {
   const [open,      setOpen]      = useState(false);
   const [scrolled,  setScrolled]  = useState(false);
   const [campOpen,  setCampOpen]  = useState(false);
-  const [navConfig, setNavConfig] = useState<NavConfig>({ showTryouts: true });
+  const [navConfig, setNavConfig] = useState<NavConfig>({
+    showTryouts:  true,
+    labelHome: "", labelAbout: "", labelPrograms: "", labelCamps: "",
+    labelTournaments: "", labelTryout: "", labelYouthCoaches: "",
+    labelHSCoaches: "", labelMerch: "", labelFilmRoom: "", labelContact: "",
+  });
   const campRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,18 +74,44 @@ export function Navbar() {
         const nb = d?.navbar;
         if (nb) {
           setNavConfig({
-            showTryouts: nb.showTryouts !== false, // default true if missing
+            showTryouts:       nb.showTryouts !== false,
+            labelHome:         nb.labelHome         ?? "",
+            labelAbout:        nb.labelAbout        ?? "",
+            labelPrograms:     nb.labelPrograms     ?? "",
+            labelCamps:        nb.labelCamps        ?? "",
+            labelTournaments:  nb.labelTournaments  ?? "",
+            labelTryout:       nb.labelTryout       ?? "",
+            labelYouthCoaches: nb.labelYouthCoaches ?? "",
+            labelHSCoaches:    nb.labelHSCoaches    ?? "",
+            labelMerch:        nb.labelMerch        ?? "",
+            labelFilmRoom:     nb.labelFilmRoom     ?? "",
+            labelContact:      nb.labelContact      ?? "",
           });
         }
       })
       .catch(() => {}); // silently keep defaults on error
   }, []);
 
-  // Filter links based on nav config
-  const links = BASE_LINKS.filter(l => {
-    if (l.key === "showTryouts" && !navConfig.showTryouts) return false;
-    return true;
-  });
+  // Build links dynamically from navConfig labels
+  const links = [
+    { label: lbl(navConfig, "labelHome"),        href: "/" },
+    { label: lbl(navConfig, "labelAbout"),        href: "/#about" },
+    { label: lbl(navConfig, "labelPrograms"),     href: "/#programs" },
+    {
+      label: lbl(navConfig, "labelCamps"),        href: "/events",
+      dropdown: [
+        { label: "📅 Camp Events",   href: "/events" },
+        { label: "🏀 Camp Schedule", href: "/camp-schedule" },
+      ],
+    },
+    { label: lbl(navConfig, "labelTournaments"),  href: "/tournaments" },
+    ...(navConfig.showTryouts ? [{ label: lbl(navConfig, "labelTryout"), href: "/tryout" }] : []),
+    { label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" },
+    { label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" },
+    { label: lbl(navConfig, "labelMerch"),        href: "/merch" },
+    { label: lbl(navConfig, "labelFilmRoom"),     href: "/film-room" },
+    { label: lbl(navConfig, "labelContact"),      href: "/#contact" },
+  ];
 
   return (
     <header className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-300", scrolled ? "glass-dark py-3" : "py-5 bg-transparent")}>
@@ -81,7 +123,7 @@ export function Navbar() {
 
         <nav className="hidden md:flex items-center gap-0.5">
           {links.map(l => {
-            if (l.label === "Film Room") {
+            if (l.href === "/film-room") {
               return (
                 <a key={l.label} href={l.href} className="px-2.5 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all whitespace-nowrap flex items-center gap-1">
                   🎬 {l.label}
@@ -147,7 +189,7 @@ export function Navbar() {
                 </div>
               );
             }
-            if (l.label === "Film Room") {
+            if (l.href === "/film-room") {
               return <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all">🎬 {l.label}</a>;
             }
             return <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">{l.label}</a>;

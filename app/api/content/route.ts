@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContent, saveContent } from "@/lib/content";
 
+export const dynamic = "force-dynamic";
+
 const pw      = () => process.env.ADMIN_PASSWORD ?? "hilhi-admin";
 const isAdmin = (r: NextRequest) => r.nextUrl.searchParams.get("key") === pw();
 

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const links = [
+const BASE_LINKS = [
   { label: "Home",          href: "/" },
   { label: "About",         href: "/#about" },
   { label: "Programs",      href: "/#programs" },
@@ -15,7 +15,7 @@ const links = [
     ],
   },
   { label: "Tournaments",   href: "/tournaments" },
-  { label: "Youth Tryout",  href: "/tryout" },
+  { label: "Youth Tryout",  href: "/tryout",              key: "showTryouts" },
   { label: "Youth Coaches", href: "/youth-coaches" },
   { label: "HS Coaches",    href: "/high-school-coaches" },
   { label: "Merch",         href: "/merch" },
@@ -23,10 +23,15 @@ const links = [
   { label: "Contact",       href: "/#contact" },
 ];
 
+interface NavConfig {
+  showTryouts: boolean;
+}
+
 export function Navbar() {
-  const [open,        setOpen]        = useState(false);
-  const [scrolled,    setScrolled]    = useState(false);
-  const [campOpen,    setCampOpen]    = useState(false);
+  const [open,      setOpen]      = useState(false);
+  const [scrolled,  setScrolled]  = useState(false);
+  const [campOpen,  setCampOpen]  = useState(false);
+  const [navConfig, setNavConfig] = useState<NavConfig>({ showTryouts: true });
   const campRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,6 +49,27 @@ export function Navbar() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Fetch nav visibility settings from content API
+  useEffect(() => {
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(d => {
+        const nb = d?.navbar;
+        if (nb) {
+          setNavConfig({
+            showTryouts: nb.showTryouts !== false, // default true if missing
+          });
+        }
+      })
+      .catch(() => {}); // silently keep defaults on error
+  }, []);
+
+  // Filter links based on nav config
+  const links = BASE_LINKS.filter(l => {
+    if (l.key === "showTryouts" && !navConfig.showTryouts) return false;
+    return true;
+  });
 
   return (
     <header className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-300", scrolled ? "glass-dark py-3" : "py-5 bg-transparent")}>

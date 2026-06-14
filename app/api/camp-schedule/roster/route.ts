@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContacts } from "@/lib/contacts";
+import type { CamperRosterEntry } from "@/lib/camp-schedule";
 
 export const dynamic = "force-dynamic";
-
-export interface CamperRosterEntry {
-  id:          string;  // contact.id
-  fullName:    string;  // camperName or parsed from name
-  displayName: string;  // "First L."
-  grade:       string;  // raw grade string
-  gradeNum:    number;  // 1–8 for sorting (99 = unknown)
-}
 
 /** Parse a grade string like "3rd", "4th Grade", "Grade 5", "5" → number */
 function parseGradeNum(raw: string | undefined): number {

@@ -118,3 +118,12 @@ export async function saveCampSchedule(data: CampScheduleData): Promise<CampSche
   await write(data);
   return data;
 }
+
+// ── Camper roster entry (shared with admin roster UI) ───────────────────────
+export interface CamperRosterEntry {
+  id:          string;
+  fullName:    string;
+  displayName: string; // "First L."
+  grade:       string;
+  gradeNum:    number; // 1-8 for sort, 99 = unknown
+}

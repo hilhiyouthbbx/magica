@@ -5,9 +5,9 @@ import {
   Users, GripVertical, RefreshCw
 } from "lucide-react";
 import type {
-  CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division
+  CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
+  CamperRosterEntry
 } from "@/lib/camp-schedule";
-import type { CamperRosterEntry } from "@/app/api/camp-schedule/roster/route";
 
 const EVENT_NAMES = [
   "Free Throw Contest",

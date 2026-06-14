@@ -38,11 +38,13 @@ export async function GET(_req: NextRequest) {
     const fullName = (c.camperName?.trim() || c.name?.trim()) ?? "Unknown";
     const grade    = c.grade?.trim() ?? "";
     return {
-      id:          c.id,
+      id:            c.id,
       fullName,
-      displayName: formatDisplay(fullName),
+      displayName:   formatDisplay(fullName),
       grade,
-      gradeNum:    parseGradeNum(grade),
+      gradeNum:      parseGradeNum(grade),
+      paymentStatus: (c.paymentStatus ?? "").trim(),
+      confirmed:     /paid|free|manual payment approved|approved/i.test((c.paymentStatus ?? "").trim()) || !(c.paymentStatus ?? "").trim(),
     };
   });
 

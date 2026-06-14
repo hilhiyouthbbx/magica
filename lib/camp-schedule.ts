@@ -121,9 +121,11 @@ export async function saveCampSchedule(data: CampScheduleData): Promise<CampSche
 
 // ── Camper roster entry (shared with admin roster UI) ───────────────────────
 export interface CamperRosterEntry {
-  id:          string;
-  fullName:    string;
-  displayName: string; // "First L."
-  grade:       string;
-  gradeNum:    number; // 1-8 for sort, 99 = unknown
+  id:            string;
+  fullName:      string;
+  displayName:   string; // "First L."
+  grade:         string;
+  gradeNum:      number; // 1-8 for sort, 99 = unknown
+  paymentStatus: string; // raw value from Wix e.g. "Paid", "Pending", ""
+  confirmed:     boolean; // true if paid/free/manually approved
 }

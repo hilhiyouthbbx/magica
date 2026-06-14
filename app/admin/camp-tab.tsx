@@ -87,14 +87,18 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           return !!(c.camperName && c.camperName.trim());
         })
         .map(c => {
-          const fullName = (c.camperName ?? c.name ?? "").trim();
-          const grade    = (c.grade ?? "").trim();
+          const fullName      = (c.camperName ?? c.name ?? "").trim();
+          const grade         = (c.grade ?? "").trim();
+          const paymentStatus = (c.paymentStatus ?? "").trim();
+          const confirmed     = /paid|free|manual payment approved|approved/i.test(paymentStatus) || paymentStatus === "";
           return {
             id:          c.id ?? Math.random().toString(36).slice(2),
             fullName,
             displayName: fmt(fullName),
             grade,
             gradeNum:    parseGradeNum(grade),
+            paymentStatus,
+            confirmed,
           };
         })
         .sort((a, b) => a.gradeNum !== b.gradeNum ? a.gradeNum - b.gradeNum : a.fullName.localeCompare(b.fullName));
@@ -405,8 +409,9 @@ export function CampTab({ adminKey }: { adminKey: string }) {
               <p className="text-gray-600 text-sm">Go to the 📋 Camper Roster tab and click "Load from Registrations" first.</p>
             </div>
           ) : (() => {
+            const confirmedRoster = roster.filter(cam => cam.confirmed);
             const gradeMap = new Map<number, { label: string; campers: CamperRosterEntry[] }>();
-            roster.forEach(cam => {
+            confirmedRoster.forEach(cam => {
               if (!gradeMap.has(cam.gradeNum)) gradeMap.set(cam.gradeNum, { label: gradeLabel(cam.grade), campers: [] });
               gradeMap.get(cam.gradeNum)!.campers.push(cam);
             });
@@ -426,7 +431,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                     <div className="text-xs text-gray-500">Absent</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-black text-white">{roster.length}</div>
+                    <div className="text-2xl font-black text-white">{confirmedRoster.length}</div>
                     <div className="text-xs text-gray-500">Total</div>
                   </div>
                   <div className="flex-1" />
@@ -502,6 +507,11 @@ export function CampTab({ adminKey }: { adminKey: string }) {
               <div>
                 <h3 className="text-white font-black text-base flex items-center gap-2">
                   <Users className="w-4 h-4 text-blue-400" />Camper Roster
+                  {roster.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 bg-blue-600/30 border border-blue-500/40 rounded-full text-blue-300 text-xs font-bold">
+                      {roster.filter(r => r.confirmed).length} registered · {roster.length} total
+                    </span>
+                  )}
                 </h3>
                 <p className="text-gray-500 text-sm mt-0.5">
                   Auto-pulled from 2026 Summer Youth Camp registrations, sorted by grade.
@@ -526,57 +536,96 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           </div>
 
           {roster.length > 0 && (() => {
-            // Group by grade number, then grade label
-            const gradeMap = new Map<number, { label: string; campers: CamperRosterEntry[] }>();
-            roster.forEach(cam => {
-              const key = cam.gradeNum;
-              if (!gradeMap.has(key)) gradeMap.set(key, { label: gradeLabel(cam.grade), campers: [] });
-              gradeMap.get(key)!.campers.push(cam);
-            });
-            const sorted = [...gradeMap.entries()].sort((a, b) => a[0] - b[0]);
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded bg-blue-500/30 border border-blue-500/50 inline-block" />
-                    Unassigned
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded bg-green-500/20 border border-green-500/40 inline-block" />
-                    Already on a team ✓
-                  </span>
-                  <span className="text-gray-600">Drag a name onto any team card below to assign.</span>
-                </div>
-                {sorted.map(([gradeNum, { label, campers }]) => (
-                  <div key={gradeNum} className="glass rounded-2xl border border-white/10 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-black text-white">{label}</span>
-                      <span className="text-xs text-gray-500">{campers.length} camper{campers.length !== 1 ? "s" : ""}</span>
+            const confirmed = roster.filter(cam => cam.confirmed);
+            const pending   = roster.filter(cam => !cam.confirmed);
+
+            function RosterGroup({ campers, draggable: isDraggable }: { campers: CamperRosterEntry[]; draggable: boolean }) {
+              const gradeMap = new Map<number, { label: string; campers: CamperRosterEntry[] }>();
+              campers.forEach(cam => {
+                const key = cam.gradeNum;
+                if (!gradeMap.has(key)) gradeMap.set(key, { label: gradeLabel(cam.grade), campers: [] });
+                gradeMap.get(key)!.campers.push(cam);
+              });
+              const sorted = [...gradeMap.entries()].sort((a, b) => a[0] - b[0]);
+              return (
+                <>
+                  {sorted.map(([gradeNum, { label, campers: gc }]) => (
+                    <div key={gradeNum} className="glass rounded-2xl border border-white/10 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-black text-white">{label}</span>
+                        <span className="text-xs text-gray-500">{gc.length} camper{gc.length !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {gc.map(cam => {
+                          const isAssigned = assignedIds.has(cam.id);
+                          return (
+                            <div
+                              key={cam.id}
+                              draggable={isDraggable}
+                              onDragStart={isDraggable ? e => handleDragStart(e, cam) : undefined}
+                              title={isDraggable ? `${cam.fullName}${cam.grade ? " · " + cam.grade : ""} — drag to a team` : cam.fullName}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold select-none transition-all border ${
+                                !isDraggable
+                                  ? "bg-orange-500/10 border-orange-500/30 text-orange-300 cursor-default"
+                                  : isAssigned
+                                  ? "bg-green-500/15 border-green-500/40 text-green-300 opacity-70 cursor-grab active:cursor-grabbing"
+                                  : "bg-blue-500/20 border-blue-500/40 text-blue-200 hover:bg-blue-500/30 cursor-grab active:cursor-grabbing"
+                              }`}
+                            >
+                              {isDraggable && <GripVertical className="w-3 h-3 opacity-40 flex-shrink-0" />}
+                              {cam.displayName}
+                              {isDraggable && isAssigned && <span className="text-green-500 text-[10px] ml-0.5">✓</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {campers.map(cam => {
-                        const isAssigned = assignedIds.has(cam.id);
-                        return (
-                          <div
-                            key={cam.id}
-                            draggable
-                            onDragStart={e => handleDragStart(e, cam)}
-                            title={`${cam.fullName}${cam.grade ? " · " + cam.grade : ""} — drag to a team`}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold cursor-grab active:cursor-grabbing select-none transition-all border ${
-                              isAssigned
-                                ? "bg-green-500/15 border-green-500/40 text-green-300 opacity-70"
-                                : "bg-blue-500/20 border-blue-500/40 text-blue-200 hover:bg-blue-500/30"
-                            }`}
-                          >
-                            <GripVertical className="w-3 h-3 opacity-40 flex-shrink-0" />
-                            {cam.displayName}
-                            {isAssigned && <span className="text-green-500 text-[10px] ml-0.5">✓</span>}
-                          </div>
-                        );
-                      })}
+                  ))}
+                </>
+              );
+            }
+
+            return (
+              <div className="space-y-5">
+                {/* ── Confirmed registered campers ── */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-black text-white">
+                      ✅ Registered Campers
+                      <span className="ml-2 px-2 py-0.5 bg-green-600/25 border border-green-500/40 rounded-full text-green-300 text-xs font-bold">
+                        {confirmed.length}
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded bg-blue-500/30 border border-blue-500/50 inline-block" />Unassigned
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded bg-green-500/20 border border-green-500/40 inline-block" />On a team
+                      </span>
                     </div>
                   </div>
-                ))}
+                  {confirmed.length === 0
+                    ? <p className="text-gray-600 text-sm italic">No confirmed registrations yet.</p>
+                    : <RosterGroup campers={confirmed} draggable={true} />
+                  }
+                </div>
+
+                {/* ── Pending / needs registration ── */}
+                {pending.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-black text-orange-300">
+                        ⚠️ Needs to Register
+                        <span className="ml-2 px-2 py-0.5 bg-orange-600/25 border border-orange-500/40 rounded-full text-orange-300 text-xs font-bold">
+                          {pending.length}
+                        </span>
+                      </span>
+                      <span className="text-xs text-gray-600">Payment not yet confirmed — cannot be assigned to a team</span>
+                    </div>
+                    <RosterGroup campers={pending} draggable={false} />
+                  </div>
+                )}
               </div>
             );
           })()}

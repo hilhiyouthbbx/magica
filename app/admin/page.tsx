@@ -1682,7 +1682,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!authed) return;
-    if (tab === "contacts" && !contactsLoaded) {
+    if ((tab === "contacts" || tab === "tourney") && !contactsLoaded) {
       fetch(`/api/admin/contacts?key=${adminKey}`).then(r=>r.json()).then(d => { setContacts(Array.isArray(d) ? d : (d.contacts ?? [])); setContactsLoaded(true); });
     }
     if (tab === "tournaments" && !tournLoaded) {
@@ -2242,7 +2242,7 @@ export default function AdminPage() {
         {tab === "vouchers"  && <VouchersTab  adminKey={adminKey} />}
         {tab === "filmroom"  && <FilmRoomTab  adminKey={adminKey} />}
         {tab === "camp"      && <CampTab      adminKey={adminKey} />}
-        {tab === "tourney"   && <TourneyTab />}
+        {tab === "tourney"   && <TourneyTab contacts={contacts} />}
         {tab === "pages"     && <PagesTab     adminKey={adminKey} />}
       </div>
     </main>

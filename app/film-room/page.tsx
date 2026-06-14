@@ -1,9 +1,9 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Eye, EyeOff, Radio, Play, ExternalLink, Calendar, Search, User, Mail } from "lucide-react";
+import { Lock, Eye, EyeOff, Radio, Play, ExternalLink, Calendar, Search, User, Mail, MessageCircle, Send, X as XIcon } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { SiteContent, VideoItem } from "@/lib/content";
@@ -139,11 +139,234 @@ function VideoModal({ item, onClose }: { item: VideoItem; onClose: () => void })
   );
 }
 
+
+// ── Chat Panel ────────────────────────────────────────────────────────────────
+interface ChatMsg     { id: string; name: string; text: string; sentAt: string; }
+interface ActiveViewer { name: string; lastSeen: string; }
+
+function ChatPanel({ viewerName, onClose }: { viewerName: string; onClose: () => void }) {
+  const [messages,  setMessages]  = useState<ChatMsg[]>([]);
+  const [viewers,   setViewers]   = useState<ActiveViewer[]>([]);
+  const [input,     setInput]     = useState("");
+  const [sending,   setSending]   = useState(false);
+  const [since,     setSince]     = useState<string | undefined>(undefined);
+  const [tab,       setTab]       = useState<"chat"|"who">("chat");
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Initial load — messages + heartbeat
+  useEffect(() => {
+    fetch("/api/film-room/chat")
+      .then(r => r.json())
+      .then((msgs: ChatMsg[]) => {
+        setMessages(msgs);
+        if (msgs.length > 0) setSince(msgs[msgs.length - 1].sentAt);
+      })
+      .catch(() => {});
+
+    // Register presence immediately
+    if (viewerName) {
+      fetch("/api/film-room/presence", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: viewerName }),
+      }).then(r => r.json()).then(setViewers).catch(() => {});
+    }
+
+    // Leave when page closes
+    const handleLeave = () => {
+      if (viewerName) {
+        navigator.sendBeacon("/api/film-room/presence",
+          JSON.stringify({ name: viewerName, action: "leave" }));
+      }
+    };
+    window.addEventListener("beforeunload", handleLeave);
+    return () => window.removeEventListener("beforeunload", handleLeave);
+  }, [viewerName]);
+
+  // Heartbeat every 30s + poll messages every 2s
+  useEffect(() => {
+    // Message polling
+    const msgInterval = setInterval(() => {
+      const url = since ? `/api/film-room/chat?since=${encodeURIComponent(since)}` : "/api/film-room/chat";
+      fetch(url)
+        .then(r => r.json())
+        .then((newMsgs: ChatMsg[]) => {
+          if (newMsgs.length > 0) {
+            setMessages(prev => {
+              const ids = new Set(prev.map(m => m.id));
+              const fresh = newMsgs.filter(m => !ids.has(m.id));
+              return [...prev, ...fresh];
+            });
+            setSince(newMsgs[newMsgs.length - 1].sentAt);
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+
+    // Presence heartbeat every 30s
+    const presenceInterval = setInterval(() => {
+      if (!viewerName) return;
+      fetch("/api/film-room/presence", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: viewerName }),
+      }).then(r => r.json()).then(setViewers).catch(() => {});
+    }, 30000);
+
+    // Also refresh viewers list every 10s
+    const viewersInterval = setInterval(() => {
+      fetch("/api/film-room/presence")
+        .then(r => r.json()).then(setViewers).catch(() => {});
+    }, 10000);
+
+    return () => {
+      clearInterval(msgInterval);
+      clearInterval(presenceInterval);
+      clearInterval(viewersInterval);
+    };
+  }, [since, viewerName]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (tab === "chat") bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, tab]);
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim() || sending) return;
+    setSending(true);
+    try {
+      const res = await fetch("/api/film-room/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: viewerName, text: input.trim() }),
+      });
+      const msg: ChatMsg = await res.json();
+      if (msg.id) {
+        setMessages(prev => [...prev.filter(m => m.id !== msg.id), msg]);
+        setSince(msg.sentAt);
+        setInput("");
+      }
+    } catch { /* ignore */ }
+    setSending(false);
+  }
+
+  const formatTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+
+  const avatarColor = (name: string) => {
+    const colors = ["bg-blue-600","bg-purple-600","bg-green-600","bg-orange-600","bg-pink-600","bg-red-600","bg-teal-600"];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-[#0d1525] border-l border-white/10">
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-blue-400" />
+          <span className="text-white font-bold text-sm">Film Room</span>
+          <span className="flex items-center gap-1 bg-green-500/15 border border-green-500/30 text-green-400 text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+            {viewers.length} watching
+          </span>
+        </div>
+        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <XIcon className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex border-b border-white/10 flex-shrink-0">
+        <button onClick={() => setTab("chat")}
+          className={`flex-1 py-2 text-xs font-bold transition-colors ${tab==="chat" ? "text-white border-b-2 border-blue-500" : "text-gray-500 hover:text-gray-300"}`}>
+          💬 Chat
+        </button>
+        <button onClick={() => setTab("who")}
+          className={`flex-1 py-2 text-xs font-bold transition-colors ${tab==="who" ? "text-white border-b-2 border-blue-500" : "text-gray-500 hover:text-gray-300"}`}>
+          👥 Who&apos;s Watching ({viewers.length})
+        </button>
+      </div>
+
+      {tab === "who" ? (
+        /* ── Who's watching ── */
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-0">
+          {viewers.length === 0 ? (
+            <div className="text-center py-8 text-gray-600 text-xs">No one else is in the room yet.</div>
+          ) : (
+            viewers.map(v => (
+              <div key={v.name} className="flex items-center gap-3 py-2">
+                <div className={`w-8 h-8 rounded-full ${avatarColor(v.name)} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+                  {v.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-white text-sm font-semibold truncate">
+                    {v.name} {v.name === viewerName ? <span className="text-gray-500 font-normal text-xs">(you)</span> : ""}
+                  </div>
+                </div>
+                <span className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0" />
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        /* ── Chat messages ── */
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
+          {messages.length === 0 && (
+            <div className="text-center py-8">
+              <MessageCircle className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+              <p className="text-gray-600 text-xs">No messages yet.<br/>Be the first to say something!</p>
+            </div>
+          )}
+          {messages.map(msg => {
+            const isMe = msg.name === viewerName;
+            return (
+              <div key={msg.id} className={`flex gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
+                <div className={`w-7 h-7 rounded-full ${avatarColor(msg.name)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5`}>
+                  {msg.name.charAt(0).toUpperCase()}
+                </div>
+                <div className={`max-w-[75%] ${isMe ? "items-end" : "items-start"} flex flex-col`}>
+                  {!isMe && <span className="text-gray-500 text-xs mb-1 px-1">{msg.name}</span>}
+                  <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed break-words ${
+                    isMe ? "bg-blue-600 text-white rounded-tr-sm" : "bg-white/8 text-gray-200 rounded-tl-sm"
+                  }`}>
+                    {msg.text}
+                  </div>
+                  <span className="text-gray-600 text-xs mt-1 px-1">{formatTime(msg.sentAt)}</span>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+      )}
+
+      {/* Input */}
+      {tab === "chat" && (
+        <form onSubmit={sendMessage} className="flex gap-2 px-3 py-3 border-t border-white/10 flex-shrink-0">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder="Type a message…"
+            maxLength={500}
+            className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+          />
+          <button type="submit" disabled={!input.trim() || sending}
+            className="w-9 h-9 flex-shrink-0 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded-xl flex items-center justify-center transition-all">
+            <Send className="w-4 h-4 text-white" />
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function FilmRoomPage() {
   const [authed,     setAuthed]     = useState(false);
   const [viewerName, setViewerName] = useState("");
+  const [chatOpen,   setChatOpen]   = useState(false);
   const [name,       setName]       = useState("");
   const [email,      setEmail]      = useState("");
   const [password,   setPassword]   = useState("");
@@ -335,7 +558,7 @@ export default function FilmRoomPage() {
       )}
 
       {/* Library */}
-      <section className="max-w-7xl mx-auto px-4 pb-24">
+      <section className="max-w-7xl mx-auto px-4 pb-32">
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -375,6 +598,26 @@ export default function FilmRoomPage() {
 
       {selected && <VideoModal item={selected} onClose={() => setSelected(null)} />}
       <Footer />
+
+      {/* ── Floating chat button ── */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 9999 }}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-3 rounded-2xl shadow-xl shadow-blue-500/30 transition-all hover:scale-105"
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span className="text-sm">Live Chat</span>
+        </button>
+      )}
+
+      {/* ── Chat drawer (fixed right side) ── */}
+      {chatOpen && (
+        <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "320px", zIndex: 9999 }}>
+          <ChatPanel viewerName={viewerName} onClose={() => setChatOpen(false)} />
+        </div>
+      )}
+
     </main>
   );
 }

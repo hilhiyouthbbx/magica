@@ -108,6 +108,21 @@ export async function logVisitor(visitor: Omit<FilmRoomVisitor, "id">): Promise<
   return { entry, tally };
 }
 
+export async function deleteGuest(tallyKey: string): Promise<void> {
+  // Remove from tally
+  const tallies = await readTally();
+  await writeTally(tallies.filter(t => t.key !== tallyKey));
+  // Remove all log entries for this guest (key = "name|email")
+  const [guestName] = tallyKey.split("|");
+  const log = await readLog();
+  await writeLog(log.filter(v => v.name.toLowerCase() !== guestName.toLowerCase()));
+}
+
+export async function deleteVisitEntry(id: string): Promise<void> {
+  const log = await readLog();
+  await writeLog(log.filter(v => v.id !== id));
+}
+
 export async function clearVisitors(): Promise<void> {
   await writeLog([]);
   await writeTally([]);

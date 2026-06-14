@@ -142,7 +142,7 @@ function VideoModal({ item, onClose }: { item: VideoItem; onClose: () => void })
 
 // ── Chat Panel ────────────────────────────────────────────────────────────────
 interface ChatMsg     { id: string; name: string; text: string; sentAt: string; }
-interface ActiveViewer { name: string; lastSeen: string; }
+interface ActiveViewer { name: string; lastSeen: string; watching?: string; }
 
 function ChatPanel({ viewerName, onClose }: { viewerName: string; onClose: () => void }) {
   const [messages,  setMessages]  = useState<ChatMsg[]>([]);
@@ -277,10 +277,16 @@ function ChatPanel({ viewerName, onClose }: { viewerName: string; onClose: () =>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-white text-sm font-semibold truncate">
-                    {v.name} {v.name === viewerName ? <span className="text-gray-500 font-normal text-xs">(you)</span> : ""}
+                    {v.name === viewerName ? "You" : v.name}
                   </div>
+                  {v.watching
+                    ? <div className="text-green-400 text-xs flex items-center gap-1 mt-0.5 truncate">
+                        <Play className="w-2.5 h-2.5 flex-shrink-0" />{v.watching}
+                      </div>
+                    : <div className="text-gray-600 text-xs mt-0.5">Browsing…</div>
+                  }
                 </div>
-                <span className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0" />
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${v.watching ? "bg-green-400 animate-pulse" : "bg-gray-600"}`} />
               </div>
             ))
           )}
@@ -354,7 +360,7 @@ export default function FilmRoomPage() {
   const [selected,   setSelected]   = useState<VideoItem | null>(null);
   const [search,     setSearch]     = useState("");
   const [filter,     setFilter]     = useState<"all" | "video" | "stream">("all");
-  const [viewers,    setViewers]    = useState<string[]>([]);
+  const [viewers,    setViewers]    = useState<ActiveViewer[]>([]);
   const [isCoach,    setIsCoach]    = useState(false);
 
   // Always require fresh sign-in on every visit
@@ -401,7 +407,7 @@ export default function FilmRoomPage() {
     const fetchViewers = () =>
       fetch("/api/film-room/presence")
         .then(r => r.json())
-        .then((data: { name: string }[]) => setViewers(data.map((v: { name: string }) => v.name)))
+        .then((data: ActiveViewer[]) => setViewers(Array.isArray(data) ? data : []))
         .catch(() => {});
     fetchViewers();
     const iv = setInterval(fetchViewers, 10000);
@@ -561,18 +567,23 @@ export default function FilmRoomPage() {
               {/* Who's Watching strip */}
               {viewers.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap justify-center mt-1">
-                  <span className="text-gray-500 text-xs font-semibold uppercase tracking-widest">Watching Now:</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {viewers.map((vname) => (
-                      <div key={vname}
-                        title={vname}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                          vname === viewerName
-                            ? "bg-blue-600/30 border-blue-500/50 text-blue-300"
-                            : "bg-white/8 border-white/15 text-gray-300"
+                  <span className="text-gray-500 text-xs font-semibold uppercase tracking-widest">In the Room:</span>
+                  <div className="flex items-center gap-2 flex-wrap justify-center">
+                    {viewers.map((v) => (
+                      <div key={v.name}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                          v.name === viewerName
+                            ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
+                            : "bg-white/5 border-white/15 text-gray-300"
                         }`}>
-                        <span className={`w-2 h-2 rounded-full ${vname === viewerName ? "bg-blue-400" : "bg-green-400"} animate-pulse`} />
-                        {vname}
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${v.name === viewerName ? "bg-blue-400" : "bg-green-400"} animate-pulse`} />
+                        <span>{v.name === viewerName ? "You" : v.name}</span>
+                        {v.watching && (
+                          <span className="flex items-center gap-1 text-green-400 font-semibold">
+                            <Play className="w-2.5 h-2.5 flex-shrink-0" />
+                            <span className="max-w-[120px] truncate">{v.watching}</span>
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>

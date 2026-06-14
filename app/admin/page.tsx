@@ -331,6 +331,18 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
     setChatCount(0);
   }
 
+  async function removeGuest(tallyKey: string, name: string) {
+    if (!confirm(`Remove ${name} from the visitor list? This will delete their tally and all log entries.`)) return;
+    await fetch(`/api/film-room/visitors?key=${adminKey}&guest=${encodeURIComponent(tallyKey)}`, { method: "DELETE" });
+    setTally(prev => prev.filter(t => t.key !== tallyKey));
+    setVisitors(prev => prev.filter(v => v.name.toLowerCase() !== name.toLowerCase()));
+  }
+
+  async function removeEntry(id: string) {
+    await fetch(`/api/film-room/visitors?key=${adminKey}&entryId=${encodeURIComponent(id)}`, { method: "DELETE" });
+    setVisitors(prev => prev.filter(v => v.id !== id));
+  }
+
   if (!loaded) return <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Loading…</div>;
 
   const totalVisits   = tally.reduce((s, t) => s + t.count, 0);
@@ -455,6 +467,7 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
                 <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="px-5 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Visits</th>
                 <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Last Seen</th>
+                <th className="px-3 py-3 w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -479,6 +492,13 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
                   <td className="px-5 py-3 text-gray-400 text-sm">
                     {new Date(t.lastSeen).toLocaleString("en-US", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles" })}
                   </td>
+                  <td className="px-3 py-3">
+                    <button onClick={() => removeGuest(t.key, t.name)}
+                      title="Remove guest"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -493,6 +513,7 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
                 <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Signed In</th>
+                <th className="px-3 py-3 w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -511,6 +532,13 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
                   </td>
                   <td className="px-5 py-3 text-gray-400 text-sm">
                     {new Date(v.enteredAt).toLocaleString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit", hour12:true, timeZone:"America/Los_Angeles" })}
+                  </td>
+                  <td className="px-3 py-3">
+                    <button onClick={() => removeEntry(v.id)}
+                      title="Remove this entry"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </td>
                 </tr>
               ))}

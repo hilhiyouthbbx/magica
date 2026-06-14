@@ -1,11 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
 import {
-  Plus, Save, Trash2, X, Loader2, CheckCircle
+  Plus, Save, Trash2, X, Loader2, CheckCircle,
+  Users, GripVertical, RefreshCw
 } from "lucide-react";
 import type {
   CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division
 } from "@/lib/camp-schedule";
+import type { CamperRosterEntry } from "@/app/api/camp-schedule/roster/route";
 
 const EVENT_NAMES = [
   "Free Throw Contest",
@@ -15,10 +17,14 @@ const EVENT_NAMES = [
 ];
 
 export function CampTab({ adminKey }: { adminKey: string }) {
-  const [data,    setData]    = useState<CampScheduleData | null>(null);
-  const [saving,  setSaving]  = useState(false);
-  const [saved,   setSaved]   = useState(false);
-  const [section, setSection] = useState<"teams"|"standings"|"bracket"|"events"|"settings">("teams");
+  const [data,        setData]        = useState<CampScheduleData | null>(null);
+  const [saving,      setSaving]      = useState(false);
+  const [saved,       setSaved]       = useState(false);
+  const [section,     setSection]     = useState<"roster"|"teams"|"standings"|"bracket"|"events"|"settings">("teams");
+  const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
+  const [rosterLoad,  setRosterLoad]  = useState(false);
+  const [dragOver,    setDragOver]    = useState<string | null>(null);
+  const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/camp-schedule")
@@ -26,6 +32,31 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       .then(setData)
       .catch(() => {});
   }, []);
+
+  // Recompute assignedIds whenever teams or roster changes
+  useEffect(() => {
+    if (!data || roster.length === 0) return;
+    const allNames = new Set<string>();
+    data.teams.forEach(t => t.players.forEach(p => p && allNames.add(p.trim().toLowerCase())));
+    const ids = new Set<string>();
+    roster.forEach(cam => {
+      if (allNames.has(cam.displayName.toLowerCase()) || allNames.has(cam.fullName.toLowerCase()))
+        ids.add(cam.id);
+    });
+    setAssignedIds(ids);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.teams, roster]);
+
+  async function loadRoster() {
+    setRosterLoad(true);
+    try {
+      const res  = await fetch(`/api/camp-schedule/roster?key=${adminKey}`);
+      const json = await res.json();
+      if (json.campers) setRoster(json.campers as CamperRosterEntry[]);
+    } finally {
+      setRosterLoad(false);
+    }
+  }
 
   async function save(patch: Partial<CampScheduleData>) {
     if (!data) return;
@@ -65,7 +96,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     if (!data) return;
     const team = data.teams.find(t => t.id === teamId);
     if (!team) return;
-    // Keep array positions — pad with empty strings up to idx
     const arr = Array.from({ length: 6 }, (_, i) => team.players[i] ?? "");
     arr[idx] = value;
     setData({ ...data, teams: data.teams.map(t => t.id === teamId ? { ...t, players: arr } : t) });
@@ -73,7 +103,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
   function saveTeams() {
     if (!data) return;
-    // Strip trailing empty strings only on save
     const cleaned = data.teams.map(t => ({
       ...t, players: t.players.filter(p => p.trim() !== "")
     }));
@@ -142,7 +171,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
   function saveEvents() {
     if (!data) return;
-    // Strip empty nominees on save
     const cleaned = (data.individualEvents ?? []).map(e => ({
       ...e, nominees: e.nominees.map(n => ({ ...n, players: n.players.filter(p => p.trim() !== "") }))
     }));
@@ -154,12 +182,64 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     save({ individualEvents: (data.individualEvents ?? []).filter(e => e.id !== id) });
   }
 
+  // ── Drag-and-drop helpers ─────────────────────────────────────────────────
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>, cam: CamperRosterEntry) {
+    e.dataTransfer.setData("camper", JSON.stringify(cam));
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>, teamId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOver(teamId);
+  }
+  function handleDragLeave() { setDragOver(null); }
+  function handleDrop(e: React.DragEvent<HTMLDivElement>, teamId: string) {
+    e.preventDefault();
+    setDragOver(null);
+    if (!data) return;
+    const raw = e.dataTransfer.getData("camper");
+    if (!raw) return;
+    const cam: CamperRosterEntry = JSON.parse(raw) as CamperRosterEntry;
+    const team = data.teams.find(t => t.id === teamId);
+    if (!team) return;
+    const playerName = cam.displayName;
+    if (team.players.includes(playerName)) return;
+    const arr = Array.from({ length: 6 }, (_, i) => team.players[i] ?? "");
+    const emptyIdx = arr.findIndex(p => !p.trim());
+    if (emptyIdx === -1) return;
+    arr[emptyIdx] = playerName;
+    const updatedTeams = data.teams.map(t => t.id === teamId ? { ...t, players: arr } : t);
+    setData({ ...data, teams: updatedTeams });
+    setAssignedIds(prev => new Set([...prev, cam.id]));
+  }
+  function removeFromTeam(teamId: string, playerName: string) {
+    if (!data) return;
+    const updatedTeams = data.teams.map(t =>
+      t.id !== teamId ? t : { ...t, players: t.players.map(p => p === playerName ? "" : p) }
+    );
+    setData({ ...data, teams: updatedTeams });
+    const stillAssigned = updatedTeams.some(t => t.players.some(p => p === playerName));
+    if (!stillAssigned) {
+      const cam = roster.find(r => r.displayName === playerName || r.fullName === playerName);
+      if (cam) setAssignedIds(prev => { const s = new Set(prev); s.delete(cam.id); return s; });
+    }
+  }
+
   if (!data) return (
     <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Loading…</div>
   );
 
   const divTeams = (div: Division) => data.teams.filter(t => t.division === div);
   const teamOpts = (div: Division) => divTeams(div).map(t => ({ id: t.id, name: t.name || "(unnamed)" }));
+
+  // Grade label helper (used in roster section)
+  function gradeLabel(g: string) {
+    if (!g || g === "Unknown Grade") return g || "Unknown Grade";
+    const n = parseInt(g.match(/\d+/)?.[0] ?? "0", 10);
+    if (n === 0) return g;
+    const suf = n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th";
+    return `${n}${suf} Grade`;
+  }
 
   return (
     <div className="space-y-5">
@@ -180,11 +260,12 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       {/* Section nav */}
       <div className="flex flex-wrap gap-2 items-center">
         {([
-          ["teams",    "👥 Teams & Rosters"],
-          ["standings","📊 Standings"],
-          ["bracket",  "🏆 Bracket"],
-          ["events",   "🎯 Individual Events"],
-          ["settings", "⚙️ Settings"],
+          ["roster",    "📋 Camper Roster"],
+          ["teams",     "👥 Teams & Rosters"],
+          ["standings", "📊 Standings"],
+          ["bracket",   "🏆 Bracket"],
+          ["events",    "🎯 Individual Events"],
+          ["settings",  "⚙️ Settings"],
         ] as const).map(([s, label]) => (
           <button key={s} onClick={() => setSection(s)}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${section === s ? "bg-blue-600 text-white" : "glass border border-white/15 text-gray-400 hover:text-white"}`}>
@@ -195,7 +276,162 @@ export function CampTab({ adminKey }: { adminKey: string }) {
         {saved  && <span className="flex items-center gap-1 text-green-400 text-sm"><CheckCircle className="w-3.5 h-3.5" />Saved!</span>}
       </div>
 
-      {/* ── TEAMS ── */}
+      {/* ── ROSTER ── */}
+      {section === "roster" && (
+        <div className="space-y-5">
+          {/* Header + Load button */}
+          <div className="glass rounded-2xl border border-white/10 p-5">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-white font-black text-base flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-400" />Camper Roster
+                </h3>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  Auto-pulled from 2026 Summer Youth Camp registrations, sorted by grade.
+                </p>
+              </div>
+              <button onClick={loadRoster} disabled={rosterLoad}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl text-sm font-bold text-white transition-all">
+                {rosterLoad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {roster.length === 0 ? "Load from Registrations" : "Refresh"}
+              </button>
+            </div>
+            {roster.length === 0 && !rosterLoad && (
+              <p className="text-gray-600 text-sm mt-4 italic">
+                Click &quot;Load from Registrations&quot; to pull in all campers from the contact form.
+              </p>
+            )}
+          </div>
+
+          {roster.length > 0 && (() => {
+            // Group by grade number, then grade label
+            const gradeMap = new Map<number, { label: string; campers: CamperRosterEntry[] }>();
+            roster.forEach(cam => {
+              const key = cam.gradeNum;
+              if (!gradeMap.has(key)) gradeMap.set(key, { label: gradeLabel(cam.grade), campers: [] });
+              gradeMap.get(key)!.campers.push(cam);
+            });
+            const sorted = [...gradeMap.entries()].sort((a, b) => a[0] - b[0]);
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded bg-blue-500/30 border border-blue-500/50 inline-block" />
+                    Unassigned
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded bg-green-500/20 border border-green-500/40 inline-block" />
+                    Already on a team ✓
+                  </span>
+                  <span className="text-gray-600">Drag a name onto any team card below to assign.</span>
+                </div>
+                {sorted.map(([gradeNum, { label, campers }]) => (
+                  <div key={gradeNum} className="glass rounded-2xl border border-white/10 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-black text-white">{label}</span>
+                      <span className="text-xs text-gray-500">{campers.length} camper{campers.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {campers.map(cam => {
+                        const isAssigned = assignedIds.has(cam.id);
+                        return (
+                          <div
+                            key={cam.id}
+                            draggable
+                            onDragStart={e => handleDragStart(e, cam)}
+                            title={`${cam.fullName}${cam.grade ? " · " + cam.grade : ""} — drag to a team`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold cursor-grab active:cursor-grabbing select-none transition-all border ${
+                              isAssigned
+                                ? "bg-green-500/15 border-green-500/40 text-green-300 opacity-70"
+                                : "bg-blue-500/20 border-blue-500/40 text-blue-200 hover:bg-blue-500/30"
+                            }`}
+                          >
+                            <GripVertical className="w-3 h-3 opacity-40 flex-shrink-0" />
+                            {cam.displayName}
+                            {isAssigned && <span className="text-green-500 text-[10px] ml-0.5">✓</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Drop zone — team cards */}
+          {roster.length > 0 && data.teams.length > 0 && (
+            <div className="glass rounded-2xl border border-white/10 p-5">
+              <h3 className="text-white font-black text-sm mb-1">🏀 Drop Zone — Assign to Teams</h3>
+              <p className="text-gray-500 text-xs mb-4">Drag a name from above onto a team box. Click ✕ next to a name to remove them.</p>
+              <div className="space-y-5">
+                {(["NBA", "College"] as Division[]).map(div => (
+                  <div key={div}>
+                    <div className={`text-xs font-black uppercase tracking-widest mb-2 ${div === "NBA" ? "text-orange-400" : "text-blue-400"}`}>
+                      {div} Division
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {data.teams.filter(t => t.division === div).map(team => {
+                        const isDragTarget  = dragOver === team.id;
+                        const filledPlayers = team.players.filter(p => p.trim());
+                        const isFull        = filledPlayers.length >= 6;
+                        return (
+                          <div
+                            key={team.id}
+                            onDragOver={e => !isFull && handleDragOver(e, team.id)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={e => handleDrop(e, team.id)}
+                            className={`rounded-xl border p-3 transition-all min-h-[80px] ${
+                              isDragTarget ? "border-blue-400 bg-blue-500/15 scale-[1.01]"
+                              : isFull     ? "border-white/10 bg-white/[0.02] opacity-60"
+                              :              "border-white/15 bg-white/[0.03] hover:border-white/25"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-white font-black text-sm">{team.name || "(unnamed)"}</span>
+                              <span className={`text-xs font-bold ${isFull ? "text-yellow-500" : "text-gray-600"}`}>
+                                {filledPlayers.length}/6{isFull ? " full" : ""}
+                              </span>
+                            </div>
+                            {filledPlayers.length === 0 ? (
+                              <p className={`text-xs py-2 text-center rounded-lg border border-dashed ${isDragTarget ? "text-blue-400 border-blue-400/50" : "text-gray-700 border-white/10"}`}>
+                                Drop player here
+                              </p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {filledPlayers.map((p, idx) => (
+                                  <span key={idx} className="flex items-center gap-1 bg-white/10 rounded-lg px-2 py-1 text-xs text-white">
+                                    {p}
+                                    <button onClick={() => removeFromTeam(team.id, p)} className="text-gray-500 hover:text-red-400 ml-0.5 flex-shrink-0">
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                                {!isFull && (
+                                  <span className={`text-xs border border-dashed rounded-lg px-2 py-1 ${isDragTarget ? "text-blue-400 border-blue-400/40" : "text-gray-700 border-white/10"}`}>
+                                    + drop here
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button onClick={saveTeams}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all">
+                  <Save className="w-3.5 h-3.5" />Save All Team Rosters
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {section === "teams" && (
         <div className="space-y-6">
           {(["NBA", "College"] as Division[]).map(div => (

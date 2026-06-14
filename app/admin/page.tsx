@@ -37,7 +37,7 @@ interface Contact {
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 
-type Tab = "contacts" | "tournaments" | "pages" | "vouchers" | "filmroom" | "camp";
+type Tab = "contacts" | "tournaments" | "pages" | "vouchers" | "filmroom" | "camp" | "tourney";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-component: image field with upload
@@ -552,6 +552,7 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
 
 
 import { CampTab } from "./camp-tab";
+import { TourneyTab } from "./tourney-tab";
 
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1896,6 +1897,7 @@ export default function AdminPage() {
             { id:"vouchers",    icon:<Tag      className="w-4 h-4"/>, label:"Vouchers"    },
             { id:"filmroom",    icon:<Video    className="w-4 h-4"/>, label:"Film Room"   },
             { id:"camp",        icon:<Trophy   className="w-4 h-4"/>, label:"Camp Hub"    },
+            { id:"tourney",     icon:<Trophy   className="w-4 h-4"/>, label:"Tournament Manager" },
             { id:"pages",       icon:<FileText className="w-4 h-4"/>, label:"Pages"       },
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -2240,6 +2242,7 @@ export default function AdminPage() {
         {tab === "vouchers"  && <VouchersTab  adminKey={adminKey} />}
         {tab === "filmroom"  && <FilmRoomTab  adminKey={adminKey} />}
         {tab === "camp"      && <CampTab      adminKey={adminKey} />}
+        {tab === "tourney"   && <TourneyTab />}
         {tab === "pages"     && <PagesTab     adminKey={adminKey} />}
       </div>
     </main>

@@ -52,14 +52,48 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     setRosterLoad(true);
     setRosterError("");
     try {
-      const res  = await fetch(`/api/camp-schedule/roster?key=${adminKey}`);
-      const json = await res.json() as { campers?: CamperRosterEntry[]; error?: string };
-      if (!res.ok || json.error) {
-        setRosterError(`Error ${res.status}: ${json.error ?? "Unknown error"}`);
-      } else if (json.campers) {
-        setRoster(json.campers);
+      const res  = await fetch(`/api/admin/contacts?key=${adminKey}`);
+      if (!res.ok) {
+        setRosterError(`Could not load contacts (status ${res.status}). Check admin password.`);
+        return;
+      }
+      const raw = await res.json() as unknown;
+      const all: Record<string, string>[] = Array.isArray(raw) ? raw : (raw as { contacts?: Record<string, string>[] }).contacts ?? [];
+
+      // Filter to camp registrations + format
+      function parseGradeNum(g: string | undefined): number {
+        if (!g) return 99;
+        const m = g.match(/\d+/);
+        return m ? parseInt(m[0], 10) : 99;
+      }
+      function fmt(full: string): string {
+        const parts = full.trim().split(/\s+/);
+        if (parts.length < 2 || !parts[0]) return parts[0] || "Unknown";
+        return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+      }
+
+      const campers: CamperRosterEntry[] = all
+        .filter(c => {
+          const src = (c.source ?? "").toLowerCase();
+          return (src.includes("camp") || src.includes("2026")) && (c.camperName || c.name);
+        })
+        .map(c => {
+          const fullName = (c.camperName ?? c.name ?? "").trim();
+          const grade    = (c.grade ?? "").trim();
+          return {
+            id:          c.id ?? Math.random().toString(36).slice(2),
+            fullName,
+            displayName: fmt(fullName),
+            grade,
+            gradeNum:    parseGradeNum(grade),
+          };
+        })
+        .sort((a, b) => a.gradeNum !== b.gradeNum ? a.gradeNum - b.gradeNum : a.fullName.localeCompare(b.fullName));
+
+      if (campers.length === 0) {
+        setRosterError(`Found ${all.length} contacts but none matched the camp filter. Sources found: ${[...new Set(all.map(c => c.source).filter(Boolean))].join(", ") || "none"}`);
       } else {
-        setRosterError("No campers returned. Check that contacts have a source containing 'camp' or '2026'.");
+        setRoster(campers);
       }
     } catch (err) {
       setRosterError(`Network error: ${String(err)}`);

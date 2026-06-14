@@ -153,7 +153,7 @@ function ChatPanel({ viewerName, onClose }: { viewerName: string; onClose: () =>
   const [tab,       setTab]       = useState<"chat"|"who">("chat");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Initial load — messages + heartbeat
+  // Initial load — messages + fetch current viewers
   useEffect(() => {
     fetch("/api/film-room/chat")
       .then(r => r.json())
@@ -163,24 +163,10 @@ function ChatPanel({ viewerName, onClose }: { viewerName: string; onClose: () =>
       })
       .catch(() => {});
 
-    // Register presence immediately
-    if (viewerName) {
-      fetch("/api/film-room/presence", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: viewerName }),
-      }).then(r => r.json()).then(setViewers).catch(() => {});
-    }
-
-    // Leave when page closes
-    const handleLeave = () => {
-      if (viewerName) {
-        navigator.sendBeacon("/api/film-room/presence",
-          JSON.stringify({ name: viewerName, action: "leave" }));
-      }
-    };
-    window.addEventListener("beforeunload", handleLeave);
-    return () => window.removeEventListener("beforeunload", handleLeave);
-  }, [viewerName]);
+    // Fetch who is currently watching
+    fetch("/api/film-room/presence")
+      .then(r => r.json()).then(setViewers).catch(() => {});
+  }, []);
 
   // Heartbeat every 30s + poll messages every 2s
   useEffect(() => {
@@ -202,16 +188,7 @@ function ChatPanel({ viewerName, onClose }: { viewerName: string; onClose: () =>
         .catch(() => {});
     }, 2000);
 
-    // Presence heartbeat every 30s
-    const presenceInterval = setInterval(() => {
-      if (!viewerName) return;
-      fetch("/api/film-room/presence", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: viewerName }),
-      }).then(r => r.json()).then(setViewers).catch(() => {});
-    }, 30000);
-
-    // Also refresh viewers list every 10s
+    // Refresh viewers list every 10s
     const viewersInterval = setInterval(() => {
       fetch("/api/film-room/presence")
         .then(r => r.json()).then(setViewers).catch(() => {});
@@ -219,7 +196,6 @@ function ChatPanel({ viewerName, onClose }: { viewerName: string; onClose: () =>
 
     return () => {
       clearInterval(msgInterval);
-      clearInterval(presenceInterval);
       clearInterval(viewersInterval);
     };
   }, [since, viewerName]);
@@ -393,6 +369,30 @@ export default function FilmRoomPage() {
       .catch(() => {});
   }, [authed]);
 
+  // Keep presence alive with heartbeat every 30s while in the room
+  useEffect(() => {
+    if (!authed || !viewerName) return;
+
+    const beat = () => fetch("/api/film-room/presence", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: viewerName }),
+    }).catch(() => {});
+
+    const interval = setInterval(beat, 30000);
+
+    // Remove presence when tab closes
+    const onLeave = () => navigator.sendBeacon(
+      "/api/film-room/presence",
+      JSON.stringify({ name: viewerName, action: "leave" })
+    );
+    window.addEventListener("beforeunload", onLeave);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, [authed, viewerName]);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) { setPwError("Please enter your name."); return; }
@@ -411,6 +411,16 @@ export default function FilmRoomPage() {
       } else {
         setViewerName(name.trim());
         setAuthed(true);
+        // Register presence immediately on sign-in
+        fetch("/api/film-room/presence", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim() }),
+        }).catch(() => {});
+        // Auto-open chat if there are already messages
+        fetch("/api/film-room/chat")
+          .then(r => r.json())
+          .then((msgs: ChatMsg[]) => { if (msgs.length > 0) setChatOpen(true); })
+          .catch(() => {});
       }
     } catch {
       setPwError("Unable to connect. Please try again.");

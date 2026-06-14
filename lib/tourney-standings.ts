@@ -1,9 +1,10 @@
-import type { PoolGame, Team, TeamStanding } from "@/lib/tourney-types";
+import type { PoolGame, Team, TeamStanding, TiebreakerMethod } from "@/lib/tourney-types";
 
 export function calculateStandings(
   teamIds: string[],
   teams: Team[],
-  games: PoolGame[]
+  games: PoolGame[],
+  tiebreaker: TiebreakerMethod = "point_diff"
 ): TeamStanding[] {
   const teamMap = new Map(teams.map(t => [t.id, t.name]));
   const s = new Map<string, TeamStanding>(
@@ -28,8 +29,10 @@ export function calculateStandings(
   const list = [...s.values()].map(x => ({ ...x, pd: x.pf - x.pa }));
 
   list.sort((a, b) => {
+    // 1. Wins
     if (b.wins !== a.wins) return b.wins - a.wins;
-    // Head-to-head tiebreaker
+
+    // 2. Head-to-head (always checked first within a tie)
     const h2h = games.find(
       g => g.status === "completed" &&
         ((g.team1Id === a.teamId && g.team2Id === b.teamId) ||
@@ -39,11 +42,26 @@ export function calculateStandings(
       const aWon =
         (h2h.team1Id === a.teamId && h2h.score1 > h2h.score2) ||
         (h2h.team2Id === a.teamId && h2h.score2 > h2h.score1);
-      if (aWon) return -1;
-      return 1;
+      const bWon =
+        (h2h.team1Id === b.teamId && h2h.score1 > h2h.score2) ||
+        (h2h.team2Id === b.teamId && h2h.score2 > h2h.score1);
+      if (aWon && !bWon) return -1;
+      if (bWon && !aWon) return 1;
+      // tied head-to-head (shouldn't happen unless tie game) — fall through
     }
-    if (b.pd !== a.pd) return b.pd - a.pd;
-    return b.pf - a.pf;
+
+    // 3. Tiebreaker setting
+    if (tiebreaker === "least_pa") {
+      // Fewest points allowed wins — lower PA is better
+      if (a.pa !== b.pa) return a.pa - b.pa;
+      // Then most points for
+      return b.pf - a.pf;
+    } else {
+      // Default: point_diff — higher net is better
+      if (b.pd !== a.pd) return b.pd - a.pd;
+      // Then most points for
+      return b.pf - a.pf;
+    }
   });
 
   return list;

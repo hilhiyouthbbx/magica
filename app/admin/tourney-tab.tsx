@@ -1,40 +1,104 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { Tournament, Division, Pool, PoolGame, BracketGame, Team, BracketFormat } from "@/lib/tourney-types";
+import type {
+  Tournament, Division, Pool, PoolGame, BracketGame, Team,
+  BracketFormat, TiebreakerMethod, VenueConfig
+} from "@/lib/tourney-types";
 import { getAllTournaments, saveTournament, deleteTournament as deleteT } from "@/lib/tourney-storage";
 import { generateDivisionSchedule } from "@/lib/tourney-scheduler";
 import { calculateStandings } from "@/lib/tourney-standings";
 import { generateBracket, advanceBracketWinner } from "@/lib/tourney-bracket";
-import { Plus, Trash2, ArrowLeft, Trophy, Calendar, MapPin, Users, Clock, Edit, X, Download } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Trophy, Calendar, MapPin, Users, Clock, Edit, X, Download, ChevronDown } from "lucide-react";
 
-// ── Registration contact (from admin contacts list) ──────────────────────────
+// ── Registration contact ──────────────────────────────────────────────────────
 
 export interface RegistrationContact {
-  id: string;
-  name: string;           // coach / contact name
-  email: string;
-  phone: string;
-  source: string;         // "tournament"
-  tournamentName?: string;
-  teamName?: string;
-  division?: string;
+  id: string; name: string; email: string; phone: string;
+  source: string;
+  tournamentName?: string; teamName?: string; division?: string;
   date: string;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Division presets ──────────────────────────────────────────────────────────
+
+const GRADE_PRESETS: { grade: string; presets: string[] }[] = [
+  {
+    grade: "4th Grade",
+    presets: [
+      "4th Grade Competitive",
+      "4th Grade Development",
+      "4th Grade Boys",
+      "4th Grade Girls",
+      "4th Grade Boys Competitive",
+      "4th Grade Boys Development",
+      "4th Grade Girls Competitive",
+      "4th Grade Girls Development",
+    ],
+  },
+  {
+    grade: "5th Grade",
+    presets: [
+      "5th Grade Boys",
+      "5th Grade Boys Competitive",
+      "5th Grade Boys Development",
+      "5th Grade Girls",
+      "5th Grade Girls Competitive",
+      "5th Grade Girls Development",
+    ],
+  },
+  {
+    grade: "6th Grade",
+    presets: [
+      "6th Grade Boys",
+      "6th Grade Boys Competitive",
+      "6th Grade Boys Development",
+      "6th Grade Girls",
+      "6th Grade Girls Competitive",
+      "6th Grade Girls Development",
+    ],
+  },
+  {
+    grade: "7th Grade",
+    presets: [
+      "7th Grade Boys",
+      "7th Grade Boys Competitive",
+      "7th Grade Boys Development",
+      "7th Grade Girls",
+      "7th Grade Girls Competitive",
+      "7th Grade Girls Development",
+    ],
+  },
+  {
+    grade: "8th Grade",
+    presets: [
+      "8th Grade Boys",
+      "8th Grade Boys Competitive",
+      "8th Grade Boys Development",
+      "8th Grade Girls",
+      "8th Grade Girls Competitive",
+      "8th Grade Girls Development",
+    ],
+  },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2,5)}`;
 
-/** All registrations matching this tournament manager tournament by name */
+function totalCourts(venues: VenueConfig[]): number {
+  return venues.reduce((s, v) => s + (v.courts || 1), 0);
+}
+function venueLabel(venues: VenueConfig[]): string {
+  return venues.filter(v => v.name.trim()).map(v => v.name).join(" · ") || "—";
+}
+
 function matchingRegs(contacts: RegistrationContact[], tournamentName: string): RegistrationContact[] {
   const n = tournamentName.toLowerCase().trim();
   return contacts.filter(c =>
     c.source === "tournament" && c.tournamentName?.toLowerCase().trim() === n && c.teamName?.trim()
   );
 }
-
-/** Check if a team name is already imported into a division */
 function teamImported(tournament: Tournament, teamName: string, divisionName: string): boolean {
   const div = tournament.divisions.find(d => d.name.toLowerCase() === divisionName.toLowerCase());
   return !!div?.teams.some(t => t.name.toLowerCase() === teamName.toLowerCase().trim());
@@ -65,24 +129,41 @@ function IF({ label, value, onChange, placeholder = "", type = "text", min, step
   );
 }
 
-function VenueEditor({ venues, onChange }: { venues: string[]; onChange: (v: string[]) => void }) {
+// ── Venue + Courts editor ─────────────────────────────────────────────────────
+
+function VenueEditor({ venues, onChange }: { venues: VenueConfig[]; onChange: (v: VenueConfig[]) => void }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Venues</label>
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Venues &amp; Courts</label>
+        <span className="text-[10px] text-gray-600">Total: {totalCourts(venues)} court{totalCourts(venues)!==1?"s":""}</span>
+      </div>
       <div className="space-y-2">
         {venues.map((v, i) => (
-          <div key={i} className="flex gap-2 items-center">
-            <input value={v} onChange={e => { const n=[...venues]; n[i]=e.target.value; onChange(n); }}
-              placeholder={`Venue ${i+1} (e.g. Main Gym)`}
-              className="flex-1 bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500/60 placeholder:text-gray-600" />
+          <div key={i} className="flex gap-2 items-start">
+            {/* Venue name */}
+            <div className="flex-1">
+              <input value={v.name} onChange={e => { const n=[...venues]; n[i]={...n[i], name: e.target.value}; onChange(n); }}
+                placeholder={`Venue ${i+1} (e.g. Main Gym)`}
+                className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500/60 placeholder:text-gray-600" />
+            </div>
+            {/* Courts at this venue */}
+            <div className="flex-shrink-0 w-28">
+              <div className="relative">
+                <input type="number" min="1" max="20" value={v.courts}
+                  onChange={e => { const n=[...venues]; n[i]={...n[i], courts: Math.max(1, +e.target.value||1)}; onChange(n); }}
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 pr-2 rounded-lg focus:outline-none focus:border-blue-500/60 text-center" />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px] pointer-events-none">courts</span>
+              </div>
+            </div>
             {venues.length > 1 && (
-              <button onClick={() => onChange(venues.filter((_,j)=>j!==i))} className="text-gray-600 hover:text-red-400 transition-colors p-1">
-                <X className="w-4 h-4" />
+              <button onClick={() => onChange(venues.filter((_,j)=>j!==i))} className="text-gray-600 hover:text-red-400 transition-colors p-2 mt-0.5">
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
         ))}
-        <button onClick={() => onChange([...venues, ""])}
+        <button onClick={() => onChange([...venues, { name: "", courts: 2 }])}
           className="text-xs text-blue-400 hover:text-blue-300 font-bold transition-colors">
           + Add another venue
         </button>
@@ -90,6 +171,35 @@ function VenueEditor({ venues, onChange }: { venues: string[]; onChange: (v: str
     </div>
   );
 }
+
+// ── Tiebreaker picker ─────────────────────────────────────────────────────────
+
+function TiebreakerPicker({ value, onChange }: { value: TiebreakerMethod; onChange: (v: TiebreakerMethod) => void }) {
+  const opts: { value: TiebreakerMethod; label: string; desc: string }[] = [
+    { value: "point_diff", label: "Point Differential",    desc: "Net +/− points (PF minus PA) breaks ties" },
+    { value: "least_pa",   label: "Least Points Allowed",  desc: "Fewest points scored against you wins the tiebreaker" },
+  ];
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tiebreaker (when teams are tied in W-L)</label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {opts.map(o => (
+          <button key={o.value} type="button" onClick={() => onChange(o.value)}
+            className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${value===o.value?"border-blue-500/60 bg-blue-500/10":"border-white/10 hover:border-white/20"}`}>
+            <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 ${value===o.value?"border-blue-500 bg-blue-500":"border-gray-600"}`}/>
+            <div>
+              <div className={`text-sm font-bold ${value===o.value?"text-white":"text-gray-300"}`}>{o.label}</div>
+              <div className="text-[11px] text-gray-500 leading-tight mt-0.5">{o.desc}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+      <p className="text-[10px] text-gray-600 mt-1">Head-to-head result is always checked first before either tiebreaker.</p>
+    </div>
+  );
+}
+
+// ── Bracket format picker ─────────────────────────────────────────────────────
 
 function BracketFormatPicker({ value, onChange }: { value: BracketFormat; onChange: (v: BracketFormat) => void }) {
   const opts: { value: BracketFormat; label: string; desc: string }[] = [
@@ -104,7 +214,7 @@ function BracketFormatPicker({ value, onChange }: { value: BracketFormat; onChan
         {opts.map(o => (
           <button key={o.value} type="button" onClick={() => onChange(o.value)}
             className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${value===o.value?"border-blue-500/60 bg-blue-500/10":"border-white/10 hover:border-white/20"}`}>
-            <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 transition-all ${value===o.value?"border-blue-500 bg-blue-500":"border-gray-600"}`} />
+            <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 ${value===o.value?"border-blue-500 bg-blue-500":"border-gray-600"}`}/>
             <div>
               <div className={`text-sm font-bold ${value===o.value?"text-white":"text-gray-300"}`}>{o.label}</div>
               <div className="text-xs text-gray-500">{o.desc}</div>
@@ -112,6 +222,54 @@ function BracketFormatPicker({ value, onChange }: { value: BracketFormat; onChan
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Division preset picker ────────────────────────────────────────────────────
+
+function DivisionPresetPicker({ onSelect }: { onSelect: (name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [hoveredGrade, setHoveredGrade] = useState<string | null>(GRADE_PRESETS[0].grade);
+
+  const current = GRADE_PRESETS.find(g => g.grade === hoveredGrade) ?? GRADE_PRESETS[0];
+
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(p => !p)}
+        className="flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors">
+        Presets <ChevronDown className={`w-3 h-3 transition-transform ${open?"rotate-180":""}`}/>
+      </button>
+      {open && (
+        <div className="absolute top-6 left-0 z-40 bg-[#0f1522] border border-white/15 rounded-xl shadow-xl overflow-hidden w-[380px]">
+          <div className="flex">
+            {/* Grade column */}
+            <div className="w-32 border-r border-white/10 py-1">
+              {GRADE_PRESETS.map(g => (
+                <button key={g.grade} type="button"
+                  onMouseEnter={() => setHoveredGrade(g.grade)}
+                  onClick={() => setHoveredGrade(g.grade)}
+                  className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${hoveredGrade===g.grade?"bg-blue-500/15 text-blue-300":"text-gray-400 hover:text-gray-200"}`}>
+                  {g.grade}
+                </button>
+              ))}
+            </div>
+            {/* Options column */}
+            <div className="flex-1 p-2 space-y-1">
+              {current.presets.map(p => (
+                <button key={p} type="button"
+                  onClick={() => { onSelect(p); setOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors font-medium">
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-white/10 px-3 py-2">
+            <button type="button" onClick={() => setOpen(false)} className="text-[10px] text-gray-600 hover:text-gray-400">Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -130,30 +288,21 @@ function getTeamName(tournament: Tournament, teamId: string|null|undefined): str
   return tournament.divisions.flatMap(d => d.teams).find(t => t.id === teamId)?.name ?? "TBD";
 }
 
-// ── IMPORT REGISTRATIONS PANEL ─────────────────────────────────────────────
+// ── IMPORT REGISTRATIONS PANEL ────────────────────────────────────────────────
 
 function ImportPanel({ tournament, contacts, onImport, onClose }: {
-  tournament: Tournament;
-  contacts: RegistrationContact[];
-  onImport: (updated: Tournament) => void;
-  onClose: () => void;
+  tournament: Tournament; contacts: RegistrationContact[];
+  onImport: (updated: Tournament) => void; onClose: () => void;
 }) {
   const regs = matchingRegs(contacts, tournament.name);
-
-  // Group by division name
   const byDiv: Record<string, RegistrationContact[]> = {};
   regs.forEach(c => {
     const key = c.division?.trim() || "Unassigned";
     if (!byDiv[key]) byDiv[key] = [];
     byDiv[key].push(c);
   });
-
-  // Build initial selection — exclude already-imported teams
   const initialSel: Record<string, boolean> = {};
-  regs.forEach(c => {
-    const imported = teamImported(tournament, c.teamName!, c.division || "");
-    initialSel[c.id] = !imported; // auto-select new teams
-  });
+  regs.forEach(c => { initialSel[c.id] = !teamImported(tournament, c.teamName!, c.division || ""); });
   const [selected, setSelected] = useState<Record<string, boolean>>(initialSel);
 
   const selectedCount = Object.values(selected).filter(Boolean).length;
@@ -166,24 +315,15 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
   function doImport() {
     const toImport = regs.filter(c => selected[c.id]);
     if (!toImport.length) return;
-
     const t: Tournament = JSON.parse(JSON.stringify(tournament));
-
     toImport.forEach(c => {
       const divName = c.division?.trim() || "";
-      // Find matching division (case-insensitive)
       let div = t.divisions.find(d => d.name.toLowerCase() === divName.toLowerCase());
-      // If no division match, use first division or create unassigned
       if (!div && t.divisions.length > 0) div = t.divisions[0];
       if (!div) return;
-
-      // Skip if already in division
       if (div.teams.some(team => team.name.toLowerCase() === c.teamName!.toLowerCase().trim())) return;
-
-      // Add team
       div.teams.push({ id: makeId(), name: c.teamName!.trim(), coachName: c.name });
     });
-
     t.updatedAt = new Date().toISOString();
     onImport(t);
   }
@@ -191,7 +331,6 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
       <div className="glass border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-white/10 flex-shrink-0">
           <div>
             <h2 className="text-white font-bold text-lg flex items-center gap-2">
@@ -204,19 +343,15 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5"/></button>
         </div>
-
-        {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {regs.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p className="text-2xl mb-3">📋</p>
               <p className="font-bold text-gray-400 mb-1">No registrations found</p>
               <p className="text-sm">No contacts with tournament name matching <span className="text-gray-300">&quot;{tournament.name}&quot;</span>.</p>
-              <p className="text-xs mt-2 text-gray-600">Registrations appear in the Contacts tab when teams sign up through your website.</p>
             </div>
           ) : (
             Object.entries(byDiv).map(([divName, divRegs]) => {
-              // Find matching division in tournament
               const matchedDiv = tournament.divisions.find(d => d.name.toLowerCase() === divName.toLowerCase());
               const allSel = divRegs.every(c => selected[c.id]);
               return (
@@ -226,7 +361,7 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
                       <span className="text-gray-300 font-bold text-sm">{divName}</span>
                       {matchedDiv
                         ? <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">✓ matches division</span>
-                        : <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">⚠️ no matching division</span>
+                        : <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">⚠️ no match</span>
                       }
                     </div>
                     <button onClick={() => allSel ? deselectAll(divRegs) : selectAll(divRegs)}
@@ -239,11 +374,9 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
                       const alreadyIn = teamImported(tournament, c.teamName!, c.division || "");
                       return (
                         <label key={c.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${
-                          alreadyIn
-                            ? "border-white/5 opacity-50 cursor-not-allowed"
-                            : selected[c.id]
-                              ? "border-yellow-500/40 bg-yellow-500/5"
-                              : "border-white/10 hover:border-white/20"
+                          alreadyIn ? "border-white/5 opacity-50 cursor-not-allowed"
+                            : selected[c.id] ? "border-yellow-500/40 bg-yellow-500/5"
+                            : "border-white/10 hover:border-white/20"
                         }`}>
                           <input type="checkbox" checked={selected[c.id] ?? false} disabled={alreadyIn}
                             onChange={() => !alreadyIn && toggle(c.id)}
@@ -253,14 +386,8 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
                               <span className={`text-sm font-bold ${alreadyIn?"text-gray-600":"text-white"}`}>{c.teamName}</span>
                               {alreadyIn && <span className="text-[10px] text-gray-600 bg-white/5 px-1.5 py-0.5 rounded font-bold">already added</span>}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              Coach: {c.name}
-                              {c.email && <span className="ml-2 text-gray-600">{c.email}</span>}
-                            </div>
+                            <div className="text-xs text-gray-500">Coach: {c.name}{c.email && <span className="ml-2 text-gray-600">{c.email}</span>}</div>
                           </div>
-                          {!matchedDiv && !alreadyIn && (
-                            <span className="text-[10px] text-orange-400 shrink-0">→ {tournament.divisions[0]?.name || "first div"}</span>
-                          )}
                         </label>
                       );
                     })}
@@ -270,9 +397,7 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
             })
           )}
         </div>
-
-        {/* Footer */}
-        {regs.length > 0 && (
+        {regs.length > 0 ? (
           <div className="flex gap-3 p-5 border-t border-white/10 flex-shrink-0">
             <Btn onClick={onClose} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-400">Cancel</Btn>
             <Btn onClick={doImport} disabled={selectedCount === 0}
@@ -280,8 +405,7 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
               Import {selectedCount > 0 ? `${selectedCount} Team${selectedCount!==1?"s":""}` : "Teams"}
             </Btn>
           </div>
-        )}
-        {regs.length === 0 && (
+        ) : (
           <div className="p-5 border-t border-white/10 flex-shrink-0">
             <Btn onClick={onClose} className="w-full bg-white/5 hover:bg-white/10 text-gray-400">Close</Btn>
           </div>
@@ -294,9 +418,10 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
 // ── EDIT TOURNAMENT MODAL ─────────────────────────────────────────────────────
 
 interface EditFields {
-  name: string; date: string; venues: string[];
-  courts: number; gameDuration: number; breakBetweenGames: number;
-  startTime: string; bracketFormat: BracketFormat; gamesGuaranteed: number;
+  name: string; date: string; venues: VenueConfig[];
+  gameDuration: number; breakBetweenGames: number;
+  startTime: string; bracketFormat: BracketFormat;
+  gamesGuaranteed: number; tiebreaker: TiebreakerMethod;
 }
 
 function EditTournamentModal({ tournament, onSave, onClose }: {
@@ -305,13 +430,13 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
   const [f, setF] = useState<EditFields>({
     name:             tournament.name,
     date:             tournament.date,
-    venues:           tournament.venues?.length ? tournament.venues : ["Main Gym"],
-    courts:           tournament.courts,
+    venues:           tournament.venues?.length ? tournament.venues : [{ name: "Main Gym", courts: 2 }],
     gameDuration:     tournament.gameDuration,
     breakBetweenGames:tournament.breakBetweenGames,
     startTime:        tournament.startTime,
     bracketFormat:    tournament.bracketFormat ?? "single",
     gamesGuaranteed:  tournament.gamesGuaranteed ?? 3,
+    tiebreaker:       tournament.tiebreaker ?? "point_diff",
   });
 
   function save() {
@@ -319,13 +444,13 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
       ...tournament,
       name:             f.name.trim() || tournament.name,
       date:             f.date,
-      venues:           f.venues.filter(v => v.trim()),
-      courts:           f.courts,
+      venues:           f.venues.filter(v => v.name.trim()),
       gameDuration:     f.gameDuration,
       breakBetweenGames:f.breakBetweenGames,
       startTime:        f.startTime,
       bracketFormat:    f.bracketFormat,
       gamesGuaranteed:  f.gamesGuaranteed,
+      tiebreaker:       f.tiebreaker,
       updatedAt:        new Date().toISOString(),
     };
     onSave(updated);
@@ -336,24 +461,24 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
       <div className="glass border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-white/10">
           <h2 className="text-white font-bold text-lg">Edit Tournament Settings</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5"/></button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-5">
           <IF label="Tournament Name" value={f.name} onChange={v => setF(p=>({...p,name:v}))} />
           <IF label="Date" value={f.date} onChange={v => setF(p=>({...p,date:v}))} placeholder="June 22–25, 2026" />
           <VenueEditor venues={f.venues} onChange={v => setF(p=>({...p,venues:v}))} />
           <div className="grid grid-cols-2 gap-3">
-            <IF label="Courts" type="number" min="1" value={f.courts} onChange={v => setF(p=>({...p,courts:+v}))} />
             <IF label="Games Guaranteed" type="number" min="1" value={f.gamesGuaranteed} onChange={v => setF(p=>({...p,gamesGuaranteed:+v}))} />
+            <IF label="Game Duration (min)" type="number" min="10" value={f.gameDuration} onChange={v => setF(p=>({...p,gameDuration:+v}))} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <IF label="Game Duration (min)" type="number" min="10" value={f.gameDuration} onChange={v => setF(p=>({...p,gameDuration:+v}))} />
             <IF label="Break Between Games (min)" type="number" min="0" value={f.breakBetweenGames} onChange={v => setF(p=>({...p,breakBetweenGames:+v}))} />
+            <IF label="Start Time" type="time" value={f.startTime} onChange={v => setF(p=>({...p,startTime:v}))} />
           </div>
-          <IF label="Start Time" type="time" value={f.startTime} onChange={v => setF(p=>({...p,startTime:v}))} />
           <BracketFormatPicker value={f.bracketFormat} onChange={v => setF(p=>({...p,bracketFormat:v}))} />
+          <TiebreakerPicker value={f.tiebreaker} onChange={v => setF(p=>({...p,tiebreaker:v}))} />
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2.5 text-xs text-yellow-300">
-            ⚠️ Changing courts, game duration, break time, or start time will <strong>not</strong> automatically reschedule existing games — only affects new tournaments.
+            ⚠️ Changing game duration, break time, or start time will <strong>not</strong> automatically reschedule existing games.
           </div>
         </div>
         <div className="flex gap-3 p-5 border-t border-white/10">
@@ -369,9 +494,9 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
 
 type WizDiv = { name: string; pools: number; teams: string[] };
 interface WizState {
-  name: string; date: string; venues: string[];
-  courts: number; gameDuration: number; breakBetweenGames: number; startTime: string;
-  bracketFormat: BracketFormat; gamesGuaranteed: number;
+  name: string; date: string; venues: VenueConfig[];
+  gameDuration: number; breakBetweenGames: number; startTime: string;
+  bracketFormat: BracketFormat; gamesGuaranteed: number; tiebreaker: TiebreakerMethod;
   divisions: WizDiv[];
 }
 
@@ -392,13 +517,12 @@ function CreateWizard({ onCreated, onClose, contacts }: {
 }) {
   const [step, setStep] = useState(1);
   const [w, setW] = useState<WizState>({
-    name: "", date: "", venues: ["Main Gym"], courts: 2,
+    name: "", date: "", venues: [{ name: "Main Gym", courts: 2 }],
     gameDuration: 24, breakBetweenGames: 6, startTime: "08:00",
-    bracketFormat: "single", gamesGuaranteed: 3,
+    bracketFormat: "single", gamesGuaranteed: 3, tiebreaker: "point_diff",
     divisions: [{ name: "", pools: 2, teams: ["","","","","","","",""] }],
   });
 
-  // Registrations matching current tournament name
   const regMatches = matchingRegs(contacts, w.name);
   const regByDiv: Record<string, string[]> = {};
   regMatches.forEach(c => {
@@ -408,7 +532,6 @@ function CreateWizard({ onCreated, onClose, contacts }: {
   });
 
   function autoFillDivision(di: number, divName: string) {
-    // look for exact or partial match to this division name
     const matches = Object.entries(regByDiv).find(([k]) =>
       k.toLowerCase() === divName.toLowerCase() || divName.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(divName.toLowerCase())
     );
@@ -416,14 +539,16 @@ function CreateWizard({ onCreated, onClose, contacts }: {
     if (!teams.length) return;
     setW(p => {
       const d = [...p.divisions];
-      const padded = [...teams, ...Array(Math.max(0, 8 - teams.length)).fill("")];
-      d[di] = { ...d[di], teams: padded };
+      d[di] = { ...d[di], teams: [...teams, ...Array(Math.max(0, 8 - teams.length)).fill("")] };
       return { ...p, divisions: d };
     });
   }
 
   function generate() {
     const tid = makeId(); const now = new Date().toISOString();
+    const safeVenues = w.venues.filter(v => v.name.trim()).length > 0
+      ? w.venues.filter(v => v.name.trim())
+      : [{ name: "Main Gym", courts: 2 }];
     const divisions: Division[] = w.divisions.map(d => {
       const divId = makeId();
       const poolTeamNames = snakePools(d.teams, d.pools);
@@ -436,15 +561,15 @@ function CreateWizard({ onCreated, onClose, contacts }: {
         return { id: poolId, name: `Pool ${String.fromCharCode(65+pi)}`, teamIds };
       });
       const games: PoolGame[] = generateDivisionSchedule(
-        pools, divId, w.courts, w.gameDuration, w.breakBetweenGames, w.startTime, w.venues
+        pools, divId, safeVenues, w.gameDuration, w.breakBetweenGames, w.startTime
       );
       return { id: divId, name: d.name, teams: allTeams, pools, games, bracket: [], losersBracket: [], bracketGenerated: false };
     });
-
     const t: Tournament = {
-      id: tid, name: w.name, date: w.date, venues: w.venues.filter(v=>v.trim()),
-      courts: w.courts, gameDuration: w.gameDuration, breakBetweenGames: w.breakBetweenGames,
-      startTime: w.startTime, bracketFormat: w.bracketFormat, gamesGuaranteed: w.gamesGuaranteed,
+      id: tid, name: w.name, date: w.date, venues: safeVenues,
+      gameDuration: w.gameDuration, breakBetweenGames: w.breakBetweenGames,
+      startTime: w.startTime, bracketFormat: w.bracketFormat,
+      gamesGuaranteed: w.gamesGuaranteed, tiebreaker: w.tiebreaker,
       status: "pool_play", divisions, createdAt: now, updatedAt: now,
     };
     saveTournament(t); onCreated(t);
@@ -461,59 +586,59 @@ function CreateWizard({ onCreated, onClose, contacts }: {
             <h2 className="text-white font-bold text-lg">New Tournament</h2>
             <p className="text-gray-500 text-xs mt-0.5">Step {step} of 3</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5"/></button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-5">
           {step === 1 && <>
             <IF label="Tournament Name *" value={w.name} onChange={v=>setW(p=>({...p,name:v}))} placeholder="Hilhi Spring Invitational" />
-
-            {/* Reg preview banner if name matches contacts */}
             {w.name.trim().length > 2 && regMatches.length > 0 && (
               <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2.5 text-sm">
                 <div className="text-yellow-300 font-bold">📋 {regMatches.length} registration{regMatches.length!==1?"s":""} found</div>
-                <div className="text-yellow-400/70 text-xs mt-0.5">
-                  Teams from {Object.keys(regByDiv).length} division{Object.keys(regByDiv).length!==1?"s":""} can be auto-filled in Step 2
-                </div>
+                <div className="text-yellow-400/70 text-xs mt-0.5">Teams can be auto-filled from registrations in Step 2</div>
               </div>
             )}
-
             <IF label="Date" value={w.date} onChange={v=>setW(p=>({...p,date:v}))} placeholder="June 22–25, 2026" />
             <VenueEditor venues={w.venues} onChange={v=>setW(p=>({...p,venues:v}))} />
             <div className="grid grid-cols-2 gap-3">
-              <IF label="Courts" type="number" min="1" value={w.courts} onChange={v=>setW(p=>({...p,courts:+v}))} />
               <IF label="Games Guaranteed" type="number" min="1" value={w.gamesGuaranteed} onChange={v=>setW(p=>({...p,gamesGuaranteed:+v}))} />
+              <IF label="Game Duration (min)" type="number" value={w.gameDuration} onChange={v=>setW(p=>({...p,gameDuration:+v}))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <IF label="Game Duration (min)" type="number" value={w.gameDuration} onChange={v=>setW(p=>({...p,gameDuration:+v}))} />
               <IF label="Break Between (min)" type="number" value={w.breakBetweenGames} onChange={v=>setW(p=>({...p,breakBetweenGames:+v}))} />
+              <IF label="Start Time" type="time" value={w.startTime} onChange={v=>setW(p=>({...p,startTime:v}))} />
             </div>
-            <IF label="Start Time" type="time" value={w.startTime} onChange={v=>setW(p=>({...p,startTime:v}))} />
             <BracketFormatPicker value={w.bracketFormat} onChange={v=>setW(p=>({...p,bracketFormat:v}))} />
+            <TiebreakerPicker value={w.tiebreaker} onChange={v=>setW(p=>({...p,tiebreaker:v}))} />
           </>}
 
           {step === 2 && (
             <div className="space-y-5">
               {regMatches.length > 0 && (
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2.5 text-xs text-yellow-300">
-                  📋 <strong>{regMatches.length} registered teams</strong> found — use &quot;Fill from Registrations&quot; buttons below to auto-populate
+                  📋 <strong>{regMatches.length} registered teams</strong> — use &quot;Fill from Registrations&quot; buttons to auto-populate
                 </div>
               )}
               {w.divisions.map((div, di) => {
-                const hasRegForDiv = div.name.trim() && (
-                  Object.keys(regByDiv).some(k =>
-                    k.toLowerCase() === div.name.toLowerCase() ||
-                    div.name.toLowerCase().includes(k.toLowerCase()) ||
-                    k.toLowerCase().includes(div.name.toLowerCase())
-                  )
+                const hasRegForDiv = div.name.trim() && Object.keys(regByDiv).some(k =>
+                  k.toLowerCase() === div.name.toLowerCase() ||
+                  div.name.toLowerCase().includes(k.toLowerCase()) ||
+                  k.toLowerCase().includes(div.name.toLowerCase())
                 );
                 return (
                   <div key={di} className="border border-white/10 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <IF label="Division Name *" value={div.name} onChange={v=>setW(p=>{const d=[...p.divisions];d[di]={...d[di],name:v};return{...p,divisions:d};})} placeholder="5th Grade Boys" />
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Division Name *</label>
+                          <DivisionPresetPicker onSelect={name => setW(p=>{const d=[...p.divisions];d[di]={...d[di],name};return{...p,divisions:d};})}/>
+                        </div>
+                        <input value={div.name}
+                          onChange={e=>setW(p=>{const d=[...p.divisions];d[di]={...d[di],name:e.target.value};return{...p,divisions:d};})}
+                          placeholder="e.g. 5th Grade Boys Competitive"
+                          className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500/60 placeholder:text-gray-600" />
                       </div>
-                      <div className="w-28">
+                      <div className="w-28 flex-shrink-0">
                         <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Pools</label>
                         <select value={div.pools} onChange={e=>setW(p=>{const d=[...p.divisions];d[di]={...d[di],pools:+e.target.value};return{...p,divisions:d};})}
                           className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none">
@@ -521,20 +646,17 @@ function CreateWizard({ onCreated, onClose, contacts }: {
                         </select>
                       </div>
                       {w.divisions.length > 1 && (
-                        <button onClick={()=>setW(p=>({...p,divisions:p.divisions.filter((_,i)=>i!==di)}))} className="mt-4 text-gray-600 hover:text-red-400 transition-colors">
-                          <Trash2 className="w-4 h-4" />
+                        <button onClick={()=>setW(p=>({...p,divisions:p.divisions.filter((_,i)=>i!==di)}))} className="text-gray-600 hover:text-red-400 transition-colors mt-6">
+                          <Trash2 className="w-4 h-4"/>
                         </button>
                       )}
                     </div>
-
-                    {/* Auto-fill button when division name matches registrations */}
                     {hasRegForDiv && (
                       <button onClick={() => autoFillDivision(di, div.name)}
                         className="w-full py-2 border border-yellow-500/30 hover:border-yellow-500/60 bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-400 text-xs font-bold rounded-lg transition-all">
                         📋 Fill from Registrations — import team names
                       </button>
                     )}
-
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Team Names</label>
                       <div className="grid grid-cols-2 gap-1.5">
@@ -562,10 +684,11 @@ function CreateWizard({ onCreated, onClose, contacts }: {
                 {w.date && <p className="text-gray-400 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5"/>{w.date}</p>}
                 <p className="text-gray-400 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5"/>
-                  {w.venues.filter(v=>v.trim()).join(" · ") || "No venue set"}
+                  {venueLabel(w.venues)}
                 </p>
-                <p className="text-gray-400">{w.courts} courts · {w.gameDuration}min games · {w.gamesGuaranteed} guaranteed · starts {w.startTime}</p>
-                <p className="text-gray-400">Bracket: {w.bracketFormat === "single" ? "Single Elimination" : w.bracketFormat === "double" ? "Double Elimination" : "Pool Play Only"}</p>
+                <p className="text-gray-400">{totalCourts(w.venues)} courts · {w.gameDuration}min games · {w.gamesGuaranteed} guaranteed · starts {w.startTime}</p>
+                <p className="text-gray-400">Bracket: {w.bracketFormat==="single"?"Single Elimination":w.bracketFormat==="double"?"Double Elimination":"Pool Play Only"}</p>
+                <p className="text-gray-400">Tiebreaker: {w.tiebreaker==="point_diff"?"Point Differential":"Least Points Allowed"}</p>
               </div>
               {w.divisions.map((d,di) => {
                 const filled = d.teams.filter(t=>t.trim());
@@ -614,13 +737,13 @@ function ScoreDialog({ game, teamA, teamB, onSave, onClose }: {
           <div className="text-center">
             <div className="text-gray-300 text-xs mb-2 font-bold truncate">{teamA}</div>
             <input type="number" min="0" value={s1} onChange={e=>setS1(e.target.value)}
-              className="w-full bg-white/5 border border-white/20 text-white text-center text-2xl font-black py-3 rounded-xl focus:outline-none focus:border-blue-500/60" />
+              className="w-full bg-white/5 border border-white/20 text-white text-center text-2xl font-black py-3 rounded-xl focus:outline-none focus:border-blue-500/60"/>
           </div>
           <div className="text-center text-gray-600 font-bold">vs</div>
           <div className="text-center">
             <div className="text-gray-300 text-xs mb-2 font-bold truncate">{teamB}</div>
             <input type="number" min="0" value={s2} onChange={e=>setS2(e.target.value)}
-              className="w-full bg-white/5 border border-white/20 text-white text-center text-2xl font-black py-3 rounded-xl focus:outline-none focus:border-blue-500/60" />
+              className="w-full bg-white/5 border border-white/20 text-white text-center text-2xl font-black py-3 rounded-xl focus:outline-none focus:border-blue-500/60"/>
           </div>
         </div>
         <div className="flex gap-3">
@@ -673,9 +796,9 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
               const poolName = tournament.divisions[divIdx].pools.find(p=>p.id===game.poolId)?.name ?? "";
               return (
                 <div key={game.id} className="glass border border-white/10 hover:border-white/20 rounded-xl p-3.5 flex items-center gap-4 transition-colors">
-                  <div className="shrink-0 text-center min-w-[56px]">
-                    <div className="text-xs text-gray-600 font-bold">Ct {game.court}</div>
-                    {multiVenue && <div className="text-[10px] text-gray-700 truncate max-w-[56px]">{game.venue}</div>}
+                  <div className="shrink-0 text-center min-w-[72px]">
+                    <div className="text-xs text-gray-500 font-bold">Court {game.court}</div>
+                    {multiVenue && <div className="text-[10px] text-gray-600 truncate max-w-[72px]">{game.venue}</div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
@@ -712,14 +835,19 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
 // ── STANDINGS VIEW ────────────────────────────────────────────────────────────
 
 function StandingsView({ tournament }: { tournament: Tournament }) {
+  const tiebreaker = tournament.tiebreaker ?? "point_diff";
+  const tbLabel = tiebreaker === "least_pa" ? "Least Points Allowed" : "Point Differential";
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2 text-xs text-gray-600">
+        <span>Tiebreaker: Head-to-head → {tbLabel}</span>
+      </div>
       {tournament.divisions.map(div => (
         <div key={div.id}>
           <h3 className="text-white font-bold mb-3">{div.name}</h3>
           <div className="space-y-4">
             {div.pools.map(pool => {
-              const standings = calculateStandings(pool.teamIds, div.teams, div.games.filter(g=>g.poolId===pool.id));
+              const standings = calculateStandings(pool.teamIds, div.teams, div.games.filter(g=>g.poolId===pool.id), tiebreaker);
               return (
                 <div key={pool.id} className="glass border border-white/10 rounded-xl overflow-hidden">
                   <div className="px-4 py-2.5 bg-white/3 border-b border-white/10">
@@ -734,7 +862,9 @@ function StandingsView({ tournament }: { tournament: Tournament }) {
                         <th className="px-3 py-2 text-center font-bold">L</th>
                         <th className="px-3 py-2 text-center font-bold">PF</th>
                         <th className="px-3 py-2 text-center font-bold">PA</th>
-                        <th className="px-3 py-2 text-center font-bold">+/-</th>
+                        <th className={`px-3 py-2 text-center font-bold ${tiebreaker==="least_pa"?"text-blue-400":""}`}>
+                          {tiebreaker==="least_pa"?"PA↑":"+/−"}
+                        </th>
                       </tr></thead>
                       <tbody>
                         {standings.map((s,idx) => (
@@ -750,7 +880,13 @@ function StandingsView({ tournament }: { tournament: Tournament }) {
                             <td className="px-3 py-2.5 text-center text-red-400 font-bold">{s.losses}</td>
                             <td className="px-3 py-2.5 text-center text-gray-400">{s.pf}</td>
                             <td className="px-3 py-2.5 text-center text-gray-400">{s.pa}</td>
-                            <td className={`px-3 py-2.5 text-center font-bold ${s.pd>=0?"text-green-400":"text-red-400"}`}>{s.pd>0?"+":""}{s.pd}</td>
+                            <td className={`px-3 py-2.5 text-center font-bold ${
+                              tiebreaker==="least_pa"
+                                ? "text-gray-400"
+                                : s.pd>=0?"text-green-400":"text-red-400"
+                            }`}>
+                              {tiebreaker==="least_pa" ? s.pa : (s.pd>0?"+":"")+s.pd}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -784,7 +920,6 @@ function BracketView({ tournament, onUpdate }: { tournament: Tournament; onUpdat
   function poolPlayDone(div: Division) {
     return div.games.length > 0 && div.games.every(g => g.status==="completed");
   }
-
   function handleGenerate(divIdx: number) {
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
     t.divisions[divIdx].bracket = generateBracket(t.divisions[divIdx]);
@@ -792,7 +927,6 @@ function BracketView({ tournament, onUpdate }: { tournament: Tournament; onUpdat
     t.status = "bracket"; t.updatedAt = new Date().toISOString();
     onUpdate(t);
   }
-
   function handleScore(s1: number, s2: number) {
     if (!scoring) return;
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
@@ -828,11 +962,9 @@ function BracketView({ tournament, onUpdate }: { tournament: Tournament; onUpdat
             </div>
           );
         }
-
         const rounds = [...new Set(div.bracket.map(g=>g.round))].sort((a,b)=>a-b);
         const maxRound = Math.max(...rounds);
         const champion = div.bracket.find(g=>g.round===maxRound&&g.winnerId);
-
         return (
           <div key={div.id}>
             <div className="flex items-center gap-2 mb-4">
@@ -907,15 +1039,14 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
   const total = tournament.divisions.reduce((s,d)=>s+d.games.length,0);
   const done  = tournament.divisions.reduce((s,d)=>s+d.games.filter(g=>g.status==="completed").length,0);
   const teams = tournament.divisions.reduce((s,d)=>s+d.teams.length,0);
-  const venueStr = tournament.venues?.filter(v=>v.trim()).join(" · ") || "";
+  const vLabel = venueLabel(tournament.venues ?? []);
+  const courts = totalCourts(tournament.venues ?? []);
 
-  // Registration summary
   const regs = matchingRegs(contacts, tournament.name);
   const unimportedRegs = regs.filter(c => !teamImported(tournament, c.teamName!, c.division || ""));
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-start gap-3 mb-4">
         <button onClick={onBack} className="mt-1 text-gray-500 hover:text-white transition-colors">
           <ArrowLeft className="w-4 h-4"/>
@@ -926,27 +1057,22 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
             <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${S_COLOR[tournament.status]}`}>{S_LABEL[tournament.status]}</span>
           </div>
           <div className="flex flex-wrap gap-x-4 text-xs text-gray-500 mt-1">
-            {tournament.date   && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>{tournament.date}</span>}
-            {venueStr          && <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/>{venueStr}</span>}
-            <span className="flex items-center gap-1"><Users className="w-3 h-3"/>{teams} teams · {tournament.courts} courts</span>
+            {tournament.date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/>{tournament.date}</span>}
+            {vLabel !== "—" && <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/>{vLabel}</span>}
+            <span className="flex items-center gap-1"><Users className="w-3 h-3"/>{teams} teams · {courts} court{courts!==1?"s":""}</span>
             {tournament.gamesGuaranteed > 0 && <span>{tournament.gamesGuaranteed} guaranteed</span>}
             {total > 0 && <span>{done}/{total} scored</span>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Import button — always visible, badge shows unimported count */}
           <button onClick={()=>setImporting(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 glass border rounded-lg text-xs font-bold transition-all relative ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 glass border rounded-lg text-xs font-bold transition-all ${
               unimportedRegs.length > 0
-                ? "border-yellow-500/40 hover:border-yellow-500/70 text-yellow-400 hover:text-yellow-300"
+                ? "border-yellow-500/40 hover:border-yellow-500/70 text-yellow-400"
                 : "border-white/15 hover:border-white/25 text-gray-400 hover:text-white"
             }`}>
             <Download className="w-3.5 h-3.5"/>
-            {unimportedRegs.length > 0 ? (
-              <span>Import Teams <span className="bg-yellow-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">{unimportedRegs.length}</span></span>
-            ) : (
-              <span>Import Teams</span>
-            )}
+            Import{unimportedRegs.length > 0 && <span className="bg-yellow-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">{unimportedRegs.length}</span>}
           </button>
           <button onClick={()=>setEditing(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-lg text-xs font-bold transition-all">
@@ -955,26 +1081,18 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
         </div>
       </div>
 
-      {/* Unimported registrations banner */}
       {unimportedRegs.length > 0 && (
         <div className="mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 flex items-center gap-3">
           <span className="text-xl">📋</span>
           <div className="flex-1">
-            <p className="text-yellow-300 font-bold text-sm">
-              {unimportedRegs.length} unimported registration{unimportedRegs.length!==1?"s":""}
-            </p>
-            <p className="text-yellow-400/70 text-xs mt-0.5">
-              Teams from your registration form haven&apos;t been added to this tournament manager yet.
-            </p>
+            <p className="text-yellow-300 font-bold text-sm">{unimportedRegs.length} unimported registration{unimportedRegs.length!==1?"s":""}</p>
+            <p className="text-yellow-400/70 text-xs mt-0.5">Teams from your registration form haven&apos;t been added yet.</p>
           </div>
-          <button onClick={()=>setImporting(true)}
-            className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs rounded-lg transition-colors flex-shrink-0">
+          <button onClick={()=>setImporting(true)} className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs rounded-lg transition-colors flex-shrink-0">
             Review →
           </button>
         </div>
       )}
-
-      {/* All-imported confirmation */}
       {regs.length > 0 && unimportedRegs.length === 0 && (
         <div className="mb-4 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm">
           <span className="text-green-400">✓</span>
@@ -992,20 +1110,22 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
         </div>
       )}
 
-      {/* Info bar */}
       <div className="flex flex-wrap gap-2 mb-5">
         <span className="glass border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-400">
-          🏀 {tournament.bracketFormat === "single" ? "Single Elim" : tournament.bracketFormat === "double" ? "Double Elim" : "Pool Play Only"}
+          🏀 {tournament.bracketFormat==="single"?"Single Elim":tournament.bracketFormat==="double"?"Double Elim":"Pool Play Only"}
         </span>
         <span className="glass border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-400">
-          ✅ {tournament.gamesGuaranteed ?? 3} games guaranteed
+          ✅ {tournament.gamesGuaranteed ?? 3} guaranteed
         </span>
         <span className="glass border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-400">
-          ⏱ {tournament.gameDuration}min games
+          ⏱ {tournament.gameDuration}min
+        </span>
+        <span className="glass border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-400">
+          {tournament.tiebreaker === "least_pa" ? "🔒 Least PA tiebreaker" : "📊 +/− tiebreaker"}
         </span>
         {(tournament.venues?.length ?? 0) > 1 && (
           <span className="glass border border-white/10 rounded-lg px-3 py-1.5 text-xs text-gray-400">
-            📍 {tournament.venues.length} venues
+            📍 {tournament.venues.length} venues · {courts} courts total
           </span>
         )}
         {regs.length > 0 && (
@@ -1015,7 +1135,6 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-white/10 mb-5">
         {(["schedule","standings","bracket"] as DetailTab[]).map(k=>(
           <button key={k} onClick={()=>setTab(k)}
@@ -1029,21 +1148,8 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
       {tab==="standings" && <StandingsView tournament={tournament}/>}
       {tab==="bracket"   && <BracketView   tournament={tournament} onUpdate={handleUpdate}/>}
 
-      {editing && (
-        <EditTournamentModal
-          tournament={tournament}
-          onSave={t => { handleUpdate(t); setEditing(false); }}
-          onClose={() => setEditing(false)}
-        />
-      )}
-      {importing && (
-        <ImportPanel
-          tournament={tournament}
-          contacts={contacts}
-          onImport={t => { handleUpdate(t); setImporting(false); }}
-          onClose={() => setImporting(false)}
-        />
-      )}
+      {editing && <EditTournamentModal tournament={tournament} onSave={t=>{handleUpdate(t);setEditing(false);}} onClose={()=>setEditing(false)}/>}
+      {importing && <ImportPanel tournament={tournament} contacts={contacts} onImport={t=>{handleUpdate(t);setImporting(false);}} onClose={()=>setImporting(false)}/>}
     </div>
   );
 }
@@ -1065,21 +1171,13 @@ export function TourneyTab({ contacts = [] }: { contacts?: RegistrationContact[]
   }
   function handleUpdate(updated: Tournament) { setList(p=>p.map(t=>t.id===updated.id?updated:t)); }
 
-  if (selected) return <TournamentDetail
-    tournament={selected}
-    contacts={contacts}
-    onBack={()=>setSelected(null)}
-    onUpdate={u=>{setSelected(u);handleUpdate(u);}}/>;
+  if (selected) return <TournamentDetail tournament={selected} contacts={contacts} onBack={()=>setSelected(null)} onUpdate={u=>{setSelected(u);handleUpdate(u);}}/>;
 
-  const totalGames = (t: Tournament) => t.divisions.reduce((s,d)=>s+d.games.length,0);
-  const doneGames  = (t: Tournament) => t.divisions.reduce((s,d)=>s+d.games.filter(g=>g.status==="completed").length,0);
-  const totalTeams = (t: Tournament) => t.divisions.reduce((s,d)=>s+d.teams.length,0);
-
-  // Registration stats per tournament
-  function regCount(t: Tournament) { return matchingRegs(contacts, t.name).length; }
-  function unimportedCount(t: Tournament) {
-    return matchingRegs(contacts, t.name).filter(c => !teamImported(t, c.teamName!, c.division || "")).length;
-  }
+  const tGames = (t: Tournament) => t.divisions.reduce((s,d)=>s+d.games.length,0);
+  const dGames  = (t: Tournament) => t.divisions.reduce((s,d)=>s+d.games.filter(g=>g.status==="completed").length,0);
+  const tTeams  = (t: Tournament) => t.divisions.reduce((s,d)=>s+d.teams.length,0);
+  const regCount = (t: Tournament) => matchingRegs(contacts, t.name).length;
+  const unimportedCount = (t: Tournament) => matchingRegs(contacts, t.name).filter(c => !teamImported(t, c.teamName!, c.division||"")).length;
 
   return (
     <div className="space-y-4">
@@ -1103,41 +1201,33 @@ export function TourneyTab({ contacts = [] }: { contacts?: RegistrationContact[]
       ) : (
         <div className="space-y-3">
           {list.map(t => {
-            const done=doneGames(t), total=totalGames(t);
+            const done=dGames(t), total=tGames(t);
             const pct = total>0?Math.round((done/total)*100):0;
-            const venueStr = t.venues?.filter(v=>v.trim()).join(", ") || "";
+            const courts = totalCourts(t.venues ?? []);
             const regs = regCount(t);
             const unimported = unimportedCount(t);
             return (
-              <div key={t.id} className={`glass border rounded-2xl p-4 transition-all ${unimported > 0 ? "border-yellow-500/25 hover:border-yellow-500/40" : "border-white/10 hover:border-white/20"}`}>
+              <div key={t.id} className={`glass border rounded-2xl p-4 transition-all ${unimported>0?"border-yellow-500/25 hover:border-yellow-500/40":"border-white/10 hover:border-white/20"}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="text-white font-bold truncate">{t.name}</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${S_COLOR[t.status]}`}>{S_LABEL[t.status]}</span>
-                      {/* Registration badge */}
-                      {unimported > 0 && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-300 flex items-center gap-1">
-                          📋 {unimported} to import
-                        </span>
-                      )}
-                      {regs > 0 && unimported === 0 && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-500/15 text-green-400">
-                          ✓ {regs} registered
-                        </span>
-                      )}
+                      {unimported > 0 && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-300">📋 {unimported} to import</span>}
+                      {regs > 0 && unimported === 0 && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-500/15 text-green-400">✓ {regs} registered</span>}
                     </div>
                     <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mb-1.5">
                       {t.date && <span>{t.date}</span>}
-                      {venueStr && <span>{venueStr}</span>}
-                      <span>{totalTeams(t)} teams · {t.divisions.length} div{t.divisions.length!==1?"s":""} · {t.courts} courts</span>
+                      {venueLabel(t.venues ?? []) !== "—" && <span>{venueLabel(t.venues ?? [])}</span>}
+                      <span>{tTeams(t)} teams · {t.divisions.length} div{t.divisions.length!==1?"s":""} · {courts} court{courts!==1?"s":""}</span>
                     </div>
                     <div className="flex flex-wrap gap-2 mb-2">
                       <span className="text-[10px] bg-white/5 text-gray-500 px-2 py-0.5 rounded-md">
                         {t.bracketFormat==="single"?"Single Elim":t.bracketFormat==="double"?"Double Elim":"Pool Play Only"}
                       </span>
+                      <span className="text-[10px] bg-white/5 text-gray-500 px-2 py-0.5 rounded-md">{t.gamesGuaranteed??3} guaranteed</span>
                       <span className="text-[10px] bg-white/5 text-gray-500 px-2 py-0.5 rounded-md">
-                        {t.gamesGuaranteed??3} guaranteed
+                        {(t.tiebreaker??"point_diff")==="least_pa"?"Least PA":"Point Diff"}
                       </span>
                     </div>
                     {total>0&&(

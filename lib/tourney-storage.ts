@@ -1,14 +1,37 @@
-import type { Tournament } from "@/lib/tourney-types";
+import type { Tournament, VenueConfig } from "@/lib/tourney-types";
 
 const KEY = "hilhi_tourney_v1";
 
-/** Migrate old tournament shape to current shape */
 function migrate(t: Tournament): Tournament {
+  // ── venues: old string[] → VenueConfig[] ─────────────────────────────────
+  const rawVenues = (t as any).venues;
+  const oldCourts = (t as any).courts ?? 2;
+  let venues: VenueConfig[];
+
+  if (Array.isArray(rawVenues) && rawVenues.length > 0) {
+    if (typeof rawVenues[0] === "string") {
+      // Old format: string[] — convert, put old court count on first venue
+      venues = (rawVenues as string[]).map((name, i) => ({
+        name: name.trim() || "Main Gym",
+        courts: i === 0 ? oldCourts : 1,
+      }));
+    } else {
+      // Already new VenueConfig[]
+      venues = rawVenues as VenueConfig[];
+    }
+  } else if ((t as any).venue) {
+    // Even older: single venue string
+    venues = [{ name: (t as any).venue, courts: oldCourts }];
+  } else {
+    venues = [{ name: "Main Gym", courts: oldCourts }];
+  }
+
   return {
     ...t,
-    venues: (t as any).venue ? [(t as any).venue] : (t.venues ?? ["Main Gym"]),
-    bracketFormat: t.bracketFormat ?? "single",
-    gamesGuaranteed: t.gamesGuaranteed ?? 3,
+    venues,
+    bracketFormat:    t.bracketFormat    ?? "single",
+    gamesGuaranteed:  t.gamesGuaranteed  ?? 3,
+    tiebreaker:       t.tiebreaker       ?? "point_diff",
     divisions: (t.divisions ?? []).map(d => ({
       ...d,
       losersBracket: d.losersBracket ?? [],

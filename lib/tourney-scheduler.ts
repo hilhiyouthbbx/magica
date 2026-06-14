@@ -1,4 +1,4 @@
-import type { Pool, PoolGame } from "@/lib/tourney-types";
+import type { Pool, PoolGame, VenueConfig } from "@/lib/tourney-types";
 
 export function addMinutes(timeStr: string, minutes: number): string {
   const [h, m] = timeStr.split(":").map(Number);
@@ -11,6 +11,16 @@ export function formatTime12(timeStr: string): string {
   const period = h >= 12 ? "PM" : "AM";
   const hour = h > 12 ? h - 12 : h === 0 ? 12 : h;
   return `${hour}:${m.toString().padStart(2, "0")} ${period}`;
+}
+
+/** Map a 1-based court number to its venue name given per-venue court counts */
+function courtToVenueName(courtNum: number, venues: VenueConfig[]): string {
+  let cumulative = 0;
+  for (const v of venues) {
+    cumulative += v.courts;
+    if (courtNum <= cumulative) return v.name;
+  }
+  return venues[0]?.name ?? "Main Gym";
 }
 
 /** Circle/polygon round-robin pairing algorithm */
@@ -37,12 +47,14 @@ function roundRobinPairs(ids: string[]): [string, string][][] {
 export function generateDivisionSchedule(
   pools: Pool[],
   divisionId: string,
-  courts: number,
+  venues: VenueConfig[],
   gameDuration: number,
   breakBetween: number,
   startTime: string,
-  venues: string[] = ["Main Gym"]
 ): PoolGame[] {
+  const safeVenues = venues.length > 0 ? venues : [{ name: "Main Gym", courts: 2 }];
+  const totalCourts = safeVenues.reduce((s, v) => s + (v.courts || 1), 0);
+
   // Interleave rounds from all pools so round 1 of each pool comes before round 2
   const poolRounds = pools.map(p => roundRobinPairs(p.teamIds));
   const maxRounds = Math.max(...poolRounds.map(r => r.length), 0);
@@ -58,14 +70,14 @@ export function generateDivisionSchedule(
 
   // Greedy court + time-slot assignment
   const courtBusy = new Map<number, Set<number>>();
-  const teamBusy = new Map<string, Set<number>>();
+  const teamBusy  = new Map<string, Set<number>>();
   const games: PoolGame[] = [];
 
   for (const pair of pairs) {
     for (let slot = 0; slot < 500; slot++) {
       if (teamBusy.get(pair.team1Id)?.has(slot) || teamBusy.get(pair.team2Id)?.has(slot)) continue;
       let court = -1;
-      for (let c = 1; c <= courts; c++) {
+      for (let c = 1; c <= totalCourts; c++) {
         if (!courtBusy.get(c)?.has(slot)) { court = c; break; }
       }
       if (court === -1) continue;
@@ -77,14 +89,12 @@ export function generateDivisionSchedule(
       teamBusy.get(pair.team1Id)!.add(slot);
       teamBusy.get(pair.team2Id)!.add(slot);
 
-      const venueCount = venues.length || 1;
-      const assignedVenue = venues[Math.floor((court - 1) / Math.ceil(courts / venueCount))] ?? venues[0] ?? "Main Gym";
       games.push({
         id: `${pair.poolId}-${pair.team1Id.slice(-6)}-${pair.team2Id.slice(-6)}-${slot}`,
         poolId: pair.poolId,
         divisionId,
         court,
-        venue: assignedVenue,
+        venue: courtToVenueName(court, safeVenues),
         timeSlot: slot,
         time: addMinutes(startTime, slot * (gameDuration + breakBetween)),
         team1Id: pair.team1Id,

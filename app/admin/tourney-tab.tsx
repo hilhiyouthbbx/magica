@@ -592,7 +592,67 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
 
         <div className="p-5 space-y-5">
           {step === 1 && <>
-            <IF label="Tournament Name *" value={w.name} onChange={v=>setW(p=>({...p,name:v}))} placeholder="Hilhi Spring Invitational" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">Tournament Name *</label>
+              {tournaments.length > 0 ? (
+                <>
+                  <select
+                    value={tournaments.find(tc => tc.name === w.name) ? w.name : (w.name ? "__custom__" : "")}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === "" ) { setW(p => ({ ...p, name: "" })); return; }
+                      if (val === "__custom__") { setW(p => ({ ...p, name: p.name === "" ? "" : p.name })); return; }
+                      const tc = tournaments.find(t => t.name === val);
+                      if (!tc) return;
+                      // auto-fill from TournamentConfig
+                      const fmt = tc.format?.toLowerCase() ?? "";
+                      const bracketFormat: BracketFormat =
+                        fmt.includes("double") ? "double" :
+                        (fmt.includes("pool") || fmt.includes("none")) ? "none" : "single";
+                      const gamesGuaranteed = parseInt(tc.gamesGuaranteed) || 3;
+                      const venues: VenueConfig[] = tc.venue?.trim()
+                        ? [{ name: tc.venue.trim(), courts: 2 }]
+                        : [{ name: "Main Gym", courts: 2 }];
+                      const divisions: WizDiv[] = tc.divisions?.length > 0
+                        ? tc.divisions.map(name => ({ name, pools: 2, teams: ["","","","","","","",""] }))
+                        : [{ name: "", pools: 2, teams: ["","","","","","","",""] }];
+                      setW(p => ({
+                        ...p,
+                        name: tc.name,
+                        date: tc.dates || p.date,
+                        venues,
+                        gamesGuaranteed,
+                        bracketFormat,
+                        divisions,
+                      }));
+                    }}
+                    className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500/60"
+                  >
+                    <option value="" className="bg-slate-900">— Select a tournament —</option>
+                    {tournaments.map(tc => (
+                      <option key={tc.id} value={tc.name} className="bg-slate-900">{tc.name}</option>
+                    ))}
+                    <option value="__custom__" className="bg-slate-900">Other / Custom name…</option>
+                  </select>
+                  {/* Show text input when "Other / Custom" is chosen or no list match */}
+                  {(w.name && !tournaments.find(tc => tc.name === w.name)) && (
+                    <input
+                      value={w.name}
+                      onChange={e => setW(p => ({ ...p, name: e.target.value }))}
+                      placeholder="Enter custom tournament name"
+                      className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500/60 placeholder:text-gray-600"
+                    />
+                  )}
+                </>
+              ) : (
+                <input
+                  value={w.name}
+                  onChange={e => setW(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Hilhi Spring Invitational"
+                  className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500/60 placeholder:text-gray-600"
+                />
+              )}
+            </div>
             {w.name.trim().length > 2 && regMatches.length > 0 && (
               <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2.5 text-sm">
                 <div className="text-yellow-300 font-bold">📋 {regMatches.length} registration{regMatches.length!==1?"s":""} found</div>

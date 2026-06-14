@@ -28,15 +28,7 @@ function formatDisplay(fullName: string): string {
   return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
 }
 
-export async function GET(req: NextRequest) {
-  // Optional: only admin can call this (use same key check as main route)
-  const key = req.nextUrl.searchParams.get("key");
-  const adminPw = process.env.ADMIN_PASSWORD ?? "hilhi-admin";
-  const coachPw = process.env.COACH_PASSWORD ?? "Kem-admin";
-  if (key !== adminPw && key !== coachPw) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function GET(_req: NextRequest) {
   const contacts = await getContacts();
 
   // Filter to contacts that look like camp registrations:

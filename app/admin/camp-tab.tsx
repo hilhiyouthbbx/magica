@@ -25,6 +25,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [rosterLoad,  setRosterLoad]  = useState(false);
   const [dragOver,    setDragOver]    = useState<string | null>(null);
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
+  const [rosterError,  setRosterError]  = useState<string>("");
 
   useEffect(() => {
     fetch("/api/camp-schedule")
@@ -49,10 +50,19 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
   async function loadRoster() {
     setRosterLoad(true);
+    setRosterError("");
     try {
       const res  = await fetch(`/api/camp-schedule/roster?key=${adminKey}`);
-      const json = await res.json();
-      if (json.campers) setRoster(json.campers as CamperRosterEntry[]);
+      const json = await res.json() as { campers?: CamperRosterEntry[]; error?: string };
+      if (!res.ok || json.error) {
+        setRosterError(`Error ${res.status}: ${json.error ?? "Unknown error"}`);
+      } else if (json.campers) {
+        setRoster(json.campers);
+      } else {
+        setRosterError("No campers returned. Check that contacts have a source containing 'camp' or '2026'.");
+      }
+    } catch (err) {
+      setRosterError(`Network error: ${String(err)}`);
     } finally {
       setRosterLoad(false);
     }
@@ -296,7 +306,12 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                 {roster.length === 0 ? "Load from Registrations" : "Refresh"}
               </button>
             </div>
-            {roster.length === 0 && !rosterLoad && (
+            {rosterError && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm text-red-400">
+                ⚠️ {rosterError}
+              </div>
+            )}
+            {roster.length === 0 && !rosterLoad && !rosterError && (
               <p className="text-gray-600 text-sm mt-4 italic">
                 Click &quot;Load from Registrations&quot; to pull in all campers from the contact form.
               </p>

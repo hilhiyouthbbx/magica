@@ -466,149 +466,141 @@ export default function CampSchedulePage() {
 
         {/* ── BRACKET TAB ── */}
         {activeTab === "bracket" && (
-          data.bracketGames.length === 0 ? (
-            <div className="glass rounded-2xl border border-white/10 p-12 text-center">
-              <Trophy className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-              <p className="text-gray-400 font-bold">Championship bracket will be posted after Day 3.</p>
-              <p className="text-gray-600 text-sm mt-1">Final seeds are determined after all 3 seeding rounds.</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {(["NBA","College"] as Division[]).map(div => {
-                const semis  = data.bracketGames.filter(g => g.division === div && g.round === "semi");
-                const finals = data.bracketGames.filter(g => g.division === div && g.round === "final");
-                const thirds = data.bracketGames.filter(g => g.division === div && g.round === "3rd");
-                const getTeam = (id: string) => data.teams.find(t => t.id === id);
+          <div className="space-y-8">
+            {(["NBA","College"] as Division[]).map(div => {
+              const accentColor = div === "NBA" ? "text-orange-400" : "text-blue-400";
+              const bgColor     = div === "NBA" ? "bg-orange-500/10" : "bg-blue-500/10";
+              const gradeLabel  = div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade";
+              const getTeam     = (id: string) => data.teams.find(t => t.id === id);
 
-                // Helper: render a single matchup slot
-                function MatchSlot({ teamName, score, isWinner, isFinal }: {
-                  teamName: string; score: number | null; isWinner: boolean; isFinal: boolean;
-                }) {
+              const semis  = data.bracketGames.filter(g => g.division === div && g.round === "semi");
+              const finals = data.bracketGames.filter(g => g.division === div && g.round === "final");
+              const thirds = data.bracketGames.filter(g => g.division === div && g.round === "3rd");
+
+              // Build 2 semi slots (real game or placeholder)
+              const semiSlots = [0, 1].map(i => semis[i] ?? null);
+              const finalGame = finals[0] ?? null;
+              const thirdGame = thirds[0] ?? null;
+
+              // Render one team row inside a game box
+              const TeamRow = ({ name, score, winner, isChamp }: { name: string; score: number | null; winner: boolean; isChamp: boolean }) => (
+                <div className={`flex items-center justify-between px-3 py-2 border-b last:border-0 border-white/10 ${winner && isChamp ? "bg-yellow-500/10" : ""}`}>
+                  <span className={`text-sm font-bold truncate max-w-[130px] ${winner && isChamp ? "text-yellow-300" : winner ? "text-white" : name === "TBA" ? "text-gray-600 italic font-normal" : "text-gray-300"}`}>
+                    {winner && isChamp && "🏆 "}{name}
+                  </span>
+                  <span className={`text-base font-black ml-2 flex-shrink-0 ${winner && isChamp ? "text-yellow-400" : winner ? "text-white" : "text-gray-700"}`}>
+                    {score !== null ? score : "—"}
+                  </span>
+                </div>
+              );
+
+              // Render a full game box (real or placeholder)
+              const GameCard = ({ game, label, isChamp, isThird }: {
+                game: (typeof semis)[0] | null; label: string; isChamp?: boolean; isThird?: boolean;
+              }) => {
+                const borderClass = isChamp ? "border-yellow-500/40" : "border-white/15";
+                const headerBg    = isChamp ? "bg-yellow-500/15" : "bg-white/5";
+                const labelColor  = isChamp ? "text-yellow-400" : isThird ? "text-gray-500" : accentColor;
+                if (!game) {
+                  // Placeholder
                   return (
-                    <div className={`flex items-center justify-between px-3 py-2 border-b last:border-0 border-white/10 ${isWinner && isFinal ? "bg-yellow-500/10" : ""}`}>
-                      <span className={`text-sm font-bold truncate max-w-[120px] ${isWinner && isFinal ? "text-yellow-300" : isWinner ? "text-white" : "text-gray-400"}`}>
-                        {isWinner && isFinal && "🏆 "}{teamName || "TBA"}
-                      </span>
-                      <span className={`text-base font-black ml-2 flex-shrink-0 ${isWinner && isFinal ? "text-yellow-400" : isWinner ? "text-white" : "text-gray-500"}`}>
-                        {score !== null ? score : "—"}
-                      </span>
+                    <div className={`rounded-xl overflow-hidden border ${borderClass}`} style={{ minWidth: 165 }}>
+                      <div className={`px-3 py-1.5 flex items-center justify-between ${headerBg}`}>
+                        <span className={`text-[10px] font-black uppercase tracking-wider ${labelColor}`}>{label}</span>
+                        <span className="text-[10px] text-gray-700">Upcoming</span>
+                      </div>
+                      <div className="bg-[#070c18]">
+                        <TeamRow name="TBA" score={null} winner={false} isChamp={!!isChamp} />
+                        <TeamRow name="TBA" score={null} winner={false} isChamp={!!isChamp} />
+                      </div>
                     </div>
                   );
                 }
-
-                function GameBox({ game, label, accent }: {
-                  game: typeof semis[0]; label: string; accent?: string;
-                }) {
-                  const t1 = getTeam(game.team1Id);
-                  const t2 = getTeam(game.team2Id);
-                  const s1 = game.score1, s2 = game.score2;
-                  const done = game.status === "final";
-                  const w1 = done && s1 !== null && s2 !== null && s1 > s2;
-                  const w2 = done && s1 !== null && s2 !== null && s2 > s1;
-                  const isFinal = game.round === "final";
-                  return (
-                    <div className={`rounded-xl overflow-hidden border ${isFinal ? "border-yellow-500/40" : "border-white/15"}`} style={{ minWidth: 160 }}>
-                      <div className={`px-3 py-1.5 flex items-center justify-between ${isFinal ? "bg-yellow-500/15" : "bg-white/5"}`}>
-                        <span className={`text-[10px] font-black uppercase tracking-wider ${isFinal ? "text-yellow-400" : accent ?? "text-gray-500"}`}>{label}</span>
-                        {game.status === "live" && <span className="flex items-center gap-1 text-[10px] font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />LIVE</span>}
-                        {done && <span className="text-[10px] text-gray-600 font-bold">FINAL</span>}
-                      </div>
-                      <div className="bg-[#0a1020]">
-                        <MatchSlot teamName={t1?.name ?? "TBA"} score={s1} isWinner={w1} isFinal={isFinal} />
-                        <MatchSlot teamName={t2?.name ?? "TBA"} score={s2} isWinner={w2} isFinal={isFinal} />
-                      </div>
-                      {game.court && <div className="px-3 py-1 bg-white/[0.03] text-[10px] text-gray-600">Court {game.court}</div>}
-                    </div>
-                  );
-                }
-
+                const t1   = getTeam(game.team1Id);
+                const t2   = getTeam(game.team2Id);
+                const s1   = game.score1, s2 = game.score2;
+                const done = game.status === "final";
+                const w1   = done && s1 !== null && s2 !== null && s1 > s2;
+                const w2   = done && s1 !== null && s2 !== null && s2 > s1;
                 return (
-                  <div key={div} className="glass rounded-2xl border border-white/10 overflow-hidden">
-                    {/* Header */}
-                    <div className={`px-5 py-3 border-b border-white/10 ${div === "NBA" ? "bg-orange-500/10" : "bg-blue-500/10"}`}>
-                      <span className={`font-black text-base ${div === "NBA" ? "text-orange-400" : "text-blue-400"}`}>{div} Division Championship Bracket</span>
-                      <span className="text-gray-500 text-xs ml-2">{div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade"}</span>
+                  <div className={`rounded-xl overflow-hidden border ${borderClass}`} style={{ minWidth: 165 }}>
+                    <div className={`px-3 py-1.5 flex items-center justify-between ${headerBg}`}>
+                      <span className={`text-[10px] font-black uppercase tracking-wider ${labelColor}`}>{label}</span>
+                      {game.status === "live" && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-red-400">
+                          <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />LIVE
+                        </span>
+                      )}
+                      {done && <span className="text-[10px] text-gray-600 font-bold">FINAL</span>}
+                      {game.status === "scheduled" && !done && <span className="text-[10px] text-gray-700">Upcoming</span>}
                     </div>
-
-                    <div className="p-5">
-                      {/* ── Visual bracket ── */}
-                      {semis.length > 0 && (
-                        <div className="overflow-x-auto pb-2">
-                          <div className="flex items-stretch gap-0" style={{ minWidth: 520 }}>
-
-                            {/* Column 1 — Semifinals */}
-                            <div className="flex flex-col justify-around gap-8 flex-shrink-0" style={{ width: 190 }}>
-                              <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 text-center">Semifinals</div>
-                              {semis.slice(0,2).map((g, idx) => (
-                                <GameBox key={g.id} game={g} label={`Semi ${idx+1}`} accent={div === "NBA" ? "text-orange-400" : "text-blue-400"} />
-                              ))}
-                            </div>
-
-                            {/* Connector lines — semifinals to final */}
-                            <div className="flex flex-col justify-around flex-shrink-0" style={{ width: 50 }}>
-                              {/* top line */}
-                              <div className="flex flex-col items-center" style={{ height: "50%" }}>
-                                <div style={{ flex: 1 }} />
-                                <div className="w-full flex">
-                                  <div className="flex-1 border-t-2 border-r-2 border-white/20 rounded-tr-lg" style={{ height: 32 }} />
-                                </div>
-                              </div>
-                              {/* bottom line */}
-                              <div className="flex flex-col items-center" style={{ height: "50%" }}>
-                                <div className="w-full flex">
-                                  <div className="flex-1 border-b-2 border-r-2 border-white/20 rounded-br-lg" style={{ height: 32 }} />
-                                </div>
-                                <div style={{ flex: 1 }} />
-                              </div>
-                            </div>
-
-                            {/* Column 2 — Championship */}
-                            <div className="flex flex-col justify-center flex-shrink-0" style={{ width: 190 }}>
-                              <div className="text-[10px] font-black text-yellow-500/80 uppercase tracking-widest mb-2 text-center">🏆 Championship</div>
-                              {finals.length > 0
-                                ? <GameBox game={finals[0]} label="Championship" />
-                                : (
-                                  <div className="rounded-xl border border-white/10 overflow-hidden" style={{ minWidth: 160 }}>
-                                    <div className="px-3 py-1.5 bg-white/5">
-                                      <span className="text-[10px] font-black uppercase tracking-wider text-yellow-500/60">🏆 Championship</span>
-                                    </div>
-                                    <div className="bg-[#0a1020]">
-                                      {["Winner Semi 1", "Winner Semi 2"].map((label, i) => (
-                                        <div key={i} className="flex items-center justify-between px-3 py-2 border-b last:border-0 border-white/10">
-                                          <span className="text-sm text-gray-600 italic">{label}</span>
-                                          <span className="text-gray-700 font-black ml-2">—</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )
-                              }
-                            </div>
-
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 3rd place game */}
-                      {thirds.length > 0 && (
-                        <div className="mt-5 pt-5 border-t border-white/10">
-                          <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">3rd Place Game</div>
-                          <div style={{ maxWidth: 190 }}>
-                            <GameBox game={thirds[0]} label="3rd Place" />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Empty state — games added but no semis yet */}
-                      {semis.length === 0 && finals.length === 0 && thirds.length === 0 && (
-                        <p className="text-gray-600 text-sm">Bracket games haven&apos;t been set up yet.</p>
-                      )}
+                    <div className="bg-[#070c18]">
+                      <TeamRow name={t1?.name ?? "TBA"} score={s1} winner={w1} isChamp={!!isChamp} />
+                      <TeamRow name={t2?.name ?? "TBA"} score={s2} winner={w2} isChamp={!!isChamp} />
                     </div>
+                    {game.court && <div className="px-3 py-1 bg-white/[0.03] text-[10px] text-gray-600">Court {game.court}</div>}
                   </div>
                 );
-              })}
-            </div>
-          )
+              };
+
+              return (
+                <div key={div} className="glass rounded-2xl border border-white/10 overflow-hidden">
+                  {/* Division header */}
+                  <div className={`px-5 py-3 border-b border-white/10 ${bgColor}`}>
+                    <span className={`font-black text-base ${accentColor}`}>{div} Division Championship Bracket</span>
+                    <span className="text-gray-500 text-xs ml-2">{gradeLabel}</span>
+                  </div>
+
+                  <div className="p-5">
+                    {/* ── Visual bracket tree ── always shown ── */}
+                    <div className="overflow-x-auto pb-2">
+                      <div className="flex items-stretch gap-0" style={{ minWidth: 520 }}>
+
+                        {/* Column 1 — Semifinals */}
+                        <div className="flex flex-col justify-around gap-6 flex-shrink-0" style={{ width: 190 }}>
+                          <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1 text-center">Semifinals</div>
+                          {semiSlots.map((g, idx) => (
+                            <GameCard key={idx} game={g} label={`Semi ${idx + 1}`} />
+                          ))}
+                        </div>
+
+                        {/* Connector lines */}
+                        <div className="flex flex-col justify-around flex-shrink-0" style={{ width: 50 }}>
+                          <div className="flex flex-col items-center" style={{ height: "50%" }}>
+                            <div style={{ flex: 1 }} />
+                            <div className="w-full flex">
+                              <div className="flex-1 border-t-2 border-r-2 border-white/20 rounded-tr-lg" style={{ height: 32 }} />
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-center" style={{ height: "50%" }}>
+                            <div className="w-full flex">
+                              <div className="flex-1 border-b-2 border-r-2 border-white/20 rounded-br-lg" style={{ height: 32 }} />
+                            </div>
+                            <div style={{ flex: 1 }} />
+                          </div>
+                        </div>
+
+                        {/* Column 2 — Championship */}
+                        <div className="flex flex-col justify-center flex-shrink-0" style={{ width: 190 }}>
+                          <div className="text-[10px] font-black text-yellow-500/70 uppercase tracking-widest mb-2 text-center">🏆 Championship</div>
+                          <GameCard game={finalGame} label="Championship" isChamp />
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* 3rd place game — always shown below */}
+                    <div className="mt-6 pt-5 border-t border-white/10">
+                      <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">3rd Place Game</div>
+                      <div style={{ maxWidth: 190 }}>
+                        <GameCard game={thirdGame} label="3rd Place" isThird />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
         {/* ── INDIVIDUAL EVENTS TAB ── */}
         {activeTab === "events" && (

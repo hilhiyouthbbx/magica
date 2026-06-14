@@ -1,0 +1,190 @@
+{
+  "campName": "Hilhi Summer Youth Hoop Camp",
+  "campYear": 2025,
+  "currentDay": 0,
+  "active": true,
+  "announcement": "",
+  "teams": [
+    {
+      "id": "tba1",
+      "name": "Blazers",
+      "division": "NBA",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    },
+    {
+      "id": "tba2",
+      "name": "Lakers",
+      "division": "NBA",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    },
+    {
+      "id": "tba3",
+      "name": "Bulls",
+      "division": "NBA",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    },
+    {
+      "id": "tba4",
+      "name": "Warriors",
+      "division": "NBA",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    },
+    {
+      "id": "tba5",
+      "name": "Ducks",
+      "division": "College",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    },
+    {
+      "id": "tba6",
+      "name": "Beavers",
+      "division": "College",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    },
+    {
+      "id": "tba7",
+      "name": "Pilots",
+      "division": "College",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    },
+    {
+      "id": "tba8",
+      "name": "Vikings",
+      "division": "College",
+      "coach": "TBD",
+      "players": [],
+      "wins": 0,
+      "losses": 0,
+      "pointsFor": 0,
+      "pointsAgainst": 0
+    }
+  ],
+  "seedingGames": [],
+  "bracketGames": [
+    {
+      "id": "nba-semi1",
+      "round": "semi",
+      "division": "NBA",
+      "team1Id": "tba1",
+      "team2Id": "tba4",
+      "score1": null,
+      "score2": null,
+      "court": "1",
+      "status": "scheduled"
+    },
+    {
+      "id": "nba-semi2",
+      "round": "semi",
+      "division": "NBA",
+      "team1Id": "tba2",
+      "team2Id": "tba3",
+      "score1": null,
+      "score2": null,
+      "court": "2",
+      "status": "scheduled"
+    },
+    {
+      "id": "nba-final",
+      "round": "final",
+      "division": "NBA",
+      "team1Id": "",
+      "team2Id": "",
+      "score1": null,
+      "score2": null,
+      "court": "1",
+      "status": "scheduled"
+    },
+    {
+      "id": "nba-3rd",
+      "round": "3rd",
+      "division": "NBA",
+      "team1Id": "",
+      "team2Id": "",
+      "score1": null,
+      "score2": null,
+      "court": "2",
+      "status": "scheduled"
+    },
+    {
+      "id": "col-semi1",
+      "round": "semi",
+      "division": "College",
+      "team1Id": "tba5",
+      "team2Id": "tba8",
+      "score1": null,
+      "score2": null,
+      "court": "3",
+      "status": "scheduled"
+    },
+    {
+      "id": "col-semi2",
+      "round": "semi",
+      "division": "College",
+      "team1Id": "tba6",
+      "team2Id": "tba7",
+      "score1": null,
+      "score2": null,
+      "court": "4",
+      "status": "scheduled"
+    },
+    {
+      "id": "col-final",
+      "round": "final",
+      "division": "College",
+      "team1Id": "",
+      "team2Id": "",
+      "score1": null,
+      "score2": null,
+      "court": "3",
+      "status": "scheduled"
+    },
+    {
+      "id": "col-3rd",
+      "round": "3rd",
+      "division": "College",
+      "team1Id": "",
+      "team2Id": "",
+      "score1": null,
+      "score2": null,
+      "court": "4",
+      "status": "scheduled"
+    }
+  ],
+  "individualEvents": [],
+  "updatedAt": "2026-06-14T05:12:20.872Z"
+}

@@ -473,82 +473,135 @@ export default function CampSchedulePage() {
               <p className="text-gray-600 text-sm mt-1">Final seeds are determined after all 3 seeding rounds.</p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {(["NBA","College"] as Division[]).map(div => {
                 const semis  = data.bracketGames.filter(g => g.division === div && g.round === "semi");
                 const finals = data.bracketGames.filter(g => g.division === div && g.round === "final");
                 const thirds = data.bracketGames.filter(g => g.division === div && g.round === "3rd");
                 const getTeam = (id: string) => data.teams.find(t => t.id === id);
+
+                // Helper: render a single matchup slot
+                function MatchSlot({ teamName, score, isWinner, isFinal }: {
+                  teamName: string; score: number | null; isWinner: boolean; isFinal: boolean;
+                }) {
+                  return (
+                    <div className={`flex items-center justify-between px-3 py-2 border-b last:border-0 border-white/10 ${isWinner && isFinal ? "bg-yellow-500/10" : ""}`}>
+                      <span className={`text-sm font-bold truncate max-w-[120px] ${isWinner && isFinal ? "text-yellow-300" : isWinner ? "text-white" : "text-gray-400"}`}>
+                        {isWinner && isFinal && "🏆 "}{teamName || "TBA"}
+                      </span>
+                      <span className={`text-base font-black ml-2 flex-shrink-0 ${isWinner && isFinal ? "text-yellow-400" : isWinner ? "text-white" : "text-gray-500"}`}>
+                        {score !== null ? score : "—"}
+                      </span>
+                    </div>
+                  );
+                }
+
+                function GameBox({ game, label, accent }: {
+                  game: typeof semis[0]; label: string; accent?: string;
+                }) {
+                  const t1 = getTeam(game.team1Id);
+                  const t2 = getTeam(game.team2Id);
+                  const s1 = game.score1, s2 = game.score2;
+                  const done = game.status === "final";
+                  const w1 = done && s1 !== null && s2 !== null && s1 > s2;
+                  const w2 = done && s1 !== null && s2 !== null && s2 > s1;
+                  const isFinal = game.round === "final";
+                  return (
+                    <div className={`rounded-xl overflow-hidden border ${isFinal ? "border-yellow-500/40" : "border-white/15"}`} style={{ minWidth: 160 }}>
+                      <div className={`px-3 py-1.5 flex items-center justify-between ${isFinal ? "bg-yellow-500/15" : "bg-white/5"}`}>
+                        <span className={`text-[10px] font-black uppercase tracking-wider ${isFinal ? "text-yellow-400" : accent ?? "text-gray-500"}`}>{label}</span>
+                        {game.status === "live" && <span className="flex items-center gap-1 text-[10px] font-bold text-red-400"><span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />LIVE</span>}
+                        {done && <span className="text-[10px] text-gray-600 font-bold">FINAL</span>}
+                      </div>
+                      <div className="bg-[#0a1020]">
+                        <MatchSlot teamName={t1?.name ?? "TBA"} score={s1} isWinner={w1} isFinal={isFinal} />
+                        <MatchSlot teamName={t2?.name ?? "TBA"} score={s2} isWinner={w2} isFinal={isFinal} />
+                      </div>
+                      {game.court && <div className="px-3 py-1 bg-white/[0.03] text-[10px] text-gray-600">Court {game.court}</div>}
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={div} className="glass rounded-2xl border border-white/10 overflow-hidden">
+                    {/* Header */}
                     <div className={`px-5 py-3 border-b border-white/10 ${div === "NBA" ? "bg-orange-500/10" : "bg-blue-500/10"}`}>
-                      <span className={`font-black text-base ${div === "NBA" ? "text-orange-400" : "text-blue-400"}`}>{div} Division Championship</span>
+                      <span className={`font-black text-base ${div === "NBA" ? "text-orange-400" : "text-blue-400"}`}>{div} Division Championship Bracket</span>
+                      <span className="text-gray-500 text-xs ml-2">{div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade"}</span>
                     </div>
-                    <div className="p-5 space-y-4">
+
+                    <div className="p-5">
+                      {/* ── Visual bracket ── */}
                       {semis.length > 0 && (
-                        <div>
-                          <div className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Semifinals</div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {semis.map(g => {
-                              const t1 = getTeam(g.team1Id);
-                              const t2 = getTeam(g.team2Id);
-                              return (
-                                <div key={g.id} className="bg-white/5 rounded-xl border border-white/10 p-3">
-                                  <div className={`text-xs font-bold mb-2 ${g.status === "live" ? "text-green-400" : g.status === "final" ? "text-gray-500" : "text-blue-400"}`}>
-                                    {g.status === "live" ? "🔴 LIVE" : g.status === "final" ? "Final" : "Upcoming"} · Court {g.court}
-                                  </div>
-                                  {[{team: t1, score: g.score1}, {team: t2, score: g.score2}].map(({team, score}, idx) => (
-                                    <div key={idx} className="flex items-center justify-between py-1">
-                                      <span className="text-white font-bold text-sm">{team?.name ?? "TBA"}</span>
-                                      {score !== null && <span className="text-white font-black text-lg">{score}</span>}
-                                    </div>
-                                  ))}
+                        <div className="overflow-x-auto pb-2">
+                          <div className="flex items-stretch gap-0" style={{ minWidth: 520 }}>
+
+                            {/* Column 1 — Semifinals */}
+                            <div className="flex flex-col justify-around gap-8 flex-shrink-0" style={{ width: 190 }}>
+                              <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 text-center">Semifinals</div>
+                              {semis.slice(0,2).map((g, idx) => (
+                                <GameBox key={g.id} game={g} label={`Semi ${idx+1}`} accent={div === "NBA" ? "text-orange-400" : "text-blue-400"} />
+                              ))}
+                            </div>
+
+                            {/* Connector lines — semifinals to final */}
+                            <div className="flex flex-col justify-around flex-shrink-0" style={{ width: 50 }}>
+                              {/* top line */}
+                              <div className="flex flex-col items-center" style={{ height: "50%" }}>
+                                <div style={{ flex: 1 }} />
+                                <div className="w-full flex">
+                                  <div className="flex-1 border-t-2 border-r-2 border-white/20 rounded-tr-lg" style={{ height: 32 }} />
                                 </div>
-                              );
-                            })}
+                              </div>
+                              {/* bottom line */}
+                              <div className="flex flex-col items-center" style={{ height: "50%" }}>
+                                <div className="w-full flex">
+                                  <div className="flex-1 border-b-2 border-r-2 border-white/20 rounded-br-lg" style={{ height: 32 }} />
+                                </div>
+                                <div style={{ flex: 1 }} />
+                              </div>
+                            </div>
+
+                            {/* Column 2 — Championship */}
+                            <div className="flex flex-col justify-center flex-shrink-0" style={{ width: 190 }}>
+                              <div className="text-[10px] font-black text-yellow-500/80 uppercase tracking-widest mb-2 text-center">🏆 Championship</div>
+                              {finals.length > 0
+                                ? <GameBox game={finals[0]} label="Championship" />
+                                : (
+                                  <div className="rounded-xl border border-white/10 overflow-hidden" style={{ minWidth: 160 }}>
+                                    <div className="px-3 py-1.5 bg-white/5">
+                                      <span className="text-[10px] font-black uppercase tracking-wider text-yellow-500/60">🏆 Championship</span>
+                                    </div>
+                                    <div className="bg-[#0a1020]">
+                                      {["Winner Semi 1", "Winner Semi 2"].map((label, i) => (
+                                        <div key={i} className="flex items-center justify-between px-3 py-2 border-b last:border-0 border-white/10">
+                                          <span className="text-sm text-gray-600 italic">{label}</span>
+                                          <span className="text-gray-700 font-black ml-2">—</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              }
+                            </div>
+
                           </div>
                         </div>
                       )}
-                      {finals.length > 0 && (
-                        <div>
-                          <div className="text-xs font-black text-yellow-400 uppercase tracking-widest mb-2">🏆 Championship Game</div>
-                          {finals.map(g => {
-                            const t1 = getTeam(g.team1Id);
-                            const t2 = getTeam(g.team2Id);
-                            return (
-                              <div key={g.id} className="bg-yellow-500/10 rounded-xl border border-yellow-500/30 p-4">
-                                <div className={`text-xs font-bold mb-3 ${g.status === "live" ? "text-green-400" : g.status === "final" ? "text-gray-500" : "text-yellow-400"}`}>
-                                  {g.status === "live" ? "🔴 LIVE" : g.status === "final" ? "Final" : "Upcoming"} · Court {g.court}
-                                </div>
-                                {[{team: t1, score: g.score1}, {team: t2, score: g.score2}].map(({team, score}, idx) => (
-                                  <div key={idx} className="flex items-center justify-between py-1.5">
-                                    <span className="text-white font-black text-lg">{team?.name ?? "TBA"}</span>
-                                    {score !== null && <span className="text-yellow-400 font-black text-2xl">{score}</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
+
+                      {/* 3rd place game */}
+                      {thirds.length > 0 && (
+                        <div className="mt-5 pt-5 border-t border-white/10">
+                          <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">3rd Place Game</div>
+                          <div style={{ maxWidth: 190 }}>
+                            <GameBox game={thirds[0]} label="3rd Place" />
+                          </div>
                         </div>
                       )}
-                      {thirds.length > 0 && (
-                        <div>
-                          <div className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">3rd Place Game</div>
-                          {thirds.map(g => {
-                            const t1 = getTeam(g.team1Id);
-                            const t2 = getTeam(g.team2Id);
-                            return (
-                              <div key={g.id} className="bg-white/5 rounded-xl border border-white/10 p-3">
-                                {[{team: t1, score: g.score1}, {team: t2, score: g.score2}].map(({team, score}, idx) => (
-                                  <div key={idx} className="flex items-center justify-between py-1">
-                                    <span className="text-white font-bold text-sm">{team?.name ?? "TBA"}</span>
-                                    {score !== null && <span className="text-white font-black text-lg">{score}</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
-                        </div>
+
+                      {/* Empty state — games added but no semis yet */}
+                      {semis.length === 0 && finals.length === 0 && thirds.length === 0 && (
+                        <p className="text-gray-600 text-sm">Bracket games haven&apos;t been set up yet.</p>
                       )}
                     </div>
                   </div>

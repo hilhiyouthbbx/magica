@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash, RotateCcw, Video, Mail as MailIcon } from "lucide-react";
+import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash, RotateCcw, Video, Mail as MailIcon, MessageCircle, Lock, Eye, EyeOff, Play } from "lucide-react";
 
 import type { TournamentConfig } from "@/lib/tournament-client";
 import { TOURNAMENT_DEFAULTS } from "@/lib/tournament-client";
@@ -257,14 +257,25 @@ function TournamentForm({ initial, onSave, onCancel, adminKey }: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── FilmRoomTab — View who has accessed the Film Room ──────────────────────
-interface FilmVisitor { id: string; name: string; email: string; enteredAt: string; }
-interface FilmTally   { key: string; name: string; email: string; count: number; firstSeen: string; lastSeen: string; }
+interface FilmVisitor  { id: string; name: string; email: string; enteredAt: string; }
+interface FilmTally    { key: string; name: string; email: string; count: number; firstSeen: string; lastSeen: string; }
+interface ActiveViewer { name: string; lastSeen: string; watching?: string; }
 
 function FilmRoomTab({ adminKey }: { adminKey: string }) {
-  const [visitors, setVisitors] = useState<FilmVisitor[]>([]);
-  const [tally,    setTally]    = useState<FilmTally[]>([]);
-  const [loaded,   setLoaded]   = useState(false);
-  const [view,     setView]     = useState<"tally"|"log">("tally");
+  const [visitors,    setVisitors]    = useState<FilmVisitor[]>([]);
+  const [tally,       setTally]       = useState<FilmTally[]>([]);
+  const [loaded,      setLoaded]      = useState(false);
+  const [view,        setView]        = useState<"tally"|"log">("tally");
+  const [chatCount,   setChatCount]   = useState<number | null>(null);
+  const [liveViewers, setLiveViewers] = useState<ActiveViewer[]>([]);
+
+  // Passwords state
+  const [teamPw,      setTeamPw]      = useState("");
+  const [coachPw,     setCoachPw]     = useState("");
+  const [showTeamPw,  setShowTeamPw]  = useState(false);
+  const [showCoachPw, setShowCoachPw] = useState(false);
+  const [pwSaving,    setPwSaving]    = useState(false);
+  const [pwSaved,     setPwSaved]     = useState(false);
 
   useEffect(() => {
     fetch(`/api/film-room/visitors?key=${adminKey}`)
@@ -275,12 +286,49 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
+    fetch("/api/film-room/chat")
+      .then(r => r.json())
+      .then((msgs: unknown[]) => setChatCount(Array.isArray(msgs) ? msgs.length : 0))
+      .catch(() => {});
+    // Load current passwords
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(d => {
+        setTeamPw(d?.videoRoom?.password      || "hilhi-team");
+        setCoachPw(d?.videoRoom?.coachPassword || "Kem-admin");
+      })
+      .catch(() => {});
+    // Live viewers (poll every 10s)
+    const fetchLive = () =>
+      fetch("/api/film-room/presence")
+        .then(r => r.json()).then(setLiveViewers).catch(() => {});
+    fetchLive();
+    const iv = setInterval(fetchLive, 10000);
+    return () => clearInterval(iv);
   }, [adminKey]);
+
+  async function savePasswords() {
+    if (!teamPw.trim() || !coachPw.trim()) return;
+    setPwSaving(true);
+    await fetch(`/api/content?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoRoom: { password: teamPw.trim(), coachPassword: coachPw.trim() } }),
+    });
+    setPwSaving(false);
+    setPwSaved(true);
+    setTimeout(() => setPwSaved(false), 3000);
+  }
 
   async function clearAll() {
     if (!confirm("Clear all film room visitor logs and tallies?")) return;
     await fetch(`/api/film-room/visitors?key=${adminKey}`, { method: "DELETE" });
     setVisitors([]); setTally([]);
+  }
+
+  async function clearChat() {
+    if (!confirm("Clear all Film Room chat messages? This cannot be undone.")) return;
+    await fetch(`/api/film-room/chat?key=${adminKey}`, { method: "DELETE" });
+    setChatCount(0);
   }
 
   if (!loaded) return <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Loading…</div>;
@@ -289,7 +337,83 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
   const uniqueViewers = tally.length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+
+      {/* ── Password Settings ── */}
+      <div className="glass rounded-2xl border border-white/10 p-5">
+        <h3 className="text-white font-black text-base mb-4 flex items-center gap-2">
+          <Lock className="w-4 h-4 text-blue-400" /> Film Room Passwords
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Team Password</label>
+            <p className="text-gray-500 text-xs mb-2">Given to all players to enter the Film Room</p>
+            <div className="relative">
+              <input
+                type={showTeamPw ? "text" : "password"}
+                value={teamPw}
+                onChange={e => setTeamPw(e.target.value)}
+                className="w-full pr-10 px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              <button type="button" onClick={() => setShowTeamPw(p => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                {showTeamPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Coach Password</label>
+            <p className="text-gray-500 text-xs mb-2">Your private password — unlocks Clear Chat in Film Room</p>
+            <div className="relative">
+              <input
+                type={showCoachPw ? "text" : "password"}
+                value={coachPw}
+                onChange={e => setCoachPw(e.target.value)}
+                className="w-full pr-10 px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              <button type="button" onClick={() => setShowCoachPw(p => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                {showCoachPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-3">
+          <button onClick={savePasswords} disabled={pwSaving || !teamPw.trim() || !coachPw.trim()}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all">
+            {pwSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {pwSaving ? "Saving…" : "Save Passwords"}
+          </button>
+          {pwSaved && <span className="text-green-400 text-sm font-semibold flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Saved!</span>}
+        </div>
+      </div>
+
+      {/* ── Live Now: who is currently in the Film Room ── */}
+      {liveViewers.length > 0 && (
+        <div className="glass rounded-2xl border border-green-500/20 bg-green-500/5 p-5">
+          <h3 className="text-white font-black text-base mb-3 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse" />
+            Live Now — {liveViewers.length} viewer{liveViewers.length !== 1 ? "s" : ""} in the Film Room
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            {liveViewers.map(v => (
+              <div key={v.name} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                <div className="w-7 h-7 rounded-full bg-green-600/30 border border-green-500/40 flex items-center justify-center text-green-400 font-bold text-xs flex-shrink-0">
+                  {v.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="text-white text-sm font-bold leading-none">{v.name}</div>
+                  {v.watching
+                    ? <div className="text-green-400 text-xs mt-0.5 flex items-center gap-1"><Play className="w-3 h-3" />{v.watching}</div>
+                    : <div className="text-gray-500 text-xs mt-0.5">Browsing…</div>
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -301,9 +425,15 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
             <button onClick={() => setView("tally")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${view==="tally" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>Tally</button>
             <button onClick={() => setView("log")}   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${view==="log"   ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>Full Log</button>
           </div>
+          {(chatCount ?? 0) > 0 && (
+            <button onClick={clearChat} className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 rounded-xl text-sm font-semibold transition-all">
+              <MessageCircle className="w-4 h-4" /> Clear Chat
+              <span className="bg-orange-500/20 text-orange-400 text-xs font-bold px-1.5 py-0.5 rounded-full">{chatCount}</span>
+            </button>
+          )}
           {(visitors.length > 0 || tally.length > 0) && (
             <button onClick={clearAll} className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-red-500/40 text-gray-400 hover:text-red-400 rounded-xl text-sm font-semibold transition-all">
-              <Trash2 className="w-4 h-4" /> Clear All
+              <Trash2 className="w-4 h-4" /> Clear Visitors
             </button>
           )}
         </div>

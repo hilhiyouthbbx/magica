@@ -9,14 +9,14 @@ export async function GET() {
   return NextResponse.json(viewers);
 }
 
-// POST — heartbeat { name } or leave { name, action: "leave" }
+// POST — heartbeat { name, watching? } or leave { name, action: "leave" }
 export async function POST(req: NextRequest) {
-  const { name, action } = await req.json();
+  const { name, action, watching } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "Name required" }, { status: 400 });
   if (action === "leave") {
     await leave(name.trim());
     return NextResponse.json({ ok: true });
   }
-  const viewers = await heartbeat(name.trim());
+  const viewers = await heartbeat(name.trim(), watching as string | undefined);
   return NextResponse.json(viewers);
 }

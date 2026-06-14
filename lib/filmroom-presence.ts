@@ -16,6 +16,7 @@ async function getRedis() {
 export interface ActiveViewer {
   name:     string;
   lastSeen: string; // ISO
+  watching?: string; // video title or stream name
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
@@ -40,14 +41,15 @@ function pruneStale(viewers: ActiveViewer[]): ActiveViewer[] {
   return viewers.filter(v => new Date(v.lastSeen).getTime() > cutoff);
 }
 
-export async function heartbeat(name: string): Promise<ActiveViewer[]> {
+export async function heartbeat(name: string, watching?: string): Promise<ActiveViewer[]> {
   const all  = pruneStale(await read());
   const idx  = all.findIndex(v => v.name.toLowerCase() === name.toLowerCase());
   const now  = new Date().toISOString();
   if (idx >= 0) {
     all[idx].lastSeen = now;
+    if (watching !== undefined) all[idx].watching = watching || undefined;
   } else {
-    all.push({ name, lastSeen: now });
+    all.push({ name, lastSeen: now, ...(watching ? { watching } : {}) });
   }
   await write(all);
   return all;

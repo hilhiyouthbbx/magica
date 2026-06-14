@@ -162,10 +162,11 @@ export interface SiteContent {
   };
   /* ── Film Room (private, password-protected) ── */
   videoRoom: {
-    password: string;
-    title:    string;
-    subtitle: string;
-    videos:   VideoItem[];
+    password:      string;
+    coachPassword: string;
+    title:         string;
+    subtitle:      string;
+    videos:        VideoItem[];
   };
   /* ── Merch page ── */
   merch: {
@@ -337,8 +338,9 @@ export const DEFAULTS: SiteContent = {
     },
   },
   videoRoom: {
-    password: "hilhi-team",
-    title:    "Team Film Room",
+    password:      "hilhi-team",
+    coachPassword: "Kem-admin",
+    title:         "Team Film Room",
     subtitle: "Video sessions and live streams for Hilhi players and coaches.",
     videos:   [],
   },
@@ -410,6 +412,8 @@ function mergeContent(saved: Partial<SiteContent>): SiteContent {
       featuredCoach: { ...DEFAULTS.hsCoaches.featuredCoach, ...(saved.hsCoaches?.featuredCoach ?? {}) },
     },
     videoRoom: { ...DEFAULTS.videoRoom, ...saved.videoRoom,
+      password:      saved.videoRoom?.password      || DEFAULTS.videoRoom.password,
+      coachPassword: saved.videoRoom?.coachPassword || DEFAULTS.videoRoom.coachPassword,
       videos: (saved.videoRoom?.videos?.length ?? 0) > 0 ? saved.videoRoom!.videos : DEFAULTS.videoRoom.videos,
     },
     merch: {

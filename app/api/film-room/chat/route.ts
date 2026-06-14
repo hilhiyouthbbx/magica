@@ -3,8 +3,12 @@ import { getMessages, addMessage, clearChat } from "@/lib/filmroom-chat";
 
 export const dynamic = "force-dynamic";
 
-const pw      = () => process.env.ADMIN_PASSWORD ?? "hilhi-admin";
-const isAdmin = (r: NextRequest) => r.nextUrl.searchParams.get("key") === pw();
+const adminPw = () => process.env.ADMIN_PASSWORD ?? "hilhi-admin";
+const coachPw = () => process.env.COACH_PASSWORD ?? "Kem-admin";
+const isAdmin = (r: NextRequest) => {
+  const key = r.nextUrl.searchParams.get("key");
+  return key === adminPw() || key === coachPw();
+};
 
 // GET /api/film-room/chat?since=ISO  — poll for new messages
 export async function GET(req: NextRequest) {

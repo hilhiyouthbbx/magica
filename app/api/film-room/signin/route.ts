@@ -4,6 +4,8 @@ import { logVisitor } from "@/lib/filmroom";
 
 export const dynamic = "force-dynamic";
 
+const TEAM_PW_DEFAULT  = "hilhi-team";
+const COACH_PW_DEFAULT = "Kem-admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,18 +14,27 @@ export async function POST(req: NextRequest) {
     if (!name?.trim())     return NextResponse.json({ error: "Please enter your name." },          { status: 400 });
     if (!password?.trim()) return NextResponse.json({ error: "Please enter the team password." }, { status: 400 });
 
-    // Verify password
+    // Coach/admin password (env var COACH_PASSWORD or default)
+    const coachPw = process.env.COACH_PASSWORD || COACH_PW_DEFAULT;
+    const isCoach = password.trim() === coachPw;
+
+    // Load both passwords from content (admin-configurable)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    let correctPw = "hilhi-team";
+    let teamPw    = process.env.TEAM_PASSWORD  || TEAM_PW_DEFAULT;
+    let coachPwFinal = coachPw; // already set from env/default
     try {
       const res  = await fetch(`${baseUrl}/api/content`, { cache: "no-store" });
       const data = await res.json();
-      correctPw  = data?.videoRoom?.password || "hilhi-team";
-    } catch { /* use default */ }
+      if (data?.videoRoom?.password)      teamPw      = data.videoRoom.password;
+      if (data?.videoRoom?.coachPassword) coachPwFinal = data.videoRoom.coachPassword;
+    } catch { /* use defaults */ }
 
-    if (password.trim() !== correctPw) {
+    // Re-check coach password with content value
+    const isCoachFinal = password.trim() === coachPwFinal;
+    if (!isCoachFinal && password.trim() !== teamPw) {
       return NextResponse.json({ error: "Incorrect password. Please try again." }, { status: 401 });
     }
+    const isCoachResolved = isCoachFinal;
 
     // Log visitor + update tally
     const { entry, tally } = await logVisitor({
@@ -32,51 +43,45 @@ export async function POST(req: NextRequest) {
       enteredAt: new Date().toISOString(),
     });
 
-    const time = new Date().toLocaleString("en-US", {
-      timeZone: "America/Los_Angeles",
-      weekday: "short", month: "short", day: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true,
-    });
+    // Skip notifications when Coach signs in (it's you — no need to alert yourself)
+    if (!isCoachResolved) {
+      const time = new Date().toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+        weekday: "short", month: "short", day: "numeric",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      });
 
-    const visitWord = tally.count === 1 ? "1st visit" : `visit #${tally.count}`;
+      const visitWord = tally.count === 1 ? "1st visit" : `visit #${tally.count}`;
 
-    // ── Send notifications via existing SMTP ───────────────────────────────
-    try {
-      const smtpHost = process.env.SMTP_HOST;
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
+      try {
+        const smtpHost = process.env.SMTP_HOST;
+        const smtpUser = process.env.SMTP_USER;
+        const smtpPass = process.env.SMTP_PASS;
 
-      if (smtpHost && smtpUser && smtpPass) {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost, port: Number(process.env.SMTP_PORT || 587), secure: false,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-
-        // 1 — Push notification via ntfy.sh (free, instant, no account needed)
-        try {
-          await fetch("https://ntfy.sh/hilhi-filmroom-alerts", {
-            method:  "POST",
-            headers: {
-              "Title":    "Film Room",
-              "Priority": "high",
-              "Tags":     "basketball",
-            },
-            body: `${name.trim()} just signed in (${visitWord}) - ${time}`,
+        if (smtpHost && smtpUser && smtpPass) {
+          const transporter = nodemailer.createTransport({
+            host: smtpHost, port: Number(process.env.SMTP_PORT || 587), secure: false,
+            auth: { user: smtpUser, pass: smtpPass },
           });
-          console.log("ntfy push notification sent OK");
-        } catch (ntfyErr) {
-          console.error("ntfy notification failed:", ntfyErr);
-        }
 
-        await Promise.allSettled([
+          // Push notification via ntfy.sh
+          try {
+            await fetch("https://ntfy.sh/hilhi-filmroom-alerts", {
+              method:  "POST",
+              headers: { "Title": "Film Room", "Priority": "high", "Tags": "basketball" },
+              body: `${name.trim()} just signed in (${visitWord}) - ${time}`,
+            });
+          } catch (ntfyErr) {
+            console.error("ntfy notification failed:", ntfyErr);
+          }
 
-          // 2 — Admin email notification
-          transporter.sendMail({
-            from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
-            to:      "info@hilhiyouthbbx.com",
-            subject: `Film Room: ${name.trim()} signed in (${visitWord})`,
-            text:    `Film Room: ${name.trim()} signed in (${visitWord}) - ${time}`,
-            html: `<!DOCTYPE html>
+          await Promise.allSettled([
+            transporter.sendMail({
+              from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
+              to:      "info@hilhiyouthbbx.com",
+              subject: `Film Room: ${name.trim()} signed in (${visitWord})`,
+              text:    `Film Room: ${name.trim()} signed in (${visitWord}) - ${time}`,
+              html: `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/></head>
 <body style="margin:0;padding:20px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto">
@@ -127,15 +132,15 @@ export async function POST(req: NextRequest) {
   </td></tr>
 </table>
 </body></html>`,
-          }),
-
-        ]);
+            }),
+          ]);
+        }
+      } catch (e) {
+        console.error("Film room notification failed:", e);
       }
-    } catch (e) {
-      console.error("Film room notification failed:", e);
     }
 
-    return NextResponse.json({ ok: true, visitorId: entry.id, visitCount: tally.count });
+    return NextResponse.json({ ok: true, visitorId: entry.id, visitCount: tally.count, isCoach: isCoachResolved });
   } catch (err) {
     console.error("Film room signin error:", err);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });

@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Eye, EyeOff, Radio, Play, ExternalLink, Calendar, Search, User, Mail, MessageCircle, Send, X as XIcon } from "lucide-react";
+import { Lock, Eye, EyeOff, Radio, Play, ExternalLink, Calendar, Search, User, Mail, MessageCircle, Send, X as XIcon, Trash2 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { SiteContent, VideoItem } from "@/lib/content";
@@ -355,6 +355,7 @@ export default function FilmRoomPage() {
   const [search,     setSearch]     = useState("");
   const [filter,     setFilter]     = useState<"all" | "video" | "stream">("all");
   const [viewers,    setViewers]    = useState<string[]>([]);
+  const [isCoach,    setIsCoach]    = useState(false);
 
   // Always require fresh sign-in on every visit
   useEffect(() => {
@@ -424,6 +425,7 @@ export default function FilmRoomPage() {
         setPwError(data.error || "Incorrect password. Please try again.");
       } else {
         setViewerName(name.trim());
+        setIsCoach(data.isCoach === true);
         setAuthed(true);
         // Register presence immediately on sign-in
         fetch("/api/film-room/presence", {
@@ -595,7 +597,7 @@ export default function FilmRoomPage() {
           </div>
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
             {liveNow.map(v => (
-              <VideoCard key={v.id} item={v} onClick={() => setSelected(v)} />
+              <VideoCard key={v.id} item={v} onClick={() => { setSelected(v); if (viewerName) fetch("/api/film-room/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: viewerName, watching: v.title }) }).catch(() => {}); }} />
             ))}
           </div>
         </section>
@@ -630,7 +632,7 @@ export default function FilmRoomPage() {
         {filtered.length > 0 && (
           <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map(v => (
-              <VideoCard key={v.id} item={v} onClick={() => setSelected(v)} />
+              <VideoCard key={v.id} item={v} onClick={() => { setSelected(v); if (viewerName) fetch("/api/film-room/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: viewerName, watching: v.title }) }).catch(() => {}); }} />
             ))}
           </div>
         )}
@@ -640,7 +642,7 @@ export default function FilmRoomPage() {
         )}
       </section>
 
-      {selected && <VideoModal item={selected} onClose={() => setSelected(null)} />}
+      {selected && <VideoModal item={selected} onClose={() => { setSelected(null); if (viewerName) fetch("/api/film-room/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: viewerName, watching: "" }) }).catch(() => {}); }} />}
       <Footer />
 
       {/* ── Floating chat button ── */}
@@ -652,6 +654,21 @@ export default function FilmRoomPage() {
         >
           <MessageCircle className="w-5 h-5" />
           <span className="text-sm">Live Chat</span>
+        </button>
+      )}
+
+      {/* ── Coach Kem: Clear Chat button ── */}
+      {isCoach && (
+        <button
+          onClick={async () => {
+            if (!confirm("Clear all chat messages?")) return;
+            await fetch("/api/film-room/chat?key=Kem-admin", { method: "DELETE" });
+          }}
+          style={{ position: "fixed", bottom: "80px", right: "24px", zIndex: 9999 }}
+          className="flex items-center gap-2 bg-orange-600/90 hover:bg-orange-500 text-white font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-orange-500/20 transition-all hover:scale-105 text-sm"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Clear Chat</span>
         </button>
       )}
 

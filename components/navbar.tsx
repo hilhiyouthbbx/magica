@@ -1,15 +1,21 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Menu, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { label: "Home",          href: "/" },
   { label: "About",         href: "/#about" },
   { label: "Programs",      href: "/#programs" },
-  { label: "Camps/Clinic",  href: "/events" },
+  {
+    label: "Camps/Clinic", href: "/events",
+    dropdown: [
+      { label: "📅 Camp Events",    href: "/events" },
+      { label: "🏀 Camp Schedule",  href: "/camp-schedule" },
+    ],
+  },
   { label: "Tournaments",   href: "/tournaments" },
-  { label: "Youth Tryout",    href: "/tryout" },
+  { label: "Youth Tryout",  href: "/tryout" },
   { label: "Youth Coaches", href: "/youth-coaches" },
   { label: "HS Coaches",    href: "/high-school-coaches" },
   { label: "Merch",         href: "/merch" },
@@ -18,12 +24,25 @@ const links = [
 ];
 
 export function Navbar() {
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [open,        setOpen]        = useState(false);
+  const [scrolled,    setScrolled]    = useState(false);
+  const [campOpen,    setCampOpen]    = useState(false);
+  const campRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", fn);
     return () => window.removeEventListener("scroll", fn);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (campRef.current && !campRef.current.contains(e.target as Node)) {
+        setCampOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   return (
@@ -35,13 +54,44 @@ export function Navbar() {
         </a>
 
         <nav className="hidden md:flex items-center gap-0.5">
-          {links.map(l => (
-            l.label === "Film Room"
-              ? <a key={l.label} href={l.href} className="px-2.5 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all whitespace-nowrap flex items-center gap-1">
+          {links.map(l => {
+            if (l.label === "Film Room") {
+              return (
+                <a key={l.label} href={l.href} className="px-2.5 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all whitespace-nowrap flex items-center gap-1">
                   🎬 {l.label}
                 </a>
-              : <a key={l.label} href={l.href} className="px-2.5 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap">{l.label}</a>
-          ))}
+              );
+            }
+            if (l.dropdown) {
+              return (
+                <div key={l.label} ref={campRef} className="relative">
+                  <button
+                    onClick={() => setCampOpen(p => !p)}
+                    className="flex items-center gap-1 px-2.5 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
+                  >
+                    {l.label}
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${campOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {campOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-48 glass-dark rounded-xl border border-white/15 shadow-xl overflow-hidden z-50">
+                      {l.dropdown.map(item => (
+                        <a key={item.href} href={item.href}
+                          onClick={() => setCampOpen(false)}
+                          className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all">
+                          {item.label}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <a key={l.label} href={l.href} className="px-2.5 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap">
+                {l.label}
+              </a>
+            );
+          })}
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
@@ -57,11 +107,25 @@ export function Navbar() {
 
       {open && (
         <div className="md:hidden glass-dark border-t border-white/10 mt-2 px-4 pb-4 pt-2 space-y-1">
-          {links.map(l => (
-            l.label === "Film Room"
-              ? <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all">🎬 {l.label}</a>
-              : <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">{l.label}</a>
-          ))}
+          {links.map(l => {
+            if (l.dropdown) {
+              return (
+                <div key={l.label}>
+                  <div className="px-4 py-2 text-xs font-black text-gray-500 uppercase tracking-wider">{l.label}</div>
+                  {l.dropdown.map(item => (
+                    <a key={item.href} href={item.href} onClick={() => setOpen(false)}
+                      className="block px-6 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              );
+            }
+            if (l.label === "Film Room") {
+              return <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all">🎬 {l.label}</a>;
+            }
+            return <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">{l.label}</a>;
+          })}
           <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
             Register Now
           </a>

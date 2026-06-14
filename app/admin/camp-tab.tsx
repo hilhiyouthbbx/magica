@@ -2,12 +2,13 @@
 import { useState, useEffect } from "react";
 import {
   Plus, Save, Trash2, X, Loader2, CheckCircle,
-  Users, GripVertical, RefreshCw
+  Users, GripVertical, RefreshCw, Mail
 } from "lucide-react";
 import type {
   CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
   CamperRosterEntry
 } from "@/lib/camp-schedule";
+import type { DayKey, CheckInMap } from "@/lib/camp-checkin";
 
 const EVENT_NAMES = [
   "Free Throw Contest",
@@ -20,19 +21,27 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [data,        setData]        = useState<CampScheduleData | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [saved,       setSaved]       = useState(false);
-  const [section,     setSection]     = useState<"roster"|"teams"|"standings"|"bracket"|"events"|"settings">("teams");
+  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"bracket"|"events"|"settings">("teams");
   const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
   const [rosterLoad,  setRosterLoad]  = useState(false);
   const [dragOver,    setDragOver]    = useState<string | null>(null);
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
   const [rosterError,  setRosterError]  = useState<string>("");
+  const [checkIns,     setCheckIns]     = useState<CheckInMap>({});
+  const [checkInDay,   setCheckInDay]   = useState<DayKey>("day1");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailResult,  setEmailResult]  = useState<string>("");
 
   useEffect(() => {
     fetch("/api/camp-schedule")
       .then(r => r.json())
       .then(setData)
       .catch(() => {});
-  }, []);
+    fetch(`/api/camp-checkin?key=${adminKey}`)
+      .then(r => r.json())
+      .then(d => { if (d.checkIns) setCheckIns(d.checkIns as CheckInMap); })
+      .catch(() => {});
+  }, [adminKey]);
 
   // Recompute assignedIds whenever teams or roster changes
   useEffect(() => {
@@ -74,8 +83,8 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
       const campers: CamperRosterEntry[] = all
         .filter(c => {
-          const src = (c.source ?? "").toLowerCase();
-          return (src.includes("camp") || src.includes("2026")) && (c.camperName || c.name);
+          // Include anyone who has a camperName (i.e. filled in via the camp registration form)
+          return !!(c.camperName && c.camperName.trim());
         })
         .map(c => {
           const fullName = (c.camperName ?? c.name ?? "").trim();
@@ -91,7 +100,9 @@ export function CampTab({ adminKey }: { adminKey: string }) {
         .sort((a, b) => a.gradeNum !== b.gradeNum ? a.gradeNum - b.gradeNum : a.fullName.localeCompare(b.fullName));
 
       if (campers.length === 0) {
-        setRosterError(`Found ${all.length} contacts but none matched the camp filter. Sources found: ${[...new Set(all.map(c => c.source).filter(Boolean))].join(", ") || "none"}`);
+        const sources = [...new Set(all.map((c: Record<string,string>) => c.source).filter(Boolean))].join(", ");
+        const withName = all.filter((c: Record<string,string>) => c.camperName).length;
+        setRosterError(`Found ${all.length} contacts, ${withName} have a camper name. Sources: ${sources || "none"}. Make sure camperName is populated in your registrations.`);
       } else {
         setRoster(campers);
       }
@@ -273,6 +284,49 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Loading…</div>
   );
 
+  // ── Check-in helpers ──────────────────────────────────────────────────────
+  async function toggleCheckIn(contactId: string, day: DayKey, checked: boolean) {
+    const updated = {
+      ...checkIns,
+      [contactId]: {
+        ...(checkIns[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+        [day]: checked,
+      },
+    };
+    setCheckIns(updated); // optimistic
+    const res = await fetch(`/api/camp-checkin?key=${adminKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "toggle", contactId, day, checked }),
+    });
+    const json = await res.json() as { checkIns?: CheckInMap };
+    if (json.checkIns) setCheckIns(json.checkIns);
+  }
+
+  async function sendAbsentEmails() {
+    setSendingEmail(true);
+    setEmailResult("");
+    try {
+      const res  = await fetch(`/api/camp-checkin?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send-absent", day: checkInDay,
+          dayLabel: { day1:"Day 1",day2:"Day 2",day3:"Day 3",day4:"Day 4" }[checkInDay],
+          campName: data?.campName || "Hilhi Youth Basketball Camp",
+        }),
+      });
+      const json = await res.json() as { ok?: boolean; sent?: number; failed?: number; total?: number; message?: string; error?: string };
+      if (json.error) setEmailResult("❌ " + json.error);
+      else if (json.message) setEmailResult("✅ " + json.message);
+      else setEmailResult(`✅ Sent ${json.sent ?? 0} emails to absent campers${json.failed ? ` (${json.failed} failed)` : ""}`);
+    } catch (err) {
+      setEmailResult("❌ Network error: " + String(err));
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
   const divTeams = (div: Division) => data.teams.filter(t => t.division === div);
   const teamOpts = (div: Division) => divTeams(div).map(t => ({ id: t.id, name: t.name || "(unnamed)" }));
 
@@ -305,6 +359,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       <div className="flex flex-wrap gap-2 items-center">
         {([
           ["roster",    "📋 Camper Roster"],
+          ["checkin",   "✅ Check-In"],
           ["teams",     "👥 Teams & Rosters"],
           ["standings", "📊 Standings"],
           ["bracket",   "🏆 Bracket"],
@@ -319,6 +374,124 @@ export function CampTab({ adminKey }: { adminKey: string }) {
         {saving && <span className="flex items-center gap-1 text-blue-400 text-sm"><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</span>}
         {saved  && <span className="flex items-center gap-1 text-green-400 text-sm"><CheckCircle className="w-3.5 h-3.5" />Saved!</span>}
       </div>
+
+      {/* ── CHECK-IN ── */}
+      {section === "checkin" && (
+        <div className="space-y-5">
+          {/* Day selector + send button */}
+          <div className="glass rounded-2xl border border-white/10 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h3 className="text-white font-black text-base">Daily Check-In</h3>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  Check off each camper as they arrive. Use the day tabs to switch between days.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(["day1","day2","day3","day4"] as DayKey[]).map(d => (
+                  <button key={d} onClick={() => { setCheckInDay(d); setEmailResult(""); }}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${checkInDay === d ? "bg-blue-600 text-white" : "glass border border-white/15 text-gray-400 hover:text-white"}`}>
+                    {({ day1:"Day 1", day2:"Day 2", day3:"Day 3", day4:"Day 4" } as Record<DayKey,string>)[d]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Roster with checkboxes */}
+          {roster.length === 0 ? (
+            <div className="glass rounded-2xl border border-white/10 p-8 text-center">
+              <p className="text-gray-400 font-bold mb-2">No campers loaded yet.</p>
+              <p className="text-gray-600 text-sm">Go to the 📋 Camper Roster tab and click "Load from Registrations" first.</p>
+            </div>
+          ) : (() => {
+            const gradeMap = new Map<number, { label: string; campers: CamperRosterEntry[] }>();
+            roster.forEach(cam => {
+              if (!gradeMap.has(cam.gradeNum)) gradeMap.set(cam.gradeNum, { label: gradeLabel(cam.grade), campers: [] });
+              gradeMap.get(cam.gradeNum)!.campers.push(cam);
+            });
+            const grades = [...gradeMap.entries()].sort((a,b) => a[0]-b[0]);
+            const totalPresent = roster.filter(cam => checkIns[cam.id]?.[checkInDay]).length;
+            const totalAbsent  = roster.length - totalPresent;
+            return (
+              <div className="space-y-4">
+                {/* Summary bar */}
+                <div className="glass rounded-2xl border border-white/10 p-4 flex flex-wrap gap-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-black text-green-400">{totalPresent}</div>
+                    <div className="text-xs text-gray-500">Present</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-black text-red-400">{totalAbsent}</div>
+                    <div className="text-xs text-gray-500">Absent</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-black text-white">{roster.length}</div>
+                    <div className="text-xs text-gray-500">Total</div>
+                  </div>
+                  <div className="flex-1" />
+                  {/* Send absent emails */}
+                  <div className="flex flex-col gap-2 items-end">
+                    <button
+                      onClick={sendAbsentEmails}
+                      disabled={sendingEmail || totalAbsent === 0}
+                      className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 rounded-xl text-sm font-bold text-white transition-all"
+                    >
+                      {sendingEmail
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Sending…</>
+                        : <><Mail className="w-3.5 h-3.5" />Email Absent Parents ({totalAbsent})</>
+                      }
+                    </button>
+                    {emailResult && (
+                      <span className={`text-xs font-bold px-3 py-1 rounded-lg ${emailResult.startsWith("✅") ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                        {emailResult}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Grade groups */}
+                {grades.map(([gradeNum, { label, campers }]) => (
+                  <div key={gradeNum} className="glass rounded-2xl border border-white/10 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
+                      <span className="text-sm font-black text-white">{label}</span>
+                      <span className="text-xs text-gray-500">
+                        {campers.filter(cam => checkIns[cam.id]?.[checkInDay]).length}/{campers.length} present
+                      </span>
+                    </div>
+                    <div className="divide-y divide-white/[0.06]">
+                      {campers.map(cam => {
+                        const isPresent = !!(checkIns[cam.id]?.[checkInDay]);
+                        return (
+                          <label key={cam.id}
+                            className={`flex items-center gap-4 px-5 py-3 cursor-pointer transition-colors ${isPresent ? "bg-green-500/10 hover:bg-green-500/15" : "hover:bg-white/[0.03]"}`}>
+                            <input
+                              type="checkbox"
+                              checked={isPresent}
+                              onChange={e => toggleCheckIn(cam.id, checkInDay, e.target.checked)}
+                              className="w-5 h-5 rounded accent-green-500 cursor-pointer flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className={`font-bold text-sm ${isPresent ? "text-green-300" : "text-white"}`}>
+                                {cam.fullName}
+                              </span>
+                              <span className="text-gray-600 text-xs ml-2">{cam.grade}</span>
+                            </div>
+                            {isPresent
+                              ? <span className="text-green-500 text-xs font-bold flex-shrink-0">✓ Present</span>
+                              : <span className="text-gray-700 text-xs flex-shrink-0">Absent</span>
+                            }
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* ── ROSTER ── */}
       {section === "roster" && (

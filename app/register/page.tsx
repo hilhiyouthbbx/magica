@@ -17,6 +17,7 @@ import {
   AlertCircle, Lock, Loader2, CheckCircle, ArrowLeft,
 } from "lucide-react";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 // ─── Square config ────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
@@ -311,7 +312,8 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen bg-[#080D1A]">
         <Script src={SQ_SCRIPT} strategy="afterInteractive" />
-        <Navbar />
+        <DynamicTitle pageKey="register" fallback="Camp Registration | Hilhi Youth Basketball" />
+      <Navbar />
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
           <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}
             className="glass rounded-3xl border border-green-500/30 p-10 max-w-lg w-full">

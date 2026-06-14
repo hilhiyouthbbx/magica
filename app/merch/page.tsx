@@ -11,6 +11,7 @@ import {
 import { Navbar }  from "@/components/navbar";
 import { Footer }  from "@/components/footer";
 import type { SiteContent, MerchProduct } from "@/lib/content";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 // ── Square config ─────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
@@ -212,6 +213,7 @@ export default function MerchPage() {
       {/* Square Web Payments SDK — load as early as possible */}
       <Script src={SQ_SCRIPT} strategy="afterInteractive" />
 
+      <DynamicTitle pageKey="merch" fallback="Merch | Hilhi Youth Basketball" />
       <Navbar />
 
       {/* Hero */}

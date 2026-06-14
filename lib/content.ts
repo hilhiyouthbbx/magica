@@ -94,11 +94,36 @@ export interface TryoutSession {
 }
 
 export interface SiteContent {
+  /* ── Page Titles ── */
+  pageTitles: {
+    home:         string;
+    events:       string;
+    campSchedule: string;
+    tournaments:  string;
+    tryout:       string;
+    youthCoaches: string;
+    hsCoaches:    string;
+    merch:        string;
+    filmRoom:     string;
+    register:     string;
+  };
   /* ── Navbar ── */
   navbar: {
-    siteName:    string;
-    tagline:     string;
-    showTryouts: boolean;
+    siteName:     string;
+    tagline:      string;
+    showTryouts:  boolean;
+    // Editable link labels (empty = use default)
+    labelHome:         string;
+    labelAbout:        string;
+    labelPrograms:     string;
+    labelCamps:        string;
+    labelTournaments:  string;
+    labelTryout:       string;
+    labelYouthCoaches: string;
+    labelHSCoaches:    string;
+    labelMerch:        string;
+    labelFilmRoom:     string;
+    labelContact:      string;
   };
   /* ── Home page ── */
   home: {
@@ -180,10 +205,33 @@ export interface SiteContent {
 
 // ── Defaults ──────────────────────────────────────────────────────────────
 export const DEFAULTS: SiteContent = {
+  pageTitles: {
+    home:         "",
+    events:       "",
+    campSchedule: "",
+    tournaments:  "",
+    tryout:       "",
+    youthCoaches: "",
+    hsCoaches:    "",
+    merch:        "",
+    filmRoom:     "",
+    register:     "",
+  },
   navbar: {
     siteName:    "HILHI",
     tagline:     "Youth Basketball",
-    showTryouts: true,
+    showTryouts:  true,
+    labelHome:         "",
+    labelAbout:        "",
+    labelPrograms:     "",
+    labelCamps:        "",
+    labelTournaments:  "",
+    labelTryout:       "",
+    labelYouthCoaches: "",
+    labelHSCoaches:    "",
+    labelMerch:        "",
+    labelFilmRoom:     "",
+    labelContact:      "",
   },
   home: {
     heroBadge:     "Hillsboro Youth Basketball",
@@ -379,6 +427,7 @@ function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6
 // ── Merge saved data with defaults ────────────────────────────────────────
 function mergeContent(saved: Partial<SiteContent>): SiteContent {
   return {
+    pageTitles:   { ...DEFAULTS.pageTitles,   ...(saved.pageTitles ?? {}) },
     navbar:       { ...DEFAULTS.navbar,       ...saved.navbar },
     home: {
       ...DEFAULTS.home,

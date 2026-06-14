@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { SiteContent, Coach, FeaturedCoach } from "@/lib/content";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 // ── Static hero background ────────────────────────────────────────────────────
 const HERO_BG = "https://static.wixstatic.com/media/458ec6_410e9b5e45414d0a8bfce9e06a704395~mv2.jpg/v1/fill/w_1920,h_800,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/banner.jpg";
@@ -132,6 +133,7 @@ export default function HighSchoolCoachesPage() {
 
   return (
     <main className="min-h-screen bg-[#080D1A]">
+      <DynamicTitle pageKey="hsCoaches" fallback="HS Coaches | Hilhi Youth Basketball" />
       <Navbar />
 
       {/* Hero */}

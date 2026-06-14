@@ -7,6 +7,7 @@ import { Lock, Eye, EyeOff, Radio, Play, ExternalLink, Calendar, Search, User, M
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { SiteContent, VideoItem } from "@/lib/content";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getEmbedUrl(url: string): string | null {
@@ -548,6 +549,7 @@ export default function FilmRoomPage() {
   // ── Film Room ────────────────────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-[#080D1A]">
+      <DynamicTitle pageKey="filmRoom" fallback="Film Room | Hilhi Youth Basketball" />
       <Navbar />
 
       {/* Hero */}

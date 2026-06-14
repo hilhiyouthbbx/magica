@@ -10,6 +10,7 @@ import {
   ChevronRight, Share2, Facebook, Twitter, ArrowRight, Ticket
 } from "lucide-react";
 import type { SiteContent, CampItem } from "@/lib/content";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 // ── CMS Camp Card ─────────────────────────────────────────────────────────────
 function CampCard({ item, index }: { item: CampItem; index: number }) {
@@ -100,6 +101,7 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-[#080D1A]">
+      <DynamicTitle pageKey="events" fallback="Events | Hilhi Youth Basketball" />
       <Navbar />
 
       {/* Hero */}

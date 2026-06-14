@@ -13,12 +13,14 @@ import { Quote }           from "@/components/quote";
 import { Contact }         from "@/components/contact";
 import { Footer }          from "@/components/footer";
 import { getContent }      from "@/lib/content";
+import { DynamicTitle }    from "@/components/dynamic-title";
 
 export default async function Home() {
   const content = await getContent();
 
   return (
     <main className="min-h-screen bg-[#080D1A]">
+      <DynamicTitle pageKey="home" fallback="Hilhi Youth Basketball | Hillsboro, OR" />
       <Navbar />
       <Hero           content={content.home}    />
       <UpcomingEvents />

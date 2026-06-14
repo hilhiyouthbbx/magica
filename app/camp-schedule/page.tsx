@@ -6,6 +6,7 @@ import { Navbar }  from "@/components/navbar";
 import { Footer }  from "@/components/footer";
 import { Calendar, Clock, Trophy, Users, Megaphone, ChevronDown, ChevronUp } from "lucide-react";
 import type { CampScheduleData, CampTeam, Division } from "@/lib/camp-schedule";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 // ── Static 4-day schedule ─────────────────────────────────────────────────────
 const DAYS = [
@@ -177,6 +178,7 @@ export default function CampSchedulePage() {
 
   if (!data.active) return (
     <main className="min-h-screen bg-[#080D1A] text-white flex flex-col">
+      <DynamicTitle pageKey="campSchedule" fallback="Camp Schedule | Hilhi Youth Basketball" />
       <Navbar />
       <div className="flex-1 flex items-center justify-center px-4">
         <div className="text-center">

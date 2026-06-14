@@ -7,6 +7,7 @@ import { Calendar, MapPin, Trophy, Users, ChevronRight, Star } from "lucide-reac
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { TournamentConfig } from "@/lib/tournament";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState<TournamentConfig[]>([]);
@@ -21,6 +22,7 @@ export default function TournamentsPage() {
 
   return (
     <main className="min-h-screen bg-[#080D1A]">
+      <DynamicTitle pageKey="tournaments" fallback="Tournaments | Hilhi Youth Basketball" />
       <Navbar />
 
       <section className="relative pt-32 pb-12 overflow-hidden">

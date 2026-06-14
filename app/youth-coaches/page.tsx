@@ -7,6 +7,7 @@ import { Users, Trophy, Star } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { SiteContent, Coach } from "@/lib/content";
+import { DynamicTitle } from "@/components/dynamic-title";
 
 const BADGE  = "https://static.wixstatic.com/media/458ec6_d5ba4437af264a2196932023e209224e~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/badge.png";
 const TEAM_1 = "https://static.wixstatic.com/media/8bb438_3ae04589aef4480e89a24d7283c69798~mv2_d_2869_3586_s_4_2.jpg/v1/fill/w_1200,h_600,al_c,q_85,enc_auto/team1.jpg";
@@ -93,6 +94,7 @@ export default function YouthCoachesPage() {
 
   return (
     <main className="min-h-screen bg-[#080D1A]">
+      <DynamicTitle pageKey="youthCoaches" fallback="Youth Coaches | Hilhi Youth Basketball" />
       <Navbar />
 
       {/* Hero */}

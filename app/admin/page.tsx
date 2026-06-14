@@ -926,6 +926,8 @@ function PagesTab({ adminKey }: { adminKey: string }) {
   // Shortcut setters
   const setN = (k: keyof SiteContent["navbar"]) => (v: unknown) =>
     setContent(p => p ? { ...p, navbar: { ...p.navbar, [k]: v } } : p);
+  const setPT = (k: keyof SiteContent["pageTitles"]) => (v: string) =>
+    setContent(p => p ? { ...p, pageTitles: { ...p.pageTitles, [k]: v } } : p);
   const setH = (k: keyof SiteContent["home"]) => (v: unknown) =>
     setContent(p => p ? { ...p, home: { ...p.home, [k]: v } } : p);
   const setC = (k: keyof SiteContent["contact"]) => (v: string) =>
@@ -939,6 +941,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
   const c = content.contact;
   const t = content.tryout;
   const n = content.navbar;
+  const pt = content.pageTitles;
   const m = content.merch;
 
   // Camp helpers
@@ -1057,8 +1060,26 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           <IF label="Site Name"  value={n.siteName} onChange={setN("siteName") as (v:string)=>void} ph="HILHI" />
           <IF label="Tagline"    value={n.tagline}  onChange={setN("tagline")  as (v:string)=>void} ph="Youth Basketball" />
         </div>
+
+        <div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Navigation Link Labels <span className="text-gray-600 normal-case font-normal">(leave blank to use defaults)</span></p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <IF label="Home"           value={n.labelHome         ?? ""} onChange={setN("labelHome")         as (v:string)=>void} ph="Home" />
+            <IF label="About"          value={n.labelAbout        ?? ""} onChange={setN("labelAbout")        as (v:string)=>void} ph="About" />
+            <IF label="Programs"       value={n.labelPrograms     ?? ""} onChange={setN("labelPrograms")     as (v:string)=>void} ph="Programs" />
+            <IF label="Camps / Clinic" value={n.labelCamps        ?? ""} onChange={setN("labelCamps")        as (v:string)=>void} ph="Camps/Clinic" />
+            <IF label="Tournaments"    value={n.labelTournaments  ?? ""} onChange={setN("labelTournaments")  as (v:string)=>void} ph="Tournaments" />
+            <IF label="Youth Tryout"   value={n.labelTryout       ?? ""} onChange={setN("labelTryout")       as (v:string)=>void} ph="Youth Tryout" />
+            <IF label="Youth Coaches"  value={n.labelYouthCoaches ?? ""} onChange={setN("labelYouthCoaches") as (v:string)=>void} ph="Youth Coaches" />
+            <IF label="HS Coaches"     value={n.labelHSCoaches    ?? ""} onChange={setN("labelHSCoaches")    as (v:string)=>void} ph="HS Coaches" />
+            <IF label="Merch"          value={n.labelMerch        ?? ""} onChange={setN("labelMerch")        as (v:string)=>void} ph="Merch" />
+            <IF label="Film Room"      value={n.labelFilmRoom     ?? ""} onChange={setN("labelFilmRoom")     as (v:string)=>void} ph="Film Room" />
+            <IF label="Contact"        value={n.labelContact      ?? ""} onChange={setN("labelContact")      as (v:string)=>void} ph="Contact" />
+          </div>
+        </div>
+
         <Toggle
-          label="Show 'Tryouts' Link in Navigation"
+          label="Show Tryout Link in Navigation"
           desc="Display the Tryouts page link in the top nav and mobile menu."
           checked={n.showTryouts}
           onChange={v => { setN("showTryouts")(v); save("navbar", { navbar: { ...n, showTryouts: v } }); }}
@@ -1067,6 +1088,28 @@ function PagesTab({ adminKey }: { adminKey: string }) {
       </Section>
 
       {/* ── Home Hero ────────────────────────────────────────────────────── */}
+
+      {/* ── Page Browser Tab Titles ── */}
+      <Section openId={section} setOpenId={setSection} id="pageTitles" title="🗂️ Page Browser Tab Titles">
+        <p className="text-xs text-gray-500 mb-4">
+          Customize what appears in the browser tab for each page. Leave blank to use the default title.
+          The site name <span className="text-gray-400 font-semibold">"Hilhi Youth Basketball"</span> is added automatically after your title.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <IF label="🏠 Home"            value={pt.home         ?? ""} onChange={setPT("home")}         ph="Hilhi Youth Basketball | Hillsboro, OR" />
+          <IF label="📅 Events"          value={pt.events       ?? ""} onChange={setPT("events")}       ph="Events" />
+          <IF label="🏀 Camp Schedule"   value={pt.campSchedule ?? ""} onChange={setPT("campSchedule")} ph="Camp Schedule" />
+          <IF label="🏆 Tournaments"     value={pt.tournaments  ?? ""} onChange={setPT("tournaments")}  ph="Tournaments" />
+          <IF label="🎯 Youth Tryout"    value={pt.tryout       ?? ""} onChange={setPT("tryout")}       ph="Youth Tryout" />
+          <IF label="👟 Youth Coaches"   value={pt.youthCoaches ?? ""} onChange={setPT("youthCoaches")} ph="Youth Coaches" />
+          <IF label="🏫 HS Coaches"      value={pt.hsCoaches    ?? ""} onChange={setPT("hsCoaches")}    ph="HS Coaches" />
+          <IF label="👕 Merch"           value={pt.merch        ?? ""} onChange={setPT("merch")}        ph="Merch" />
+          <IF label="🎬 Film Room"       value={pt.filmRoom     ?? ""} onChange={setPT("filmRoom")}     ph="Film Room" />
+          <IF label="📝 Camp Register"   value={pt.register     ?? ""} onChange={setPT("register")}     ph="Camp Registration" />
+        </div>
+        <div className="flex justify-end mt-2"><SaveBtn k="pageTitles" save={save} saving={saving} saved={saved} /></div>
+      </Section>
+
       <Section openId={section} setOpenId={setSection} id="home" title="🏠 Home Page — Hero & About">
         <div className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Hero Banner</div>
         <div className="space-y-3">

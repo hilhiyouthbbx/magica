@@ -1909,69 +1909,127 @@ export default function AdminPage() {
 
         {/* ── CONTACTS TAB ── */}
         {/* ── Edit Contact Modal ── */}
-        {editingContact && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingContact(null)}>
-            <div className="glass rounded-2xl border border-white/15 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-5 border-b border-white/10">
-                <h3 className="text-white font-black text-lg">Edit Registration</h3>
-                <button onClick={() => setEditingContact(null)} className="text-gray-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+        {editingContact && (() => {
+          const isCamp = isCampSource(editingContact.source);
+          const isTourn = editingContact.source === "tournament";
+          function ef(label: string, key: keyof Contact, ph = "") {
+            return (
+              <div key={key}>
+                <label className="block text-gray-400 text-xs font-semibold mb-1">{label}</label>
+                <input
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600"
+                  placeholder={ph}
+                  value={(editPatch[key] ?? editingContact![key] ?? "") as string}
+                  onChange={e => setEditPatch(p => ({ ...p, [key]: e.target.value }))}
+                />
               </div>
-              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {([
-                  { label: "Parent / Guardian Name", key: "name" },
-                  { label: "Email", key: "email" },
-                  { label: "Phone", key: "phone" },
-                  { label: "Camper Name", key: "camperName" },
-                  { label: "Grade", key: "grade" },
-                  { label: "Shirt Size", key: "shirtSize" },
-                  { label: "Emergency Contact", key: "emergencyContact" },
-                  { label: "Emergency Phone", key: "emergencyPhone" },
-                  { label: "Payment Status", key: "paymentStatus" },
-                  { label: "Amount Paid", key: "amountPaid" },
-                ] as { label: string; key: keyof Contact }[]).map(({ label, key }) => (
-                  <div key={key}>
-                    <label className="block text-gray-400 text-xs font-semibold mb-1">{label}</label>
-                    <input
-                      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                      value={(editPatch[key] ?? editingContact[key] ?? "") as string}
-                      onChange={e => setEditPatch(p => ({ ...p, [key]: e.target.value }))}
+            );
+          }
+          return (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditingContact(null)}>
+              <div className="glass rounded-2xl border border-white/15 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-white/10">
+                  <div>
+                    <h3 className="text-white font-black text-lg">Edit Contact</h3>
+                    <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
+                      isTourn ? "bg-yellow-500/20 text-yellow-300" :
+                      isCamp  ? "bg-blue-500/20 text-blue-300" :
+                      "bg-white/10 text-gray-300"
+                    }`}>
+                      {SOURCE_LABELS[editingContact.source] || editingContact.source}
+                    </span>
+                  </div>
+                  <button onClick={() => setEditingContact(null)} className="text-gray-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+                </div>
+
+                <div className="p-5 space-y-5">
+                  {/* ── Always visible: contact info ── */}
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Contact Info</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ef("Name", "name")}
+                      {ef("Email", "email")}
+                      {ef("Phone", "phone")}
+                    </div>
+                  </div>
+
+                  {/* ── Tournament fields ── */}
+                  {isTourn && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Tournament Registration</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {ef("Tournament Name", "tournamentName", "e.g. Hilhi Spring Invitational")}
+                        {ef("Team Name", "teamName", "e.g. Portland Hawks")}
+                        {ef("Division", "division", "e.g. 5th Grade Boys Competitive")}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Camp fields ── */}
+                  {isCamp && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Camp Registration</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {ef("Camper Name", "camperName")}
+                        {ef("Grade", "grade")}
+                        <div>
+                          <label className="block text-gray-400 text-xs font-semibold mb-1">Gender</label>
+                          <select
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                            value={(editPatch.gender ?? editingContact.gender ?? "") as string}
+                            onChange={e => setEditPatch(p => ({ ...p, gender: e.target.value }))}
+                          >
+                            <option value="">Select</option>
+                            <option value="Boys">Boys</option>
+                            <option value="Girls">Girls</option>
+                          </select>
+                        </div>
+                        {ef("Shirt Size", "shirtSize")}
+                        {ef("Emergency Contact", "emergencyContact")}
+                        {ef("Emergency Phone", "emergencyPhone")}
+                        {ef("Payment Status", "paymentStatus")}
+                        {ef("Amount Paid ($)", "amountPaid")}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Merch / other quick fields ── */}
+                  {!isTourn && !isCamp && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Details</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {ef("Payment Status", "paymentStatus")}
+                        {ef("Amount Paid ($)", "amountPaid")}
+                        {ef("Order Number", "orderNumber")}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Notes — always visible ── */}
+                  <div>
+                    <label className="block text-gray-400 text-xs font-semibold mb-1">Notes</label>
+                    <textarea rows={3}
+                      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                      value={(editPatch.notes ?? editingContact.notes ?? "") as string}
+                      onChange={e => setEditPatch(p => ({ ...p, notes: e.target.value }))}
                     />
                   </div>
-                ))}
-                <div>
-                  <label className="block text-gray-400 text-xs font-semibold mb-1">Gender</label>
-                  <select
-                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                    value={(editPatch.gender ?? editingContact.gender ?? "") as string}
-                    onChange={e => setEditPatch(p => ({ ...p, gender: e.target.value }))}
-                  >
-                    <option value="">Select</option>
-                    <option value="Boys">Boys</option>
-                    <option value="Girls">Girls</option>
-                  </select>
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-gray-400 text-xs font-semibold mb-1">Notes</label>
-                  <textarea rows={3}
-                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
-                    value={(editPatch.notes ?? editingContact.notes ?? "") as string}
-                    onChange={e => setEditPatch(p => ({ ...p, notes: e.target.value }))}
-                  />
+
+                <div className="flex gap-3 p-5 border-t border-white/10">
+                  <button onClick={saveContactEdit} disabled={editSaving}
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                    {editSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Changes</>}
+                  </button>
+                  <button onClick={() => setEditingContact(null)}
+                    className="px-5 py-2.5 border border-white/20 text-gray-300 hover:text-white hover:border-white/40 font-semibold rounded-xl transition-all">
+                    Cancel
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-3 p-5 border-t border-white/10">
-                <button onClick={saveContactEdit} disabled={editSaving}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                  {editSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Changes</>}
-                </button>
-                <button onClick={() => setEditingContact(null)}
-                  className="px-5 py-2.5 border border-white/20 text-gray-300 hover:text-white hover:border-white/40 font-semibold rounded-xl transition-all">
-                  Cancel
-                </button>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {tab === "contacts" && (
           <div className="space-y-6">

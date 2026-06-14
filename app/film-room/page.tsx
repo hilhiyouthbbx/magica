@@ -354,6 +354,7 @@ export default function FilmRoomPage() {
   const [selected,   setSelected]   = useState<VideoItem | null>(null);
   const [search,     setSearch]     = useState("");
   const [filter,     setFilter]     = useState<"all" | "video" | "stream">("all");
+  const [viewers,    setViewers]    = useState<string[]>([]);
 
   // Always require fresh sign-in on every visit
   useEffect(() => {
@@ -392,6 +393,19 @@ export default function FilmRoomPage() {
       window.removeEventListener("beforeunload", onLeave);
     };
   }, [authed, viewerName]);
+
+  // Poll who is watching (every 10s)
+  useEffect(() => {
+    if (!authed) return;
+    const fetchViewers = () =>
+      fetch("/api/film-room/presence")
+        .then(r => r.json())
+        .then((data: { name: string }[]) => setViewers(data.map((v: { name: string }) => v.name)))
+        .catch(() => {});
+    fetchViewers();
+    const iv = setInterval(fetchViewers, 10000);
+    return () => clearInterval(iv);
+  }, [authed]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -540,6 +554,26 @@ export default function FilmRoomPage() {
               {viewerName && (
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 text-xs font-semibold">
                   <User className="w-3.5 h-3.5" /> Signed in as {viewerName}
+                </div>
+              )}
+              {/* Who's Watching strip */}
+              {viewers.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap justify-center mt-1">
+                  <span className="text-gray-500 text-xs font-semibold uppercase tracking-widest">Watching Now:</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {viewers.map((vname) => (
+                      <div key={vname}
+                        title={vname}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                          vname === viewerName
+                            ? "bg-blue-600/30 border-blue-500/50 text-blue-300"
+                            : "bg-white/8 border-white/15 text-gray-300"
+                        }`}>
+                        <span className={`w-2 h-2 rounded-full ${vname === viewerName ? "bg-blue-400" : "bg-green-400"} animate-pulse`} />
+                        {vname}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

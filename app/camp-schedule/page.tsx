@@ -151,7 +151,7 @@ function Seed({ n }: { n: number }) {
 export default function CampSchedulePage() {
   const [data,       setData]       = useState<CampScheduleData | null>(null);
   const [openDay,    setOpenDay]    = useState<number | null>(null);
-  const [activeTab,  setActiveTab]  = useState<"schedule"|"teams"|"standings"|"bracket">("schedule");
+  const [activeTab,  setActiveTab]  = useState<"schedule"|"teams"|"standings"|"bracket"|"events">("schedule");
 
   useEffect(() => {
     fetch("/api/camp-schedule")
@@ -188,6 +188,81 @@ export default function CampSchedulePage() {
             View Camp Events
           </a>
         </div>
+        {/* ── INDIVIDUAL EVENTS TAB ── */}
+        {activeTab === "events" && (
+          !(data.individualEvents ?? []).length ? (
+            <div className="glass rounded-2xl border border-white/10 p-12 text-center">
+              <div className="text-5xl mb-3">🎯</div>
+              <p className="text-gray-400 font-bold">Individual event lineup cards will be posted on Championship Day.</p>
+              <p className="text-gray-600 text-sm mt-1">Teams submit their nominees before 8:30 AM on Day 4.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {(["NBA","College"] as Division[]).map(div => {
+                const events = (data.individualEvents ?? []).filter(e => e.division === div);
+                if (!events.length) return null;
+                return (
+                  <div key={div}>
+                    <h3 className="text-white font-black text-lg mb-3 flex items-center gap-2">
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${div === "NBA" ? "bg-orange-500/20 text-orange-400" : "bg-blue-500/20 text-blue-400"}`}>{div} Division</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {events.map(evt => (
+                        <div key={evt.id} className="glass rounded-2xl border border-white/10 p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-white font-black text-base">{evt.name}</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                              evt.status === "live" ? "bg-green-500/20 text-green-400" :
+                              evt.status === "complete" ? "bg-gray-500/20 text-gray-400" :
+                              "bg-blue-500/20 text-blue-400"
+                            }`}>
+                              {evt.status === "live" ? "🔴 Live" : evt.status === "complete" ? "✅ Done" : "Upcoming"}
+                            </span>
+                          </div>
+
+                          {evt.nominees.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                              {evt.nominees.map(nom => {
+                                const team = data.teams.find(t => t.id === nom.teamId);
+                                if (!team || !nom.players.length) return null;
+                                return (
+                                  <div key={nom.teamId} className="flex items-start gap-2">
+                                    <span className="text-gray-500 text-xs font-semibold w-20 flex-shrink-0 pt-0.5">{team.name}</span>
+                                    <div className="flex flex-wrap gap-1">
+                                      {nom.players.map((p, i) => (
+                                        <span key={i} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-xs">{p}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {evt.status === "complete" && evt.winner && (
+                            <div className="pt-3 border-t border-white/10 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">🥇</span>
+                                <span className="text-yellow-400 font-black text-sm">{evt.winner}</span>
+                              </div>
+                              {evt.runnerUp && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">🥈</span>
+                                  <span className="text-gray-300 font-semibold text-sm">{evt.runnerUp}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+
       </div>
       <Footer />
     </main>
@@ -234,10 +309,10 @@ export default function CampSchedulePage() {
       {/* Tab Nav */}
       <div className="max-w-5xl mx-auto px-4 mb-6">
         <div className="flex gap-1 p-1 glass rounded-2xl border border-white/10">
-          {(["schedule","teams","standings","bracket"] as const).map(tab => (
+          {(["schedule","teams","standings","bracket","events"] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all capitalize ${activeTab === tab ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "text-gray-400 hover:text-white"}`}>
-              {tab === "schedule" ? "📅 Schedule" : tab === "teams" ? "👥 Teams" : tab === "standings" ? "📊 Standings" : "🏆 Bracket"}
+              {tab === "schedule" ? "📅 Schedule" : tab === "teams" ? "👥 Teams" : tab === "standings" ? "📊 Standings" : tab === "bracket" ? "🏆 Bracket" : "🎯 Events"}
             </button>
           ))}
         </div>
@@ -482,6 +557,81 @@ export default function CampSchedulePage() {
             </div>
           )
         )}
+        {/* ── INDIVIDUAL EVENTS TAB ── */}
+        {activeTab === "events" && (
+          !(data.individualEvents ?? []).length ? (
+            <div className="glass rounded-2xl border border-white/10 p-12 text-center">
+              <div className="text-5xl mb-3">🎯</div>
+              <p className="text-gray-400 font-bold">Individual event lineup cards will be posted on Championship Day.</p>
+              <p className="text-gray-600 text-sm mt-1">Teams submit their nominees before 8:30 AM on Day 4.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {(["NBA","College"] as Division[]).map(div => {
+                const events = (data.individualEvents ?? []).filter(e => e.division === div);
+                if (!events.length) return null;
+                return (
+                  <div key={div}>
+                    <h3 className="text-white font-black text-lg mb-3 flex items-center gap-2">
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${div === "NBA" ? "bg-orange-500/20 text-orange-400" : "bg-blue-500/20 text-blue-400"}`}>{div} Division</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {events.map(evt => (
+                        <div key={evt.id} className="glass rounded-2xl border border-white/10 p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-white font-black text-base">{evt.name}</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                              evt.status === "live" ? "bg-green-500/20 text-green-400" :
+                              evt.status === "complete" ? "bg-gray-500/20 text-gray-400" :
+                              "bg-blue-500/20 text-blue-400"
+                            }`}>
+                              {evt.status === "live" ? "🔴 Live" : evt.status === "complete" ? "✅ Done" : "Upcoming"}
+                            </span>
+                          </div>
+
+                          {evt.nominees.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                              {evt.nominees.map(nom => {
+                                const team = data.teams.find(t => t.id === nom.teamId);
+                                if (!team || !nom.players.length) return null;
+                                return (
+                                  <div key={nom.teamId} className="flex items-start gap-2">
+                                    <span className="text-gray-500 text-xs font-semibold w-20 flex-shrink-0 pt-0.5">{team.name}</span>
+                                    <div className="flex flex-wrap gap-1">
+                                      {nom.players.map((p, i) => (
+                                        <span key={i} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-xs">{p}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {evt.status === "complete" && evt.winner && (
+                            <div className="pt-3 border-t border-white/10 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">🥇</span>
+                                <span className="text-yellow-400 font-black text-sm">{evt.winner}</span>
+                              </div>
+                              {evt.runnerUp && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">🥈</span>
+                                  <span className="text-gray-300 font-semibold text-sm">{evt.runnerUp}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+
       </div>
       <Footer />
     </main>

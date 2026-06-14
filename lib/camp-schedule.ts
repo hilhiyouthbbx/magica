@@ -53,6 +53,21 @@ export interface BracketGame {
   status:   GameStatus;
 }
 
+export interface EventNominee {
+  teamId:  string;
+  players: string[];
+}
+
+export interface IndividualEvent {
+  id:        string;
+  name:      string;   // "Free Throw Contest", "3-Point Contest", etc.
+  division:  Division;
+  nominees:  EventNominee[];
+  winner?:   string;
+  runnerUp?: string;
+  status:    "upcoming" | "live" | "complete";
+}
+
 export interface CampScheduleData {
   campName:      string;
   campYear:      number;
@@ -61,8 +76,9 @@ export interface CampScheduleData {
   announcement:  string;
   teams:         CampTeam[];
   seedingGames:  SeedingGame[];
-  bracketGames:  BracketGame[];
-  updatedAt:     string;
+  bracketGames:    BracketGame[];
+  individualEvents: IndividualEvent[];
+  updatedAt:        string;
 }
 
 const DEFAULTS: CampScheduleData = {
@@ -73,8 +89,9 @@ const DEFAULTS: CampScheduleData = {
   announcement: "",
   teams: [],
   seedingGames: [],
-  bracketGames: [],
-  updatedAt:    new Date().toISOString(),
+  bracketGames:     [],
+  individualEvents: [],
+  updatedAt:        new Date().toISOString(),
 };
 
 async function read(): Promise<CampScheduleData> {

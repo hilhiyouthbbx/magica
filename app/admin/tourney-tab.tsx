@@ -10,6 +10,7 @@ import { generateDivisionSchedule } from "@/lib/tourney-scheduler";
 import { calculateStandings } from "@/lib/tourney-standings";
 import { generateBracket, advanceBracketWinner } from "@/lib/tourney-bracket";
 import { Plus, Trash2, ArrowLeft, Trophy, Calendar, MapPin, Users, Clock, Edit, X, Download, ChevronDown } from "lucide-react";
+import type { TournamentConfig } from "@/lib/tournament-client";
 
 // ── Registration contact ──────────────────────────────────────────────────────
 
@@ -511,9 +512,9 @@ function snakePools(teams: string[], poolCount: number): string[][] {
   return pools;
 }
 
-function CreateWizard({ onCreated, onClose, contacts }: {
+function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
   onCreated: (t: Tournament) => void; onClose: () => void;
-  contacts: RegistrationContact[];
+  contacts: RegistrationContact[]; tournaments: TournamentConfig[];
 }) {
   const [step, setStep] = useState(1);
   const [w, setW] = useState<WizState>({
@@ -1156,7 +1157,7 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
 
 // ── MAIN EXPORT ───────────────────────────────────────────────────────────────
 
-export function TourneyTab({ contacts = [] }: { contacts?: RegistrationContact[] }) {
+export function TourneyTab({ contacts = [], tournaments = [] }: { contacts?: RegistrationContact[]; tournaments?: TournamentConfig[] }) {
   const [list, setList] = useState<Tournament[]>(() =>
     getAllTournaments().sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   );
@@ -1251,7 +1252,7 @@ export function TourneyTab({ contacts = [] }: { contacts?: RegistrationContact[]
           })}
         </div>
       )}
-      {creating && <CreateWizard onCreated={handleCreated} onClose={()=>setCreating(false)} contacts={contacts}/>}
+      {creating && <CreateWizard onCreated={handleCreated} onClose={()=>setCreating(false)} contacts={contacts} tournaments={tournaments}/>}
     </div>
   );
 }

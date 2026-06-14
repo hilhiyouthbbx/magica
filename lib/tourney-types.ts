@@ -1,5 +1,6 @@
-export type GameStatus = "scheduled" | "completed";
+export type GameStatus     = "scheduled" | "completed";
 export type TournamentStatus = "pool_play" | "bracket" | "complete";
+export type BracketFormat  = "single" | "double" | "none";
 
 export interface Team {
   id: string;
@@ -9,7 +10,7 @@ export interface Team {
 
 export interface Pool {
   id: string;
-  name: string; // "A", "B", "C"
+  name: string;
   teamIds: string[];
 }
 
@@ -18,8 +19,9 @@ export interface PoolGame {
   poolId: string;
   divisionId: string;
   court: number;
+  venue: string;       // which venue this game is at
   timeSlot: number;
-  time: string; // "08:30"
+  time: string;
   team1Id: string;
   team2Id: string;
   score1?: number;
@@ -30,14 +32,16 @@ export interface PoolGame {
 export interface BracketGame {
   id: string;
   divisionId: string;
-  round: number;    // 1 = first round, higher = closer to final
-  position: number; // 0-indexed within round
+  round: number;
+  position: number;
   team1Id?: string;
   team2Id?: string;
   score1?: number;
   score2?: number;
   status: GameStatus;
   winnerId?: string;
+  loserId?: string;     // for double elimination
+  isLosersBracket?: boolean;
 }
 
 export interface Division {
@@ -47,6 +51,7 @@ export interface Division {
   pools: Pool[];
   games: PoolGame[];
   bracket: BracketGame[];
+  losersBracket: BracketGame[];   // for double elim
   bracketGenerated: boolean;
 }
 
@@ -54,11 +59,13 @@ export interface Tournament {
   id: string;
   name: string;
   date: string;
-  venue: string;
+  venues: string[];            // one or more venues
   courts: number;
   gameDuration: number;
   breakBetweenGames: number;
-  startTime: string; // "08:00"
+  startTime: string;
+  bracketFormat: BracketFormat;
+  gamesGuaranteed: number;
   divisions: Division[];
   status: TournamentStatus;
   createdAt: string;

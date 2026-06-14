@@ -40,7 +40,8 @@ export function generateDivisionSchedule(
   courts: number,
   gameDuration: number,
   breakBetween: number,
-  startTime: string
+  startTime: string,
+  venues: string[] = ["Main Gym"]
 ): PoolGame[] {
   // Interleave rounds from all pools so round 1 of each pool comes before round 2
   const poolRounds = pools.map(p => roundRobinPairs(p.teamIds));
@@ -76,11 +77,14 @@ export function generateDivisionSchedule(
       teamBusy.get(pair.team1Id)!.add(slot);
       teamBusy.get(pair.team2Id)!.add(slot);
 
+      const venueCount = venues.length || 1;
+      const assignedVenue = venues[Math.floor((court - 1) / Math.ceil(courts / venueCount))] ?? venues[0] ?? "Main Gym";
       games.push({
         id: `${pair.poolId}-${pair.team1Id.slice(-6)}-${pair.team2Id.slice(-6)}-${slot}`,
         poolId: pair.poolId,
         divisionId,
         court,
+        venue: assignedVenue,
         timeSlot: slot,
         time: addMinutes(startTime, slot * (gameDuration + breakBetween)),
         team1Id: pair.team1Id,

@@ -102,23 +102,23 @@ export async function GET(req: NextRequest) {
 
   if (isCampSource(sourceFilter) && sourceFilter !== "all") {
     headers = [
-      "Order Number","Order Date","Ticket Number","Ticket Type",
+      "Ticket Type",
       "Camper Name","Grade","Gender","Shirt Size",
       "Parent Name","Email","Phone",
       "Emergency Contact","Emergency Phone",
       "Ticket Price","Total Amount","Payment Status","Voucher Code",
-      "Tax","Wix Service Fee","Ticket Revenue",
-      "Checked In","Seat Info","Benefit","Registered Date",
+      "Service Charge","Ticket Revenue",
+      "Checked In","Registered Date",
     ].join(",");
     rows = contacts.map(c => [
-      c.orderNumber||"", c.orderDate||"", c.ticketNum||"", c.ticketType||"",
+      c.ticketType||"",
       c.camperName||"", c.grade||"", c.gender||"", fmtShirt(c.shirtSize)||"",
       c.name, c.email, c.phone,
       c.emergencyContact||"", c.emergencyPhone||"",
       c.ticketPrice||"", c.amountPaid||"",
       (() => { const f = c.paymentStatus==="Free"||parseFloat(c.amountPaid||"1")===0; return f?"Free":(c.paymentStatus||""); })(),
-      c.coupon||"", c.tax||"", c.wixServiceFee||"", c.ticketRevenue||"",
-      c.checkedIn||"", c.seatInfo||"", c.benefit||"",
+      c.coupon||"", c.wixServiceFee||"", c.ticketRevenue||"",
+      c.checkedIn||"",
       c.date ? new Date(c.date).toLocaleDateString() : "",
     ].map(esc).join(","));
     filename = `2026-youth-summer-camp-${today}.csv`;

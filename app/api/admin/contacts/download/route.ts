@@ -111,14 +111,14 @@ export async function GET(req: NextRequest) {
       "Checked In","Registered Date",
     ].join(",");
     rows = contacts.map(c => [
-      c.ticketType||"",
+      c.source||"",
       c.camperName||"", c.grade||"", c.gender||"", fmtShirt(c.shirtSize)||"",
       c.name, c.email, c.phone,
       c.emergencyContact||"", c.emergencyPhone||"",
       c.ticketPrice||"", c.amountPaid||"",
       (() => { const f = c.paymentStatus==="Free"||parseFloat(c.amountPaid||"1")===0; return f?"Free":(c.paymentStatus||""); })(),
       c.coupon||"", c.wixServiceFee||"", c.ticketRevenue||"",
-      c.checkedIn||"",
+      (()=>{ const _v=(c.checkedIn||"").trim().toLowerCase(); return (_v===""||_v==="no"||_v==="false") ? "" : (c.checkedIn||""); })(),
       c.date ? new Date(c.date).toLocaleDateString() : "",
     ].map(esc).join(","));
     filename = `2026-youth-summer-camp-${today}.csv`;
@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
       c.camperName||"", c.grade||"", c.gender||"", fmtShirt(c.shirtSize)||"",
       c.name, c.email, c.phone,
       c.emergencyContact||"", c.emergencyPhone||"",
-      c.amountPaid||"", c.paymentStatus||"", c.checkedIn||"",
+      c.amountPaid||"", c.paymentStatus||"", (()=>{ const _v=(c.checkedIn||"").trim().toLowerCase(); return (_v===""||_v==="no"||_v==="false") ? "" : (c.checkedIn||""); })(),
       c.tournamentName||"", c.teamName||"", c.division||"",
       c.date ? new Date(c.date).toLocaleDateString() : "",
     ].map(esc).join(","));

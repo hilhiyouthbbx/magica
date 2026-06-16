@@ -2260,60 +2260,14 @@ export default function AdminPage() {
                 {/* Result count */}
                 <span className="text-gray-500 text-xs whitespace-nowrap">{sorted.length} of {contacts.length} contacts</span>
 
-                <div className="relative ml-auto">
-                  <button
-                    onClick={() => setShowExportPanel(p => !p)}
-                    className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-green-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all">
-                    <Download className="w-4 h-4" />
-                    Export {sorted.length} {sorted.length !== contacts.length ? "Filtered " : ""}Contacts
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                  {showExportPanel && (
-                    <div className="absolute right-0 top-full mt-2 z-30 w-72 glass border border-white/15 rounded-2xl p-4 space-y-3 shadow-2xl" onClick={e => e.stopPropagation()}>
-                      <p className="text-white font-bold text-sm">Export Options</p>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sort By</label>
-                        <select value={sortField} onChange={e => setSortField(e.target.value)}
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 text-white text-sm rounded-xl focus:outline-none">
-                          <option value="date"       className="bg-slate-900">Date (newest first)</option>
-                          <option value="name"       className="bg-slate-900">Name (A → Z)</option>
-                          <option value="grade"      className="bg-slate-900">Grade Level</option>
-                          <option value="shirtSize"  className="bg-slate-900">Shirt Size (YS → AXL)</option>
-                          <option value="gender"     className="bg-slate-900">Gender</option>
-                          <option value="camperName" className="bg-slate-900">Camper Name</option>
-                          <option value="source"     className="bg-slate-900">Source</option>
-                          <option value="division"   className="bg-slate-900">Division</option>
-                          <option value="teamName"   className="bg-slate-900">Team</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Order</label>
-                        <div className="flex gap-2">
-                          <button onClick={() => setSortDir("asc")}
-                            className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-all ${sortDir === "asc" ? "bg-blue-600 border-blue-500 text-white" : "bg-white/5 border-white/10 text-gray-400 hover:text-white"}`}>
-                            ↑ A → Z
-                          </button>
-                          <button onClick={() => setSortDir("desc")}
-                            className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-all ${sortDir === "desc" ? "bg-blue-600 border-blue-500 text-white" : "bg-white/5 border-white/10 text-gray-400 hover:text-white"}`}>
-                            ↓ Z → A
-                          </button>
-                        </div>
-                      </div>
-                      <div className="pt-1 border-t border-white/10 text-[10px] text-gray-600">
-                        Exporting <span className="text-white font-bold">{sorted.length}</span> contacts
-                        {sorted.length !== contacts.length && <span> (filtered from {contacts.length})</span>}
-                      </div>
-                      <button
-                        onClick={() => { downloadCSV(); setShowExportPanel(false); }}
-                        className="w-full py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2">
-                        <Download className="w-4 h-4" />
-                        Download CSV
-                      </button>
-                      {/* Hidden anchor driven by dlARef for programmatic download */}
-                      <a ref={dlARef} className="hidden" aria-hidden="true" />
-                    </div>
-                  )}
-                </div>
+                <a
+                  href={`/api/admin/contacts/download?key=${adminKey}&source=${sourceFilter}&tourn=${tournFilter}&grade=${gradeFilter}&gender=${genderFilter}&q=${encodeURIComponent(searchQ)}&sort=${sortField}&dir=${sortDir}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-all">
+                  <Download className="w-4 h-4" />
+                  Export {sorted.length}{sorted.length !== contacts.length ? " Filtered" : ""} CSV
+                </a>
               <>
                 <input type="file" accept=".csv" id="csv-import" className="hidden" onChange={e => { if (e.target.files?.[0]) { importCSV(e.target.files[0]); (e.target as HTMLInputElement).value=""; } }} />
                 <label htmlFor="csv-import" className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all cursor-pointer">

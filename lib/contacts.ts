@@ -124,6 +124,21 @@ export async function saveContact(
   await persistContacts(contacts);
 }
 
+// ── Create a brand-new contact (always inserts, never upserts) ──────────────
+export async function createContact(
+  contact: Omit<Contact, "id" | "date">
+): Promise<Contact> {
+  const contacts = await getContacts();
+  const newContact: Contact = {
+    ...contact,
+    id:   `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    date: new Date().toISOString(),
+  };
+  contacts.push(newContact);
+  await persistContacts(contacts);
+  return newContact;
+}
+
 // ── Update a contact ───────────────────────────────────────────────────────
 export async function updateContact(id: string, patch: Partial<Omit<Contact, "id" | "date">>): Promise<boolean> {
   const contacts = await getContacts();

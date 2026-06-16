@@ -1662,6 +1662,7 @@ export default function AdminPage() {
   const [editingContact,  setEditingContact]  = useState<Contact|null>(null);
   const [editPatch,       setEditPatch]       = useState<Partial<Contact>>({});
   const [editSaving,      setEditSaving]      = useState(false);
+  const [isNewContact,    setIsNewContact]    = useState(false);
 
   // Tournaments
   const [tournaments,   setTournaments]   = useState<TournamentConfig[]>([]);
@@ -1702,6 +1703,25 @@ export default function AdminPage() {
     setEditSaving(false);
     setEditingContact(null);
     setEditPatch({});
+  }
+
+  async function saveNewContact() {
+    setEditSaving(true);
+    const body = { ...editingContact!, ...editPatch };
+    // Remove id/date — server assigns them
+    const { id: _id, date: _date, ...contactData } = body as Contact & { id: string; date: string };
+    void _id; void _date;
+    const res = await fetch(`/api/admin/contacts?key=${adminKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create", contact: contactData }),
+    });
+    const data = await res.json();
+    if (data.contact) setContacts(prev => [data.contact, ...prev]);
+    setEditSaving(false);
+    setEditingContact(null);
+    setEditPatch({});
+    setIsNewContact(false);
   }
 
   async function deleteContact(id: string) {
@@ -1931,15 +1951,28 @@ export default function AdminPage() {
                 <div className="flex items-center justify-between p-5 border-b border-white/10">
                   <div>
                     <h3 className="text-white font-black text-lg">Edit Contact</h3>
-                    <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
-                      isTourn ? "bg-yellow-500/20 text-yellow-300" :
-                      isCamp  ? "bg-blue-500/20 text-blue-300" :
-                      "bg-white/10 text-gray-300"
-                    }`}>
-                      {SOURCE_LABELS[editingContact.source] || editingContact.source}
-                    </span>
+                    {isNewContact ? (
+                      <select
+                        value={editPatch.source ?? editingContact!.source}
+                        onChange={e => setEditPatch(p => ({ ...p, source: e.target.value }))}
+                        className="mt-1 px-2 py-0.5 rounded-full text-xs font-bold bg-white/10 text-gray-300 border border-white/15 focus:outline-none">
+                        <option value="other" className="bg-slate-900">Other</option>
+                        <option value="tournament" className="bg-slate-900">Tournament</option>
+                        <option value="2026 Youth Summer Camp" className="bg-slate-900">2026 Youth Summer Camp</option>
+                        <option value="import" className="bg-slate-900">Import</option>
+                        <option value="tryout" className="bg-slate-900">Tryout</option>
+                      </select>
+                    ) : (
+                      <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
+                        isTourn ? "bg-yellow-500/20 text-yellow-300" :
+                        isCamp  ? "bg-blue-500/20 text-blue-300" :
+                        "bg-white/10 text-gray-300"
+                      }`}>
+                        {SOURCE_LABELS[editingContact.source] || editingContact.source}
+                      </span>
+                    )}
                   </div>
-                  <button onClick={() => setEditingContact(null)} className="text-gray-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+                  <button onClick={() => { setEditingContact(null); setIsNewContact(false); }} className="text-gray-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
                 </div>
 
                 <div className="p-5 space-y-5">
@@ -2017,11 +2050,11 @@ export default function AdminPage() {
                 </div>
 
                 <div className="flex gap-3 p-5 border-t border-white/10">
-                  <button onClick={saveContactEdit} disabled={editSaving}
+                  <button onClick={isNewContact ? saveNewContact : saveContactEdit} disabled={editSaving}
                     className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                    {editSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Changes</>}
+                    {editSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> {isNewContact ? "Create Contact" : "Save Changes"}</>}
                   </button>
-                  <button onClick={() => setEditingContact(null)}
+                  <button onClick={() => { setEditingContact(null); setIsNewContact(false); }}
                     className="px-5 py-2.5 border border-white/20 text-gray-300 hover:text-white hover:border-white/40 font-semibold rounded-xl transition-all">
                     Cancel
                   </button>
@@ -2082,6 +2115,17 @@ export default function AdminPage() {
                   Import CSV
                 </label>
               </>
+              <button
+                onClick={() => {
+                  const blank: Contact = { id: "__new__", date: new Date().toISOString(), name: "", email: "", phone: "", source: sourceFilter !== "all" ? sourceFilter : "other" };
+                  setEditingContact(blank);
+                  setEditPatch({});
+                  setIsNewContact(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-emerald-500/40 text-gray-300 hover:text-emerald-400 text-sm font-semibold rounded-xl transition-all ml-auto">
+                <Plus className="w-4 h-4" />
+                Add Contact
+              </button>
             </div>
 
             {/* Table */}
@@ -2129,8 +2173,17 @@ export default function AdminPage() {
                           <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{c.orderDate || new Date(c.date).toLocaleDateString()}</td>
                           <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center gap-2">
-                              <button onClick={() => { setEditingContact(c); setEditPatch({}); }} className="text-gray-600 hover:text-blue-400 transition-colors" title="Edit">
+                              <button onClick={() => { setEditingContact(c); setEditPatch({}); setIsNewContact(false); }} className="text-gray-600 hover:text-blue-400 transition-colors" title="Edit">
                                 <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => {
+                                const { id: _id, date: _date, ...rest } = c;
+                                void _id; void _date;
+                                setEditingContact({ ...rest, id: "__new__", date: new Date().toISOString() } as Contact);
+                                setEditPatch({});
+                                setIsNewContact(true);
+                              }} className="text-gray-600 hover:text-purple-400 transition-colors" title="Copy / Duplicate">
+                                <Copy className="w-4 h-4" />
                               </button>
                               <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors" title="Delete">
                                 <Trash2 className="w-4 h-4" />
@@ -2195,8 +2248,17 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-gray-500 text-xs">{new Date(c.date).toLocaleDateString()}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <button onClick={() => { setEditingContact(c); setEditPatch({}); }} className="text-gray-600 hover:text-blue-400 transition-colors" title="Edit">
+                            <button onClick={() => { setEditingContact(c); setEditPatch({}); setIsNewContact(false); }} className="text-gray-600 hover:text-blue-400 transition-colors" title="Edit">
                               <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => {
+                              const { id: _id, date: _date, ...rest } = c;
+                              void _id; void _date;
+                              setEditingContact({ ...rest, id: "__new__", date: new Date().toISOString() } as Contact);
+                              setEditPatch({});
+                              setIsNewContact(true);
+                            }} className="text-gray-600 hover:text-purple-400 transition-colors" title="Copy / Duplicate">
+                              <Copy className="w-4 h-4" />
                             </button>
                             <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors" title="Delete">
                               <Trash2 className="w-4 h-4" />

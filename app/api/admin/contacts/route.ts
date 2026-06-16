@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getContacts, deleteContact, updateContact, importContactsCSV } from "@/lib/contacts";
+import { getContacts, deleteContact, updateContact, importContactsCSV, createContact } from "@/lib/contacts";
 import { Redis } from "@upstash/redis";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
     } catch (e: unknown) {
       return NextResponse.json({ error: String(e) }, { status: 500 });
     }
+  }
+
+  if (body.action === "create" && body.contact) {
+    const created = await createContact(body.contact);
+    return NextResponse.json({ ok: true, contact: created });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

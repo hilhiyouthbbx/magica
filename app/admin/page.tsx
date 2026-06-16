@@ -1947,10 +1947,16 @@ export default function AdminPage() {
         filename = `hilhi-all-contacts-${today}.csv`;
       }
 
-      const csv = [headers, ...rows].join("\n");
-      const a   = document.createElement("a");
-      a.href     = URL.createObjectURL(new Blob(["\uFEFF"+csv], {type:"text/csv"}));
-      a.download = filename; a.click();
+      const csv  = [headers, ...rows].join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
   // ── Login screen ─────────────────────────────────────────────────────────

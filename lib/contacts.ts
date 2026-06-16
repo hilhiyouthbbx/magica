@@ -128,6 +128,7 @@ export async function saveContact(
 export async function createContact(
   contact: Omit<Contact, "id" | "date">
 ): Promise<Contact> {
+  if (contact.shirtSize) contact = { ...contact, shirtSize: normalizeShirtSize(contact.shirtSize) };
   const contacts = await getContacts();
   const newContact: Contact = {
     ...contact,
@@ -141,6 +142,8 @@ export async function createContact(
 
 // ── Update a contact ───────────────────────────────────────────────────────
 export async function updateContact(id: string, patch: Partial<Omit<Contact, "id" | "date">>): Promise<boolean> {
+  // Normalize shirt size if being updated
+  if (patch.shirtSize) patch = { ...patch, shirtSize: normalizeShirtSize(patch.shirtSize) };
   const contacts = await getContacts();
   const idx = contacts.findIndex(c => c.id === id);
   if (idx === -1) return false;
@@ -153,6 +156,25 @@ export async function updateContact(id: string, patch: Partial<Omit<Contact, "id
 export async function deleteContact(id: string): Promise<void> {
   const contacts = (await getContacts()).filter(c => c.id !== id);
   await persistContacts(contacts);
+}
+
+// ── Shirt-size normalizer — converts full names to abbreviations ─────────────
+function normalizeShirtSize(raw: string): string {
+  const s = raw.trim().toLowerCase().replace(/[\s\-_./]+/g, "");
+  // Adult sizes
+  if (s === "adultxxlarge" || s === "adultxxl" || s === "axxl" || s === "2xl" || s === "xxl") return "AXL";
+  if (s === "adultxlarge"  || s === "adultxl"  || s === "axl"  || s === "xl")                return "AXL";
+  if (s === "adultlarge"   || s === "al"        || s === "alarge")                            return "AL";
+  if (s === "adultmedium"  || s === "am"        || s === "amedium")                           return "AM";
+  if (s === "adultsmall"   || s === "as"        || s === "asmall")                            return "AS";
+  // Youth sizes
+  if (s === "youthxxlarge" || s === "youthxxl" || s === "yxxl")                              return "YXL";
+  if (s === "youthxlarge"  || s === "youthxl"  || s === "yxl")                               return "YXL";
+  if (s === "youthlarge"   || s === "yl"        || s === "ylarge")                            return "YL";
+  if (s === "youthmedium"  || s === "ym"        || s === "ymedium")                           return "YM";
+  if (s === "youthsmall"   || s === "ys"        || s === "ysmall")                            return "YS";
+  // Return original if no match (already an abbreviation or unknown)
+  return raw.trim();
 }
 
 // ── Wix TSV parser (tab-separated with header row) ────────────────────────
@@ -236,7 +258,7 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
       camperName,
       grade:            get(row, iCamperGrade),
       gender:           get(row, iSex),
-      shirtSize:        get(row, iShirtSize),
+      shirtSize:        normalizeShirtSize(get(row, iShirtSize)),
       emergencyContact: get(row, iEmerg1),
       emergencyPhone:   iEmerg2 !== iEmerg1 ? get(row, iEmerg2) : "",
       orderNumber:      get(row, iOrderNum),

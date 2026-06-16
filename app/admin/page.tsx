@@ -1885,6 +1885,7 @@ export default function AdminPage() {
     function esc(v: unknown) { return `"${String(v ?? "").replace(/"/g, '""')}"`; }
 
     function downloadCSV() {
+      try {
       const today = new Date().toISOString().slice(0,10);
       let headers: string;
       let rows: string[];
@@ -1951,15 +1952,19 @@ export default function AdminPage() {
         filename = `hilhi-all-contacts-${today}.csv`;
       }
 
-      const csv  = [headers, ...rows].join("\n");
-      // Use data URI — avoids blob/objectURL timing issues across browsers
+      const csv  = [headers!, ...rows!].join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
+      const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.style.display = "none";
-      a.href     = "data:text/csv;charset=utf-8," + encodeURIComponent("\uFEFF" + csv);
-      a.download = filename;
+      a.href     = url;
+      a.download = filename!;
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => document.body.removeChild(a), 500);
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+      } catch(err) {
+        alert("Download failed: " + String(err));
+      }
     }
 
   // ── Login screen ─────────────────────────────────────────────────────────

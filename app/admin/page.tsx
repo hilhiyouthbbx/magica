@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash, RotateCcw, Video, Mail as MailIcon, MessageCircle, Lock, Eye, EyeOff, Play } from "lucide-react";
+import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Image as ImgIcon, Save, Loader2, CheckCircle, FileText, Star, Copy, Tag, Percent, DollarSign, Calendar, Hash, RotateCcw, Video, Mail as MailIcon, MessageCircle, Lock, Eye, EyeOff, Play, Search } from "lucide-react";
 
 import type { TournamentConfig } from "@/lib/tournament-client";
 import { TOURNAMENT_DEFAULTS } from "@/lib/tournament-client";
@@ -1657,6 +1657,11 @@ export default function AdminPage() {
   const [contacts,      setContacts]      = useState<Contact[]>([]);
   const [sourceFilter,  setSourceFilter]  = useState("all");
   const [tournFilter,   setTournFilter]   = useState("all");
+  const [gradeFilter,   setGradeFilter]   = useState("all");
+  const [genderFilter,  setGenderFilter]  = useState("all");
+  const [searchQ,       setSearchQ]       = useState("");
+  const [sortField,     setSortField]     = useState<string>("date");
+  const [sortDir,       setSortDir]       = useState<"asc"|"desc">("desc");
   const [contactsLoaded,setContactsLoaded]= useState(false);
   const [expandedContact, setExpandedContact] = useState<string|null>(null);
   const [editingContact,  setEditingContact]  = useState<Contact|null>(null);
@@ -1765,14 +1770,58 @@ export default function AdminPage() {
   const isCampSource = (src: string) =>
     src === "registration" || src.includes("Camp") || src.includes("Summer");
 
+  // Grade sort helper — "4th Grade" → 4, "4th" → 4, unknown → 99
+  function gradeNum(g?: string) {
+    if (!g) return 99;
+    const m = g.match(/(\d+)/);
+    return m ? parseInt(m[1]) : 99;
+  }
+
+  // Sort toggle helper
+  function toggleSort(field: string) {
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  }
+  function SortIcon({ field }: { field: string }) {
+    if (sortField !== field) return <span className="text-gray-700 ml-1">⇅</span>;
+    return <span className="text-blue-400 ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
+
   const filtered = contacts.filter(c => {
     if (sourceFilter !== "all") {
-      // "2026 Youth Summer Camp" filter matches all camp-type sources
       if (isCampSource(sourceFilter) ? !isCampSource(c.source) : c.source !== sourceFilter) return false;
     }
     if (tournFilter !== "all" && c.tournamentName !== tournFilter) return false;
+    if (gradeFilter !== "all" && (c.grade || "").trim() !== gradeFilter) return false;
+    if (genderFilter !== "all" && (c.gender || "").trim() !== genderFilter) return false;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      if (!c.name?.toLowerCase().includes(q) && !c.email?.toLowerCase().includes(q) &&
+          !c.camperName?.toLowerCase().includes(q) && !c.phone?.includes(q)) return false;
+    }
     return true;
   });
+
+  const sorted = [...filtered].sort((a, b) => {
+    let va: string | number = "";
+    let vb: string | number = "";
+    if (sortField === "grade") { va = gradeNum(a.grade); vb = gradeNum(b.grade); }
+    else if (sortField === "date") { va = a.date || ""; vb = b.date || ""; }
+    else if (sortField === "name") { va = (a.name || "").toLowerCase(); vb = (b.name || "").toLowerCase(); }
+    else if (sortField === "camperName") { va = (a.camperName || "").toLowerCase(); vb = (b.camperName || "").toLowerCase(); }
+    else if (sortField === "email") { va = (a.email || "").toLowerCase(); vb = (b.email || "").toLowerCase(); }
+    else if (sortField === "source") { va = (a.source || "").toLowerCase(); vb = (b.source || "").toLowerCase(); }
+    else if (sortField === "gender") { va = (a.gender || "").toLowerCase(); vb = (b.gender || "").toLowerCase(); }
+    else if (sortField === "division") { va = (a.division || "").toLowerCase(); vb = (b.division || "").toLowerCase(); }
+    else if (sortField === "teamName") { va = (a.teamName || "").toLowerCase(); vb = (b.teamName || "").toLowerCase(); }
+    const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : (va < vb ? -1 : va > vb ? 1 : 0);
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  // Unique grade values across all contacts (for filter dropdown)
+  const allGrades = [...new Set(
+    contacts.map(c => (c.grade || "").trim()).filter(Boolean)
+  )].sort((a, b) => gradeNum(a) - gradeNum(b));
 
   const stats = {
     total:      contacts.length,
@@ -1817,7 +1866,7 @@ export default function AdminPage() {
           "Payment Status","Checked In","Seat Info","Benefit","Coupon",
           "Registered Date",
         ].join(",");
-        rows = filtered.map(c => [
+        rows = sorted.map(c => [
           c.orderNumber||"", c.orderDate||"", c.ticketNum||"", c.ticketType||"",
           c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
           c.name, c.email, c.phone,
@@ -1830,14 +1879,14 @@ export default function AdminPage() {
 
       } else if (sourceFilter === "tournament") {
         headers = "Name,Email,Phone,Tournament,Team Name,Division,Notes,Date";
-        rows    = filtered.map(c => [c.name,c.email,c.phone,c.tournamentName||"",c.teamName||"",c.division||"",c.notes||"",c.date].map(esc).join(","));
+        rows    = sorted.map(c => [c.name,c.email,c.phone,c.tournamentName||"",c.teamName||"",c.division||"",c.notes||"",c.date].map(esc).join(","));
         filename = tournFilter !== "all"
           ? `${tournFilter.toLowerCase().replace(/\s+/g,"-")}-registrations-${today}.csv`
           : `tournament-registrations-${today}.csv`;
 
       } else if (sourceFilter === "merch-order") {
         headers = "Name,Email,Phone,Notes,Date";
-        rows    = filtered.map(c => [c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
+        rows    = sorted.map(c => [c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
         filename = `merch-orders-${today}.csv`;
 
       } else {
@@ -1850,7 +1899,7 @@ export default function AdminPage() {
           "Total Amount","Payment Status","Checked In",
           "Tournament","Team","Division","Date",
         ].join(",");
-        rows    = filtered.map(c => [
+        rows    = sorted.map(c => [
           c.source, c.orderNumber||"", c.orderDate||"",
           c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
           c.name, c.email, c.phone,
@@ -2081,33 +2130,94 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {/* Filters + Export */}
-            <div className="flex flex-wrap gap-3 items-center">
-              <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none">
-                <option value="all" className="bg-gray-900">All Sources</option>
-                <option value="2026 Youth Summer Camp" className="bg-gray-900">2026 Youth Summer Camp</option>
-                <option value="tournament"   className="bg-gray-900">Tournament</option>
-                <option value="merch-order"  className="bg-gray-900">Merch Orders</option>
-                <option value="import"       className="bg-gray-900">Imports</option>
-                <option value="tryout"       className="bg-gray-900">Tryout Registrations</option>
-              </select>
-
-              {tournamentNames.length > 0 && (
-                <select value={tournFilter} onChange={e => setTournFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm focus:outline-none">
-                  <option value="all" className="bg-gray-900">All Tournaments</option>
-                  {tournamentNames.map(n => <option key={n} value={n} className="bg-gray-900">{n}</option>)}
+            {/* Filters, Search + Export */}
+            <div className="space-y-3">
+              {/* Row 1: Source / Tournament / Grade / Gender filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <select value={sourceFilter} onChange={e => { setSourceFilter(e.target.value); setGradeFilter("all"); setGenderFilter("all"); }}
+                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none">
+                  <option value="all" className="bg-gray-900">All Sources</option>
+                  <option value="2026 Youth Summer Camp" className="bg-gray-900">2026 Youth Summer Camp</option>
+                  <option value="tournament"   className="bg-gray-900">Tournament</option>
+                  <option value="merch-order"  className="bg-gray-900">Merch Orders</option>
+                  <option value="import"       className="bg-gray-900">Imports</option>
+                  <option value="tryout"       className="bg-gray-900">Tryout Registrations</option>
                 </select>
-              )}
 
-              <button onClick={downloadCSV} className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-green-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all">
-                <Download className="w-4 h-4" />
-                {sourceFilter === "registration" ? "Export 2026 Camp CSV" :
-                 sourceFilter === "tournament"   ? "Export Tournament CSV" :
-                 sourceFilter === "merch-order"  ? "Export Merch CSV" :
-                 "Export All CSV"}
-              </button>
+                {tournamentNames.length > 0 && (
+                  <select value={tournFilter} onChange={e => setTournFilter(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm focus:outline-none">
+                    <option value="all" className="bg-gray-900">All Tournaments</option>
+                    {tournamentNames.map(n => <option key={n} value={n} className="bg-gray-900">{n}</option>)}
+                  </select>
+                )}
+
+                {allGrades.length > 0 && (
+                  <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-sm focus:outline-none">
+                    <option value="all" className="bg-gray-900">All Grades</option>
+                    {allGrades.map(g => <option key={g} value={g} className="bg-gray-900">{g}</option>)}
+                  </select>
+                )}
+
+                <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none">
+                  <option value="all" className="bg-gray-900">All Genders</option>
+                  <option value="Boys" className="bg-gray-900">Boys</option>
+                  <option value="Girls" className="bg-gray-900">Girls</option>
+                </select>
+
+                {/* Active filter count badge */}
+                {(gradeFilter !== "all" || genderFilter !== "all" || searchQ.trim()) && (
+                  <button onClick={() => { setGradeFilter("all"); setGenderFilter("all"); setSearchQ(""); setSortField("date"); setSortDir("desc"); }}
+                    className="px-2 py-1 text-xs bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/30 transition-all">
+                    ✕ Clear filters
+                  </button>
+                )}
+              </div>
+
+              {/* Row 2: Search + Export/Import/Add */}
+              <div className="flex flex-wrap gap-2 items-center">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                  <input
+                    value={searchQ}
+                    onChange={e => setSearchQ(e.target.value)}
+                    placeholder="Search name, email, phone…"
+                    className="w-full pl-9 pr-3 py-2 bg-white/5 border border-white/15 text-white text-sm rounded-xl focus:outline-none focus:border-blue-500/60 placeholder:text-gray-600"
+                  />
+                </div>
+
+                {/* Sort picker */}
+                <select value={sortField} onChange={e => setSortField(e.target.value)}
+                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none">
+                  <option value="date"      className="bg-gray-900">Sort: Date</option>
+                  <option value="name"      className="bg-gray-900">Sort: Name</option>
+                  <option value="grade"     className="bg-gray-900">Sort: Grade</option>
+                  <option value="gender"    className="bg-gray-900">Sort: Gender</option>
+                  <option value="camperName" className="bg-gray-900">Sort: Camper Name</option>
+                  <option value="source"    className="bg-gray-900">Sort: Source</option>
+                  <option value="division"  className="bg-gray-900">Sort: Division</option>
+                  <option value="teamName"  className="bg-gray-900">Sort: Team</option>
+                </select>
+                <button onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm hover:border-blue-500/40 transition-all font-bold" title="Toggle sort direction">
+                  {sortDir === "asc" ? "↑ A→Z" : "↓ Z→A"}
+                </button>
+
+                {/* Result count */}
+                <span className="text-gray-500 text-xs whitespace-nowrap">{sorted.length} of {contacts.length} contacts</span>
+
+                <button onClick={downloadCSV} className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-green-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all ml-auto">
+                  <Download className="w-4 h-4" />
+                  {gradeFilter !== "all" || genderFilter !== "all" || searchQ.trim() || sortField !== "date"
+                    ? `Export ${sorted.length} Filtered`
+                    : sourceFilter === "registration" ? "Export 2026 Camp CSV"
+                    : sourceFilter === "tournament"   ? "Export Tournament CSV"
+                    : sourceFilter === "merch-order"  ? "Export Merch CSV"
+                    : "Export All CSV"}
+                </button>
               <>
                 <input type="file" accept=".csv" id="csv-import" className="hidden" onChange={e => { if (e.target.files?.[0]) { importCSV(e.target.files[0]); (e.target as HTMLInputElement).value=""; } }} />
                 <label htmlFor="csv-import" className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all cursor-pointer">
@@ -2122,11 +2232,12 @@ export default function AdminPage() {
                   setEditPatch({});
                   setIsNewContact(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-emerald-500/40 text-gray-300 hover:text-emerald-400 text-sm font-semibold rounded-xl transition-all ml-auto">
+                className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-emerald-500/40 text-gray-300 hover:text-emerald-400 text-sm font-semibold rounded-xl transition-all">
                 <Plus className="w-4 h-4" />
                 Add Contact
               </button>
-            </div>
+              </div>{/* end Row 2 */}
+            </div>{/* end space-y-3 */}
 
             {/* Table */}
             <div className="glass rounded-2xl border border-white/10 overflow-x-auto">
@@ -2135,16 +2246,25 @@ export default function AdminPage() {
                 <table className="w-full text-sm min-w-[900px]">
                   <thead className="border-b border-white/10">
                     <tr className="text-gray-500 text-xs uppercase tracking-wider">
-                      {["","Parent / Contact","Email","Phone","Camper","Grade","Gender","Shirt","Payment","Order #","Registered",""].map((h, i) => (
-                        <th key={i} className="text-left px-3 py-3 font-semibold whitespace-nowrap">{h}</th>
-                      ))}
+                      <th className="text-left px-3 py-3 font-semibold w-6"></th>
+                      <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white whitespace-nowrap" onClick={() => toggleSort("name")}>Parent / Contact <SortIcon field="name" /></th>
+                      <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("email")}>Email <SortIcon field="email" /></th>
+                      <th className="text-left px-3 py-3 font-semibold whitespace-nowrap">Phone</th>
+                      <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("camperName")}>Camper <SortIcon field="camperName" /></th>
+                      <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("grade")}>Grade <SortIcon field="grade" /></th>
+                      <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("gender")}>Gender <SortIcon field="gender" /></th>
+                      <th className="text-left px-3 py-3 font-semibold">Shirt</th>
+                      <th className="text-left px-3 py-3 font-semibold">Payment</th>
+                      <th className="text-left px-3 py-3 font-semibold whitespace-nowrap">Order #</th>
+                      <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white whitespace-nowrap" onClick={() => toggleSort("date")}>Registered <SortIcon field="date" /></th>
+                      <th className="text-left px-3 py-3 font-semibold w-20"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {filtered.length === 0 && (
+                    {sorted.length === 0 && (
                       <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-600">No camp registrations found.</td></tr>
                     )}
-                    {filtered.map(c => (
+                    {sorted.map(c => (
                       <>
                         <tr key={c.id} className="hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setExpandedContact(expandedContact === c.id ? null : c.id)}>
                           {/* Expand toggle */}
@@ -2220,16 +2340,22 @@ export default function AdminPage() {
                 <table className="w-full text-sm">
                   <thead className="border-b border-white/10">
                     <tr className="text-gray-500 text-xs uppercase tracking-wider">
-                      {["Name","Email","Phone","Source","Tournament","Team","Division","Date",""].map(h => (
-                        <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>
-                      ))}
+                      <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("name")}>Name <SortIcon field="name" /></th>
+                      <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("email")}>Email <SortIcon field="email" /></th>
+                      <th className="text-left px-4 py-3 font-semibold">Phone</th>
+                      <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("source")}>Source <SortIcon field="source" /></th>
+                      <th className="text-left px-4 py-3 font-semibold">Tournament</th>
+                      <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("teamName")}>Team <SortIcon field="teamName" /></th>
+                      <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("division")}>Division <SortIcon field="division" /></th>
+                      <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("date")}>Date <SortIcon field="date" /></th>
+                      <th className="text-left px-4 py-3 font-semibold w-24"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {filtered.length === 0 && (
+                    {sorted.length === 0 && (
                       <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-600">No contacts found.</td></tr>
                     )}
-                    {filtered.map(c => (
+                    {sorted.map(c => (
                       <tr key={c.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-4 py-3 text-white font-semibold">{c.name}</td>
                         <td className="px-4 py-3 text-gray-400">{c.email}</td>

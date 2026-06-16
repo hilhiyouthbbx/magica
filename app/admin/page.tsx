@@ -1662,6 +1662,7 @@ export default function AdminPage() {
   const [searchQ,       setSearchQ]       = useState("");
   const [sortField,     setSortField]     = useState<string>("date");
   const [sortDir,       setSortDir]       = useState<"asc"|"desc">("desc");
+  const [showExportPanel, setShowExportPanel] = useState(false);
   const [contactsLoaded,setContactsLoaded]= useState(false);
   const [expandedContact, setExpandedContact] = useState<string|null>(null);
   const [editingContact,  setEditingContact]  = useState<Contact|null>(null);
@@ -1777,6 +1778,15 @@ export default function AdminPage() {
     return m ? parseInt(m[1]) : 99;
   }
 
+  // Shirt size sort order: YS < YM < YL < YXL < AS < AM < AL < AXL < unknown
+  function shirtSizeOrder(s?: string): number {
+    const map: Record<string, number> = {
+      YS: 1, YM: 2, YL: 3, YXL: 4,
+      AS: 5, AM: 6, AL: 7, AXL: 8,
+    };
+    return map[(s || "").toUpperCase()] ?? 99;
+  }
+
   // Sort toggle helper
   function toggleSort(field: string) {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -1813,7 +1823,8 @@ export default function AdminPage() {
     else if (sortField === "source") { va = (a.source || "").toLowerCase(); vb = (b.source || "").toLowerCase(); }
     else if (sortField === "gender") { va = (a.gender || "").toLowerCase(); vb = (b.gender || "").toLowerCase(); }
     else if (sortField === "division") { va = (a.division || "").toLowerCase(); vb = (b.division || "").toLowerCase(); }
-    else if (sortField === "teamName") { va = (a.teamName || "").toLowerCase(); vb = (b.teamName || "").toLowerCase(); }
+    else if (sortField === "teamName")  { va = (a.teamName  || "").toLowerCase(); vb = (b.teamName  || "").toLowerCase(); }
+    else if (sortField === "shirtSize") { va = shirtSizeOrder(a.shirtSize);        vb = shirtSizeOrder(b.shirtSize); }
     const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : (va < vb ? -1 : va > vb ? 1 : 0);
     return sortDir === "asc" ? cmp : -cmp;
   });
@@ -1862,8 +1873,9 @@ export default function AdminPage() {
           "Camper Name","Grade","Gender","Shirt Size",
           "Parent Name","Email","Phone",
           "Emergency Contact","Emergency Phone",
-          "Ticket Price","Total Amount","Tax","Wix Service Fee","Ticket Revenue",
-          "Payment Status","Checked In","Seat Info","Benefit","Coupon",
+          "Ticket Price","Total Amount","Payment Status","Voucher Code",
+          "Tax","Wix Service Fee","Ticket Revenue",
+          "Checked In","Seat Info","Benefit",
           "Registered Date",
         ].join(",");
         rows = sorted.map(c => [
@@ -1871,8 +1883,12 @@ export default function AdminPage() {
           c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
           c.name, c.email, c.phone,
           c.emergencyContact||"", c.emergencyPhone||"",
-          c.ticketPrice||"", c.amountPaid||"", c.tax||"", c.wixServiceFee||"", c.ticketRevenue||"",
-          c.paymentStatus||"", c.checkedIn||"", c.seatInfo||"", c.benefit||"", c.coupon||"",
+          c.ticketPrice||"",
+          c.amountPaid||"",
+          (() => { const isFree = c.paymentStatus === "Free" || parseFloat(c.amountPaid || "1") === 0; return isFree ? "Free" : (c.paymentStatus || ""); })(),
+          c.coupon||"",
+          c.tax||"", c.wixServiceFee||"", c.ticketRevenue||"",
+          c.checkedIn||"", c.seatInfo||"", c.benefit||"",
           c.date ? new Date(c.date).toLocaleDateString() : "",
         ].map(esc).join(","));
         filename = `2026-youth-summer-camp-${today}.csv`;
@@ -2082,6 +2098,7 @@ export default function AdminPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {ef("Payment Status", "paymentStatus")}
                         {ef("Amount Paid ($)", "amountPaid")}
+                        {ef("Voucher / Coupon Code", "coupon")}
                         {ef("Order Number", "orderNumber")}
                       </div>
                     </div>
@@ -2114,7 +2131,7 @@ export default function AdminPage() {
         })()}
 
         {tab === "contacts" && (
-          <div className="space-y-6">
+          <div className="space-y-6" onClick={() => setShowExportPanel(false)}>
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
@@ -2200,6 +2217,7 @@ export default function AdminPage() {
                   <option value="source"    className="bg-gray-900">Sort: Source</option>
                   <option value="division"  className="bg-gray-900">Sort: Division</option>
                   <option value="teamName"  className="bg-gray-900">Sort: Team</option>
+                  <option value="shirtSize" className="bg-gray-900">Sort: Shirt Size</option>
                 </select>
                 <button onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
                   className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm hover:border-blue-500/40 transition-all font-bold" title="Toggle sort direction">
@@ -2209,15 +2227,58 @@ export default function AdminPage() {
                 {/* Result count */}
                 <span className="text-gray-500 text-xs whitespace-nowrap">{sorted.length} of {contacts.length} contacts</span>
 
-                <button onClick={downloadCSV} className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-green-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all ml-auto">
-                  <Download className="w-4 h-4" />
-                  {gradeFilter !== "all" || genderFilter !== "all" || searchQ.trim() || sortField !== "date"
-                    ? `Export ${sorted.length} Filtered`
-                    : sourceFilter === "registration" ? "Export 2026 Camp CSV"
-                    : sourceFilter === "tournament"   ? "Export Tournament CSV"
-                    : sourceFilter === "merch-order"  ? "Export Merch CSV"
-                    : "Export All CSV"}
-                </button>
+                <div className="relative ml-auto">
+                  <button
+                    onClick={() => setShowExportPanel(p => !p)}
+                    className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-green-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all">
+                    <Download className="w-4 h-4" />
+                    Export {sorted.length} {sorted.length !== contacts.length ? "Filtered " : ""}Contacts
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {showExportPanel && (
+                    <div className="absolute right-0 top-full mt-2 z-30 w-72 glass border border-white/15 rounded-2xl p-4 space-y-3 shadow-2xl" onClick={e => e.stopPropagation()}>
+                      <p className="text-white font-bold text-sm">Export Options</p>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sort By</label>
+                        <select value={sortField} onChange={e => setSortField(e.target.value)}
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 text-white text-sm rounded-xl focus:outline-none">
+                          <option value="date"       className="bg-slate-900">Date (newest first)</option>
+                          <option value="name"       className="bg-slate-900">Name (A → Z)</option>
+                          <option value="grade"      className="bg-slate-900">Grade Level</option>
+                          <option value="shirtSize"  className="bg-slate-900">Shirt Size (YS → AXL)</option>
+                          <option value="gender"     className="bg-slate-900">Gender</option>
+                          <option value="camperName" className="bg-slate-900">Camper Name</option>
+                          <option value="source"     className="bg-slate-900">Source</option>
+                          <option value="division"   className="bg-slate-900">Division</option>
+                          <option value="teamName"   className="bg-slate-900">Team</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Order</label>
+                        <div className="flex gap-2">
+                          <button onClick={() => setSortDir("asc")}
+                            className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-all ${sortDir === "asc" ? "bg-blue-600 border-blue-500 text-white" : "bg-white/5 border-white/10 text-gray-400 hover:text-white"}`}>
+                            ↑ A → Z
+                          </button>
+                          <button onClick={() => setSortDir("desc")}
+                            className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-all ${sortDir === "desc" ? "bg-blue-600 border-blue-500 text-white" : "bg-white/5 border-white/10 text-gray-400 hover:text-white"}`}>
+                            ↓ Z → A
+                          </button>
+                        </div>
+                      </div>
+                      <div className="pt-1 border-t border-white/10 text-[10px] text-gray-600">
+                        Exporting <span className="text-white font-bold">{sorted.length}</span> contacts
+                        {sorted.length !== contacts.length && <span> (filtered from {contacts.length})</span>}
+                      </div>
+                      <button
+                        onClick={() => { downloadCSV(); setShowExportPanel(false); }}
+                        className="w-full py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2">
+                        <Download className="w-4 h-4" />
+                        Download CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
               <>
                 <input type="file" accept=".csv" id="csv-import" className="hidden" onChange={e => { if (e.target.files?.[0]) { importCSV(e.target.files[0]); (e.target as HTMLInputElement).value=""; } }} />
                 <label htmlFor="csv-import" className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all cursor-pointer">
@@ -2253,16 +2314,15 @@ export default function AdminPage() {
                       <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("camperName")}>Camper <SortIcon field="camperName" /></th>
                       <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("grade")}>Grade <SortIcon field="grade" /></th>
                       <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("gender")}>Gender <SortIcon field="gender" /></th>
-                      <th className="text-left px-3 py-3 font-semibold">Shirt</th>
+                      <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("shirtSize")}>Shirt <SortIcon field="shirtSize" /></th>
                       <th className="text-left px-3 py-3 font-semibold">Payment</th>
-                      <th className="text-left px-3 py-3 font-semibold whitespace-nowrap">Order #</th>
                       <th className="text-left px-3 py-3 font-semibold cursor-pointer hover:text-white whitespace-nowrap" onClick={() => toggleSort("date")}>Registered <SortIcon field="date" /></th>
                       <th className="text-left px-3 py-3 font-semibold w-20"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {sorted.length === 0 && (
-                      <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-600">No camp registrations found.</td></tr>
+                      <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-600">No camp registrations found.</td></tr>
                     )}
                     {sorted.map(c => (
                       <>
@@ -2285,11 +2345,26 @@ export default function AdminPage() {
                             <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300">{c.shirtSize||"—"}</span>
                           </td>
                           <td className="px-3 py-3 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.paymentStatus==="Paid" ? "bg-green-500/20 text-green-400" : c.paymentStatus ? "bg-yellow-500/20 text-yellow-300" : "bg-white/10 text-gray-400"}`}>
-                              {c.paymentStatus || (c.amountPaid ? "Paid" : "—")}
-                            </span>
+                            {(() => {
+                              const isFree = c.paymentStatus === "Free" || parseFloat(c.amountPaid || "1") === 0;
+                              const label  = isFree ? "Free" : (c.paymentStatus || (c.amountPaid ? "Paid" : "—"));
+                              const color  = isFree
+                                ? "bg-sky-500/20 text-sky-300"
+                                : label === "Paid"
+                                ? "bg-green-500/20 text-green-400"
+                                : label !== "—"
+                                ? "bg-yellow-500/20 text-yellow-300"
+                                : "bg-white/10 text-gray-400";
+                              return (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${color}`}>{label}</span>
+                                  {isFree && c.coupon && (
+                                    <span className="text-[10px] text-sky-400/70 font-mono">{c.coupon}</span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
-                          <td className="px-3 py-3 text-gray-500 text-xs font-mono whitespace-nowrap">{c.orderNumber||"—"}</td>
                           <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{c.orderDate || new Date(c.date).toLocaleDateString()}</td>
                           <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center gap-2">
@@ -2313,7 +2388,7 @@ export default function AdminPage() {
                         </tr>
                         {expandedContact === c.id && (
                           <tr key={c.id+"-detail"}>
-                            <td colSpan={12} className="bg-white/5 px-6 py-4 border-b border-white/10">
+                            <td colSpan={11} className="bg-white/5 px-6 py-4 border-b border-white/10">
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-2 text-sm">
                                 <div><span className="text-gray-500 text-xs">Ticket Type</span><div className="text-white">{c.ticketType||"—"}</div></div>
                                 <div><span className="text-gray-500 text-xs">Ticket #</span><div className="text-white font-mono">{c.ticketNum||"—"}</div></div>
@@ -2322,7 +2397,15 @@ export default function AdminPage() {
                                 <div><span className="text-gray-500 text-xs">Tax</span><div className="text-white">{c.tax ? `$${c.tax}` : "—"}</div></div>
                                 <div><span className="text-gray-500 text-xs">Wix Service Fee</span><div className="text-white">{c.wixServiceFee ? `$${c.wixServiceFee}` : "—"}</div></div>
                                 <div><span className="text-gray-500 text-xs">Ticket Revenue</span><div className="text-white">{c.ticketRevenue ? `$${c.ticketRevenue}` : "—"}</div></div>
-                                <div><span className="text-gray-500 text-xs">Benefit / Coupon</span><div className="text-white">{[c.benefit, c.coupon].filter(Boolean).join(", ") || "—"}</div></div>
+                                <div>
+                                  <span className="text-gray-500 text-xs">Voucher / Coupon</span>
+                                  {(c.coupon || c.benefit) ? (
+                                    <div className="flex flex-col gap-0.5">
+                                      {c.coupon && <span className="text-sky-300 font-mono font-bold text-sm">{c.coupon}</span>}
+                                      {c.benefit && c.benefit !== c.coupon && <span className="text-gray-400 text-xs">{c.benefit}</span>}
+                                    </div>
+                                  ) : <div className="text-white">—</div>}
+                                </div>
                                 <div><span className="text-gray-500 text-xs">Emergency Contact</span><div className="text-white">{c.emergencyContact||"—"}</div></div>
                                 <div><span className="text-gray-500 text-xs">Emergency Phone</span><div className="text-white">{c.emergencyPhone||"—"}</div></div>
                                 <div><span className="text-gray-500 text-xs">Checked In</span><div className={c.checkedIn==="Yes" ? "text-green-400 font-bold" : "text-gray-400"}>{c.checkedIn||"No"}</div></div>

@@ -56,16 +56,14 @@ export async function GET(req: NextRequest) {
 
   let contacts: Contact[] = await getContacts();
 
-  // ── Filter ────────────────────────────────────────────────────────────────
+  // ── Filter — same logic as admin page.tsx ────────────────────────────────
   contacts = contacts.filter(c => {
     if (sourceFilter !== "all") {
-      if (sourceFilter === "tournament" && c.source !== "tournament") return false;
-      if (sourceFilter === "merch-order" && c.source !== "merch-order") return false;
-      if (isCampSource(sourceFilter) && c.source !== sourceFilter) return false;
+      if (isCampSource(sourceFilter) ? !isCampSource(c.source) : c.source !== sourceFilter) return false;
     }
     if (tournFilter !== "all" && c.tournamentName !== tournFilter) return false;
     if (gradeFilter !== "all" && (c.grade || "").trim() !== gradeFilter) return false;
-    if (genderFilter !== "all" && (c.gender || "").toLowerCase() !== genderFilter.toLowerCase()) return false;
+    if (genderFilter !== "all" && (c.gender || "").trim() !== genderFilter) return false;
     if (searchQ) {
       const hay = [c.name, c.email, c.phone, c.camperName, c.teamName, c.grade].join(" ").toLowerCase();
       if (!hay.includes(searchQ)) return false;

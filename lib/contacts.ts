@@ -197,11 +197,20 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
 
   let imported = 0;
 
+  // Load existing contacts once — use ticket number to detect true duplicates
+  const existingContacts = await getContacts();
+  const existingTickets  = new Set(existingContacts.map(c => c.ticketNum).filter(Boolean));
+
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i].split("\t");
 
     const email = get(row, iEmail);
     if (!email || !email.includes("@")) continue;
+
+    const ticketNum = get(row, iTicketNum);
+
+    // Skip true duplicates: same ticket number already in the database
+    if (ticketNum && existingTickets.has(ticketNum)) continue;
 
     const guestFirst = get(row, iGuestFirst);
     const guestLast  = get(row, iGuestLast);
@@ -217,7 +226,9 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
       try { phone = Math.round(parseFloat(phoneRaw)).toString(); } catch { /* keep raw */ }
     }
 
-    await saveContact({
+    // Always create a new record per ticket row — each ticket = one camper registration.
+    // Multiple tickets under the same parent email are separate registrations, NOT duplicates.
+    await createContact({
       name,
       email,
       phone,
@@ -275,7 +286,7 @@ export async function importContactsCSV(csv: string, source = "import"): Promise
     const name  = cols.slice(0, emailIdx).join(" ").trim() || "Unknown";
     const phone = cols[emailIdx + 1] || "";
     if (email.toLowerCase() === "email") continue;
-    await saveContact({ name, email, phone, source });
+    await createContact({ name, email, phone, source });
     imported++;
   }
   return imported;

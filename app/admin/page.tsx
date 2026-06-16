@@ -1788,9 +1788,14 @@ export default function AdminPage() {
   }
 
   // Normalize shirt size for display — converts stored full names to abbreviations
+  // Handles formats like "YM (Youth Medium)", "Youth Medium", "YM", "youth-medium"
   function fmtShirt(s?: string): string {
     if (!s) return "";
-    const k = s.trim().toLowerCase().replace(/[\s\-_./]+/g, "");
+    // If stored as "XX (Full Name ...)" — just grab the abbreviation before the "("
+    const parenMatch = s.trim().match(/^([A-Za-z]+)\s*\(/);
+    if (parenMatch) return fmtShirt(parenMatch[1]);
+    // Strip all non-alphanumeric chars for map lookup
+    const k = s.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
     const map: Record<string, string> = {
       youthsmall:"YS", youthmedium:"YM", youthlarge:"YL",
       youthxlarge:"YXL", youthxl:"YXL", yxxl:"YXL", youthxxlarge:"YXL",
@@ -1798,7 +1803,6 @@ export default function AdminPage() {
       adultxlarge:"AXL", adultxl:"AXL", axxl:"AXL", adultxxlarge:"AXL",
       asmall:"AS", amedium:"AM", alarge:"AL",
       ysmall:"YS", ymedium:"YM", ylarge:"YL",
-      // already abbreviated
       ys:"YS", ym:"YM", yl:"YL", yxl:"YXL",
       as:"AS", am:"AM", al:"AL", axl:"AXL",
       xs:"XS", sm:"SM", md:"MD", lg:"LG", xl:"XL", xxl:"XXL",
@@ -1948,15 +1952,14 @@ export default function AdminPage() {
       }
 
       const csv  = [headers, ...rows].join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url  = URL.createObjectURL(blob);
+      // Use data URI — avoids blob/objectURL timing issues across browsers
       const a    = document.createElement("a");
-      a.href     = url;
+      a.style.display = "none";
+      a.href     = "data:text/csv;charset=utf-8," + encodeURIComponent("\uFEFF" + csv);
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => document.body.removeChild(a), 500);
     }
 
   // ── Login screen ─────────────────────────────────────────────────────────

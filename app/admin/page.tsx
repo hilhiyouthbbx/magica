@@ -1663,6 +1663,7 @@ export default function AdminPage() {
   const [sortField,     setSortField]     = useState<string>("date");
   const [sortDir,       setSortDir]       = useState<"asc"|"desc">("desc");
   const [showExportPanel, setShowExportPanel] = useState(false);
+  const dlARef = useRef<HTMLAnchorElement>(null);
   const [contactsLoaded,setContactsLoaded]= useState(false);
   const [expandedContact, setExpandedContact] = useState<string|null>(null);
   const [editingContact,  setEditingContact]  = useState<Contact|null>(null);
@@ -1682,9 +1683,9 @@ export default function AdminPage() {
   function login(e: React.FormEvent) {
     e.preventDefault();
     fetch(`/api/admin/contacts?key=${password}`)
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(() => setAuthed(true))
-      .catch(() => setPwErr("Incorrect password."));
+      .catch((err) => setPwErr("Login failed: " + String(err)));
   }
 
   useEffect(() => {
@@ -1887,9 +1888,9 @@ export default function AdminPage() {
     function downloadCSV() {
       try {
       const today = new Date().toISOString().slice(0,10);
-      let headers: string;
-      let rows: string[];
-      let filename: string;
+      let headers = "";
+      let rows: string[] = [];
+      let filename = "contacts.csv";
 
       if (isCampSource(sourceFilter) && sourceFilter !== "all") {
         // ── Full Wix camp export — every field in its own column ──
@@ -1952,18 +1953,16 @@ export default function AdminPage() {
         filename = `hilhi-all-contacts-${today}.csv`;
       }
 
-      const csv  = [headers!, ...rows!].join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.style.display = "none";
-      a.href     = url;
-      a.download = filename!;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+      const csv = [headers, ...rows].join("\n");
+      // Use a persistent DOM anchor so the click is synchronous within the user gesture
+      const el = dlARef.current;
+      if (el) {
+        el.href     = "data:text/csv;charset=utf-8," + encodeURIComponent("\uFEFF" + csv);
+        el.download = filename;
+        el.click();
+      }
       } catch(err) {
-        alert("Download failed: " + String(err));
+        alert("Download error: " + String(err));
       }
     }
 
@@ -2310,6 +2309,8 @@ export default function AdminPage() {
                         <Download className="w-4 h-4" />
                         Download CSV
                       </button>
+                      {/* Hidden anchor driven by dlARef for programmatic download */}
+                      <a ref={dlARef} className="hidden" aria-hidden="true" />
                     </div>
                   )}
                 </div>

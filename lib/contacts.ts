@@ -272,7 +272,13 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
       amountPaid:       get(row, iTotalTicket),
       wixServiceFee:    get(row, iWixFee),
       ticketRevenue:    get(row, iRevenue),
-      paymentStatus:    get(row, iPayment),
+      paymentStatus:    (() => {
+        const amt = parseFloat(get(row, iTotalTicket) || "0");
+        const raw = get(row, iPayment);
+        // Mark as Free if total is $0 (coupon/voucher covered the cost)
+        if (amt === 0 && get(row, iCoupon)) return "Free";
+        return raw || (amt > 0 ? "Paid" : "");
+      })(),
       checkedIn:        get(row, iCheckedIn),
       seatInfo:         get(row, iSeatInfo),
       notes: [

@@ -26,6 +26,12 @@ function fmtShirt(s?: string): string {
   return map[k] ?? s.trim();
 }
 
+function shirtSizeOrder(s?: string): number {
+  const order = ["YS","YM","YL","YXL","AS","AM","AL","AXL"];
+  const i = order.indexOf(fmtShirt(s));
+  return i === -1 ? 99 : i;
+}
+
 function gradeNum(g?: string): number {
   if (!g) return 99;
   const n = parseInt(g);
@@ -80,7 +86,7 @@ export async function GET(req: NextRequest) {
       case "camperName":va = a.camperName;        vb = b.camperName;       break;
       case "email":     va = a.email;             vb = b.email;            break;
       case "gender":    va = a.gender;            vb = b.gender;           break;
-      case "shirtSize": va = fmtShirt(a.shirtSize); vb = fmtShirt(b.shirtSize); break;
+      case "shirtSize": va = shirtSizeOrder(a.shirtSize); vb = shirtSizeOrder(b.shirtSize); break;
       default:          va = a.date;              vb = b.date;             break;
     }
     const dir = sortDir === "asc" ? 1 : -1;

@@ -1784,7 +1784,27 @@ export default function AdminPage() {
       YS: 1, YM: 2, YL: 3, YXL: 4,
       AS: 5, AM: 6, AL: 7, AXL: 8,
     };
-    return map[(s || "").toUpperCase()] ?? 99;
+    return map[fmtShirt(s).toUpperCase()] ?? 99;
+  }
+
+  // Normalize shirt size for display — converts stored full names to abbreviations
+  function fmtShirt(s?: string): string {
+    if (!s) return "";
+    const k = s.trim().toLowerCase().replace(/[\s\-_./]+/g, "");
+    const map: Record<string, string> = {
+      youthsmall:"YS", youthmedium:"YM", youthlarge:"YL",
+      youthxlarge:"YXL", youthxl:"YXL", yxxl:"YXL", youthxxlarge:"YXL",
+      adultsmall:"AS", adultmedium:"AM", adultlarge:"AL",
+      adultxlarge:"AXL", adultxl:"AXL", axxl:"AXL", adultxxlarge:"AXL",
+      asmall:"AS", amedium:"AM", alarge:"AL",
+      ysmall:"YS", ymedium:"YM", ylarge:"YL",
+      // already abbreviated
+      ys:"YS", ym:"YM", yl:"YL", yxl:"YXL",
+      as:"AS", am:"AM", al:"AL", axl:"AXL",
+      xs:"XS", sm:"SM", md:"MD", lg:"LG", xl:"XL", xxl:"XXL",
+      xsmall:"XS", small:"SM", medium:"MD", large:"LG", xlarge:"XL", xxlarge:"XXL",
+    };
+    return map[k] ?? s.trim();
   }
 
   // Sort toggle helper
@@ -1880,7 +1900,7 @@ export default function AdminPage() {
         ].join(",");
         rows = sorted.map(c => [
           c.orderNumber||"", c.orderDate||"", c.ticketNum||"", c.ticketType||"",
-          c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
+          c.camperName||"", c.grade||"", c.gender||"", fmtShirt(c.shirtSize)||"",
           c.name, c.email, c.phone,
           c.emergencyContact||"", c.emergencyPhone||"",
           c.ticketPrice||"",
@@ -1917,7 +1937,7 @@ export default function AdminPage() {
         ].join(",");
         rows    = sorted.map(c => [
           c.source, c.orderNumber||"", c.orderDate||"",
-          c.camperName||"", c.grade||"", c.gender||"", c.shirtSize||"",
+          c.camperName||"", c.grade||"", c.gender||"", fmtShirt(c.shirtSize)||"",
           c.name, c.email, c.phone,
           c.emergencyContact||"", c.emergencyPhone||"",
           c.amountPaid||"", c.paymentStatus||"", c.checkedIn||"",
@@ -2342,7 +2362,7 @@ export default function AdminPage() {
                             <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${c.gender==="Boys" ? "bg-blue-500/20 text-blue-300" : c.gender==="Girls" ? "bg-pink-500/20 text-pink-300" : "bg-white/10 text-gray-400"}`}>{c.gender||"—"}</span>
                           </td>
                           <td className="px-3 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300">{c.shirtSize||"—"}</span>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300">{fmtShirt(c.shirtSize)||"—"}</span>
                           </td>
                           <td className="px-3 py-3 text-center">
                             {(() => {

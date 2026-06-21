@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 type RowType = "section" | "normal" | "break" | "game" | "highlight";
 
 interface ScheduleRow {
@@ -19,7 +19,38 @@ interface DayData {
   rows: ScheduleRow[];
 }
 
-// ─── Default Schedule ────────────────────────────────────────────────────────
+// ─── Time math helpers ────────────────────────────────────────────────────────
+function toMins(t: string): number {
+  const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return -1;
+  let h = parseInt(m[1]);
+  const min = parseInt(m[2]);
+  const ap = m[3].toUpperCase();
+  if (ap === "PM" && h !== 12) h += 12;
+  if (ap === "AM" && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+function fromMins(total: number): string {
+  if (total < 0) return "";
+  const h24 = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  const ap = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 > 12 ? h24 - 12 : h24 === 0 ? 12 : h24;
+  return `${h12}:${m.toString().padStart(2, "0")} ${ap}`;
+}
+
+// Shift all rows from `startIdx` onward by `deltaMins`
+function shiftTimes(rows: ScheduleRow[], startIdx: number, deltaMins: number): ScheduleRow[] {
+  return rows.map((r, i) => {
+    if (i < startIdx) return r;
+    const mins = toMins(r.time);
+    if (mins < 0) return r;
+    return { ...r, time: fromMins(mins + deltaMins) };
+  });
+}
+
+// ─── Default Schedule Data ────────────────────────────────────────────────────
 const DEFAULT: DayData[] = [
   {
     label: "Day 1", date: "Monday, June 22",
@@ -99,20 +130,19 @@ const DEFAULT: DayData[] = [
 
 const STORAGE_KEY = "hilhi-schedule-2026";
 
-// ─── Row styling helpers ─────────────────────────────────────────────────────
-function rowStyle(type: RowType) {
+// ─── Row color helpers ────────────────────────────────────────────────────────
+function rowBg(type: RowType, selected: boolean) {
+  if (selected) return "bg-blue-600/20 border-l-4 border-blue-400";
   if (type === "section")   return "bg-blue-950/60 border-l-4 border-yellow-400";
   if (type === "game")      return "bg-yellow-400/5 border-l-4 border-yellow-400/40";
   if (type === "break")     return "bg-white/3 opacity-60";
   if (type === "highlight") return "bg-blue-500/8 border-l-4 border-blue-400/50";
-  return "hover:bg-white/3";
+  return "hover:bg-white/5";
 }
-
-function timeStyle(type: RowType) {
+function timeColor(type: RowType) {
   return type === "section" ? "text-yellow-400 font-bold" : "text-gray-500";
 }
-
-function actStyle(type: RowType) {
+function actColor(type: RowType) {
   if (type === "section")   return "text-yellow-400 font-semibold";
   if (type === "highlight") return "text-white font-medium";
   if (type === "game")      return "text-white";
@@ -120,230 +150,320 @@ function actStyle(type: RowType) {
   return "text-gray-300";
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 export function ScheduleTab() {
-  const [days, setDays]           = useState<DayData[]>(DEFAULT);
-  const [activeDay, setActiveDay] = useState(0);
-  const [editMode, setEditMode]   = useState(false);
-  const [saved, setSaved]         = useState(false);
+  const [days, setDays]             = useState<DayData[]>(DEFAULT);
+  const [activeDay, setActiveDay]   = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editBuf, setEditBuf]       = useState<ScheduleRow | null>(null);
+  const [autoShift, setAutoShift]   = useState(true);
+  const [flash, setFlash]           = useState("");
 
-  // Load saved schedule on mount
+  // Load saved schedule
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setDays(JSON.parse(stored));
+      const s = localStorage.getItem(STORAGE_KEY);
+      if (s) setDays(JSON.parse(s));
     } catch {}
   }, []);
 
   function persist(next: DayData[]) {
     setDays(next);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   }
 
-  function updateRow(dayIdx: number, rowId: string, field: keyof ScheduleRow, value: string) {
-    persist(days.map((d, di) => di !== dayIdx ? d : {
-      ...d,
-      rows: d.rows.map(r => r.id === rowId ? { ...r, [field]: value } : r),
-    }));
+  function notify(msg: string) {
+    setFlash(msg);
+    setTimeout(() => setFlash(""), 2500);
   }
 
-  function deleteRow(dayIdx: number, rowId: string) {
-    persist(days.map((d, di) => di !== dayIdx ? d : {
-      ...d, rows: d.rows.filter(r => r.id !== rowId),
-    }));
+  const current = days[activeDay];
+
+  // ── Select a row to edit ──
+  function selectRow(row: ScheduleRow) {
+    if (selectedId === row.id) {
+      // Clicking again deselects
+      setSelectedId(null);
+      setEditBuf(null);
+    } else {
+      setSelectedId(row.id);
+      setEditBuf({ ...row });
+    }
   }
 
-  function addRow(dayIdx: number) {
-    persist(days.map((d, di) => di !== dayIdx ? d : {
-      ...d,
-      rows: [...d.rows, {
-        id: `${dayIdx + 1}-${Date.now()}`,
-        time: "", activity: "New Event", note: "", type: "normal" as RowType,
-      }],
-    }));
+  // ── Save edits for the selected row ──
+  function commitEdit() {
+    if (!editBuf) return;
+    const rows = current.rows;
+    const idx  = rows.findIndex(r => r.id === editBuf.id);
+    if (idx < 0) return;
+
+    let newRows = rows.map(r => r.id === editBuf.id ? { ...editBuf } : r);
+
+    // If time changed and autoShift is on, shift subsequent rows
+    if (autoShift) {
+      const oldMins = toMins(rows[idx].time);
+      const newMins = toMins(editBuf.time);
+      if (oldMins >= 0 && newMins >= 0 && oldMins !== newMins) {
+        const delta = newMins - oldMins;
+        newRows = newRows.map((r, i) => {
+          if (i <= idx) return r;
+          const m = toMins(r.time);
+          if (m < 0) return r;
+          return { ...r, time: fromMins(m + delta) };
+        });
+        notify(`⏱ Shifted ${rows.length - idx - 1} rows by ${delta > 0 ? "+" : ""}${delta} min`);
+      }
+    }
+
+    persist(days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows }));
+    setSelectedId(null);
+    setEditBuf(null);
+    if (!flash) notify("✓ Saved");
+  }
+
+  // ── Delete selected row (auto-adjust times) ──
+  function deleteSelected() {
+    if (!selectedId) return;
+    const rows = current.rows;
+    const idx  = rows.findIndex(r => r.id === selectedId);
+    if (idx < 0) return;
+
+    let newRows = rows.filter(r => r.id !== selectedId);
+
+    if (autoShift && idx < rows.length - 1) {
+      // Duration = gap between deleted row and next row
+      const deletedMins = toMins(rows[idx].time);
+      const nextMins    = toMins(rows[idx + 1].time);
+      if (deletedMins >= 0 && nextMins >= 0) {
+        const duration = nextMins - deletedMins;
+        // Shift everything from idx onward back by that duration
+        newRows = newRows.map((r, i) => {
+          if (i < idx) return r;
+          const m = toMins(r.time);
+          if (m < 0) return r;
+          return { ...r, time: fromMins(m - duration) };
+        });
+        notify(`🗑 Removed "${rows[idx].activity}" · shifted ${newRows.length - idx} rows back ${duration} min`);
+      }
+    } else {
+      notify(`🗑 Removed "${rows[idx].activity}"`);
+    }
+
+    persist(days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows }));
+    setSelectedId(null);
+    setEditBuf(null);
+  }
+
+  // ── Add row below selected (or at end) ──
+  function addRow() {
+    const rows = current.rows;
+    let insertIdx = rows.length;
+    let defaultTime = "";
+
+    if (selectedId) {
+      const idx = rows.findIndex(r => r.id === selectedId);
+      if (idx >= 0) {
+        insertIdx = idx + 1;
+        // Default time = midpoint between this and next row
+        const curMins  = toMins(rows[idx].time);
+        const nextMins = idx + 1 < rows.length ? toMins(rows[idx + 1].time) : curMins + 30;
+        if (curMins >= 0 && nextMins >= 0) defaultTime = fromMins(Math.round((curMins + nextMins) / 2));
+      }
+    } else if (rows.length > 0) {
+      const last = toMins(rows[rows.length - 1].time);
+      if (last >= 0) defaultTime = fromMins(last + 30);
+    }
+
+    const newRow: ScheduleRow = {
+      id: `${activeDay + 1}-${Date.now()}`,
+      time: defaultTime, activity: "New Event", note: "", type: "normal",
+    };
+    const newRows = [...rows.slice(0, insertIdx), newRow, ...rows.slice(insertIdx)];
+    persist(days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows }));
+    setSelectedId(newRow.id);
+    setEditBuf({ ...newRow });
   }
 
   function reset() {
     if (!confirm("Reset to original schedule? All edits will be lost.")) return;
     persist(JSON.parse(JSON.stringify(DEFAULT)));
+    setSelectedId(null);
+    setEditBuf(null);
   }
 
-  const current = days[activeDay];
-
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
 
-      {/* ── Top bar: day tabs + edit controls ── */}
+      {/* ── Day tabs + controls ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-
-        {/* Day tabs */}
         <div className="flex gap-1 bg-[#1a1f2e] p-1 rounded-xl border border-white/10">
           {days.map((d, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveDay(i)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-                activeDay === i
-                  ? "bg-blue-600 text-white shadow"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
+            <button key={i} onClick={() => { setActiveDay(i); setSelectedId(null); setEditBuf(null); }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${activeDay === i ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-white"}`}>
               {d.label}
-              {i === 3 && (
-                <span className="ml-1.5 text-[10px] font-black bg-orange-500 text-white px-1.5 py-0.5 rounded">FINALS</span>
-              )}
+              {i === 3 && <span className="ml-1.5 text-[10px] font-black bg-orange-500 text-white px-1.5 py-0.5 rounded">FINALS</span>}
             </button>
           ))}
         </div>
 
-        {/* Edit controls */}
         <div className="flex items-center gap-2">
-          {saved && (
-            <span className="text-green-400 text-xs font-semibold">✓ Saved</span>
-          )}
-          {editMode && (
-            <button
-              onClick={reset}
-              className="text-xs text-gray-500 hover:text-gray-300 border border-white/10 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              Reset to Default
-            </button>
-          )}
-          <button
-            onClick={() => setEditMode(!editMode)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              editMode
-                ? "bg-green-600 hover:bg-green-500 text-white"
-                : "bg-blue-600 hover:bg-blue-500 text-white"
-            }`}
-          >
-            {editMode ? (
-              <><span>✓</span> Done Editing</>
-            ) : (
-              <><span>✏️</span> Edit Schedule</>
-            )}
+          {flash && <span className="text-sm text-blue-300 font-medium">{flash}</span>}
+          <button onClick={addRow}
+            className="px-3 py-2 bg-white/8 hover:bg-white/12 border border-white/15 rounded-lg text-sm text-gray-300 hover:text-white transition-all">
+            + Add Row
+          </button>
+          <button onClick={reset}
+            className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-gray-600 hover:text-gray-400 transition-all">
+            Reset
           </button>
         </div>
       </div>
 
-      {/* Edit mode hint */}
-      {editMode && (
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-3 text-sm text-blue-300">
-          <strong>Edit Mode On</strong> — Click any field below to change it. Changes save automatically.
-        </div>
-      )}
-
-      {/* ── Day info ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-white font-bold text-lg">
-            {current.label}
-            {activeDay === 3 && <span className="ml-2 text-orange-400 text-base">— Championship Day</span>}
-          </h2>
-          <p className="text-gray-500 text-sm">{current.date}, 2026</p>
-        </div>
-        <span className="text-xs text-gray-600 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-          {current.rows.length} events
+      {/* ── Auto-shift toggle ── */}
+      <div className="flex items-center gap-3 px-4 py-2.5 bg-[#1a1f2e] rounded-xl border border-white/10">
+        <button onClick={() => setAutoShift(!autoShift)}
+          className={`relative w-10 h-5 rounded-full transition-colors ${autoShift ? "bg-blue-600" : "bg-gray-700"}`}>
+          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${autoShift ? "left-5" : "left-0.5"}`} />
+        </button>
+        <span className="text-sm text-gray-300 font-medium">
+          Auto-adjust times
+        </span>
+        <span className="text-xs text-gray-600">
+          {autoShift
+            ? "ON — deleting or moving a row shifts all times below it automatically"
+            : "OFF — only the selected row changes"}
         </span>
       </div>
 
-      {/* ── Schedule Table ── */}
-      <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0f1117]">
+      <div className="flex gap-4 items-start">
 
-        {/* Column headers */}
-        <div className={`grid text-xs font-bold uppercase tracking-widest text-gray-600 bg-white/5 border-b border-white/10 px-4 py-3 ${editMode ? "grid-cols-[100px_1fr_1fr_36px]" : "grid-cols-[100px_1fr_1fr]"}`}>
-          <div>Time</div>
-          <div>Activity</div>
-          <div>Notes</div>
-          {editMode && <div />}
+        {/* ── Schedule table ── */}
+        <div className="flex-1 rounded-2xl border border-white/10 overflow-hidden bg-[#0f1117]">
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/10">
+            <div>
+              <span className="text-white font-bold">{current.label}</span>
+              <span className="text-gray-600 text-sm ml-2">{current.date}, 2026</span>
+            </div>
+            <span className="text-xs text-gray-600">{current.rows.length} events · click any row to edit</span>
+          </div>
+
+          {/* Rows */}
+          {current.rows.map((row) => {
+            const isSelected = selectedId === row.id;
+            return (
+              <div key={row.id}
+                onClick={() => selectRow(row)}
+                className={`grid grid-cols-[90px_1fr_auto] items-start px-4 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-all ${rowBg(row.type, isSelected)}`}>
+
+                {/* Time */}
+                <div className={`text-xs font-mono pt-0.5 ${isSelected ? "text-blue-300" : timeColor(row.type)}`}>
+                  {row.time}
+                </div>
+
+                {/* Activity + note */}
+                <div>
+                  <div className={`text-sm leading-snug ${isSelected ? "text-white font-medium" : actColor(row.type)}`}>
+                    {row.activity}
+                  </div>
+                  {row.note && (
+                    <div className={`text-xs mt-0.5 ${isSelected ? "text-blue-300/70" : "text-gray-600"}`}>
+                      {row.note}
+                    </div>
+                  )}
+                </div>
+
+                {/* Edit indicator */}
+                <div className={`text-sm pl-2 transition-opacity ${isSelected ? "opacity-100 text-blue-400" : "opacity-0 group-hover:opacity-40 text-gray-600"}`}>
+                  ✏️
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Add row at bottom */}
+          <button onClick={addRow}
+            className="w-full py-3 text-sm text-gray-700 hover:text-blue-400 hover:bg-white/3 transition-all border-t border-white/5 flex items-center justify-center gap-1">
+            <span className="text-lg leading-none">+</span> add row
+          </button>
         </div>
 
-        {/* Rows */}
-        {current.rows.map((row) => (
-          <div
-            key={row.id}
-            className={`grid px-4 py-3 border-b border-white/5 last:border-0 items-start transition-colors ${rowStyle(row.type)} ${editMode ? "grid-cols-[100px_1fr_1fr_36px]" : "grid-cols-[100px_1fr_1fr]"}`}
-          >
-            {/* Time cell */}
-            {editMode ? (
+        {/* ── Edit Panel (shown when a row is selected) ── */}
+        {editBuf && (
+          <div className="w-72 shrink-0 rounded-2xl border border-blue-500/30 bg-[#0f1729] p-4 space-y-3 sticky top-4">
+
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-bold text-sm">Edit Row</h3>
+              <button onClick={() => { setSelectedId(null); setEditBuf(null); }}
+                className="text-gray-500 hover:text-white text-lg leading-none">×</button>
+            </div>
+
+            {/* Time */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Time</label>
               <input
-                value={row.time}
-                onChange={e => updateRow(activeDay, row.id, "time", e.target.value)}
-                className="w-full bg-white/8 border border-white/15 rounded-lg px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500/60 focus:bg-white/10"
+                value={editBuf.time}
+                onChange={e => setEditBuf({ ...editBuf, time: e.target.value })}
+                placeholder="9:00 AM"
+                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-blue-500/60"
               />
-            ) : (
-              <div className={`text-xs font-mono pt-0.5 ${timeStyle(row.type)}`}>{row.time}</div>
-            )}
+              {autoShift && <p className="text-xs text-blue-400/70 mt-1">⏱ Changing time will shift all rows below</p>}
+            </div>
 
-            {/* Activity cell */}
-            {editMode ? (
-              <div className="px-1 space-y-1.5">
-                <input
-                  value={row.activity}
-                  onChange={e => updateRow(activeDay, row.id, "activity", e.target.value)}
-                  className="w-full bg-white/8 border border-white/15 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500/60 focus:bg-white/10"
-                />
-                <select
-                  value={row.type}
-                  onChange={e => updateRow(activeDay, row.id, "type", e.target.value)}
-                  className="w-full bg-[#1a1f2e] border border-white/15 rounded-lg px-2 py-1 text-xs text-gray-400 focus:outline-none cursor-pointer"
-                >
-                  <option value="normal">Normal row</option>
-                  <option value="section">Section header (navy)</option>
-                  <option value="game">Game / Seeding (gold)</option>
-                  <option value="break">Break / Lunch (dim)</option>
-                  <option value="highlight">Highlight (blue)</option>
-                </select>
-              </div>
-            ) : (
-              <div className={`text-sm leading-snug ${actStyle(row.type)}`}>
-                {row.activity}
-              </div>
-            )}
-
-            {/* Note cell */}
-            {editMode ? (
+            {/* Activity */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Activity</label>
               <input
-                value={row.note}
-                onChange={e => updateRow(activeDay, row.id, "note", e.target.value)}
-                placeholder="Add a note..."
-                className="mx-1 w-full bg-white/8 border border-white/15 rounded-lg px-2 py-1.5 text-xs text-gray-400 placeholder-gray-700 focus:outline-none focus:border-blue-500/60 focus:bg-white/10"
+                value={editBuf.activity}
+                onChange={e => setEditBuf({ ...editBuf, activity: e.target.value })}
+                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/60"
               />
-            ) : (
-              <div className="text-xs text-gray-600 pt-0.5 leading-relaxed">{row.note}</div>
-            )}
+            </div>
 
-            {/* Delete button */}
-            {editMode && (
-              <button
-                onClick={() => deleteRow(activeDay, row.id)}
-                className="self-center text-gray-700 hover:text-red-400 transition-colors text-lg leading-none"
-                title="Delete row"
-              >
-                ×
+            {/* Note */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Note</label>
+              <input
+                value={editBuf.note}
+                onChange={e => setEditBuf({ ...editBuf, note: e.target.value })}
+                placeholder="Optional detail..."
+                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-gray-300 placeholder-gray-700 focus:outline-none focus:border-blue-500/60"
+              />
+            </div>
+
+            {/* Row type */}
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Row Style</label>
+              <select
+                value={editBuf.type}
+                onChange={e => setEditBuf({ ...editBuf, type: e.target.value as RowType })}
+                className="w-full px-3 py-2 bg-[#1a1f2e] border border-white/15 rounded-lg text-sm text-gray-300 focus:outline-none cursor-pointer">
+                <option value="normal">Normal</option>
+                <option value="section">Section header (gold)</option>
+                <option value="game">Game / Contest (gold outline)</option>
+                <option value="break">Break / Lunch (dim)</option>
+                <option value="highlight">Highlight (blue)</option>
+              </select>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-1">
+              <button onClick={commitEdit}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-all">
+                Save
               </button>
-            )}
+              <button onClick={deleteSelected}
+                className="flex-1 py-2.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 hover:text-red-300 text-sm font-bold rounded-lg transition-all">
+                Delete
+                {autoShift && <span className="text-xs font-normal ml-1">+ adjust</span>}
+              </button>
+            </div>
           </div>
-        ))}
-
-        {/* Add row */}
-        {editMode && (
-          <button
-            onClick={() => addRow(activeDay)}
-            className="w-full py-3.5 text-sm text-gray-600 hover:text-blue-400 hover:bg-white/3 transition-all border-t border-white/5 flex items-center justify-center gap-2"
-          >
-            <span className="text-lg leading-none">+</span>
-            Add row to {current.label}
-          </button>
         )}
       </div>
-
-      {/* ── Summary row count ── */}
-      <p className="text-xs text-gray-700 text-right">
-        {current.rows.length} scheduled events · Changes auto-save to browser
-      </p>
     </div>
   );
 }

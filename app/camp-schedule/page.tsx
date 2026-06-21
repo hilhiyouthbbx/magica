@@ -1,686 +1,537 @@
 "use client";
-export const dynamic = "force-dynamic";
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Navbar }  from "@/components/navbar";
-import { Footer }  from "@/components/footer";
-import { Calendar, Clock, Trophy, Users, Megaphone, ChevronDown, ChevronUp } from "lucide-react";
-import type { CampScheduleData, CampTeam, Division } from "@/lib/camp-schedule";
-import { DynamicTitle } from "@/components/dynamic-title";
 
-// ── Static 4-day schedule ─────────────────────────────────────────────────────
-const DAYS = [
+import { useState, useEffect, useCallback } from "react";
+
+// ─── Types ─────────────────────────────────────────────────────────
+type RowType = "section" | "normal" | "break" | "game" | "highlight";
+
+interface ScheduleRow {
+  id: string;
+  time: string;
+  activity: string;
+  note: string;
+  type: RowType;
+}
+
+interface DayData {
+  label: string;
+  date: string;
+  theme: string;
+  rows: ScheduleRow[];
+}
+
+// ─── Default Schedule ───────────────────────────────────────────────
+const DEFAULT_SCHEDULE: DayData[] = [
   {
-    day: 1, label: "Day 1 — Fundamentals + Seeding Round 1", date: "Sunday, June 22, 2025",
-    blocks: [
-      { section: "Setup & Welcome", items: [
-        { time: "7:30 – 8:00",  activity: "Setup – Coaches Meeting" },
-        { time: "8:00 – 9:00",  activity: "Registration / Check-In" },
-        { time: "9:00 – 9:15",  activity: "Camp Kickoff — Introductions & camp expectations" },
-      ]},
-      { section: "Morning Skills", items: [
-        { time: "9:15 – 9:30",  activity: "Warm-Up — Dynamic stretching, sprints" },
-        { time: "9:30 – 9:55",  activity: "Ball Handling — Right/Left hand, 2-ball drills" },
-        { time: "9:55 – 10:15", activity: "Passing — Chest pass, push pass, bounce pass" },
-        { time: "10:15 – 10:30",activity: "Layups — Right & left-hand layup lines" },
-        { time: "10:30 – 10:40",activity: "Break / Water" },
-      ]},
-      { section: "Skill Stations", items: [
-        { time: "10:40 – 11:20",activity: "4 Skill Stations (10 min rotation) — Hedge & Recover, V-cut, Box Out, Close Out" },
-        { time: "11:20 – 11:40",activity: "Shooting Fundamentals — Pocket, follow-through, H-E-W" },
-        { time: "11:40 – 12:10",activity: "3-on-3 Half Court Games" },
-      ]},
-      { section: "Lunch & Team Assignment", items: [
-        { time: "12:10 – 12:45",activity: "Lunch + Team Assignment — Coaches assign NBA & College teams" },
-      ]},
-      { section: "Seeding Round 1 of 3", items: [
-        { time: "12:45 – 1:00", activity: "Team Practice / Game Prep" },
-        { time: "1:00 – 1:40",  activity: "Seeding Game Round 1 — 2 × 12-min halves, all 4 games simultaneously" },
-        { time: "1:40 – 1:55",  activity: "Break / Water + Standings Update" },
-        { time: "1:55 – 2:20",  activity: "Free Shooting / Skill Work" },
-        { time: "2:20 – 2:30",  activity: "Center Court Wrap-Up — Results, tip of the day, preview Day 2" },
-      ]},
+    label: "Day 1", date: "Monday, June 22", theme: "Fundamentals",
+    rows: [
+      { id: "1-1",  time: "7:30 AM",  activity: "Check-In & Registration",                      note: "",                                  type: "normal"    },
+      { id: "1-2",  time: "8:00 AM",  activity: "Welcome, Camp Overview & Introductions",        note: "All campers",                       type: "highlight" },
+      { id: "1-3",  time: "8:15 AM",  activity: "Warm-Up & Dynamic Stretching",                  note: "",                                  type: "normal"    },
+      { id: "1-4",  time: "8:30 AM",  activity: "SKILL STATION — Ballhandling Fundamentals",     note: "Both courts",                       type: "section"   },
+      { id: "1-5",  time: "9:15 AM",  activity: "SKILL STATION — Footwork & Pivoting",           note: "Both courts",                       type: "section"   },
+      { id: "1-6",  time: "10:00 AM", activity: "SKILL STATION — Passing & Catching",            note: "Both courts",                       type: "section"   },
+      { id: "1-7",  time: "10:45 AM", activity: "Water Break",                                   note: "5 min",                             type: "break"     },
+      { id: "1-8",  time: "11:00 AM", activity: "Seeding Round 1 — NBA Division",                note: "2x12-min clock | 1st-4th Grade",    type: "game"      },
+      { id: "1-9",  time: "11:30 AM", activity: "Seeding Round 1 — College Division",            note: "2x12-min clock | 5th-8th Grade",    type: "game"      },
+      { id: "1-10", time: "12:00 PM", activity: "Lunch Break",                                   note: "60 min",                            type: "break"     },
+      { id: "1-11", time: "1:00 PM",  activity: "SKILL STATION — Shooting Form & Arc",           note: "Both courts",                       type: "section"   },
+      { id: "1-12", time: "1:45 PM",  activity: "SKILL STATION — Defensive Positioning",         note: "Both courts",                       type: "section"   },
+      { id: "1-13", time: "2:30 PM",  activity: "Cool Down & Camp Debrief",                      note: "",                                  type: "normal"    },
+      { id: "1-14", time: "3:00 PM",  activity: "End of Day",                                    note: "",                                  type: "highlight" },
     ],
   },
   {
-    day: 2, label: "Day 2 — Team Naming + Team Play + Seeding Round 2", date: "Monday, June 23, 2025",
-    blocks: [
-      { section: "Morning Skills", items: [
-        { time: "8:00 – 8:30",  activity: "Coaches Meeting / Court Setup — Review Day 1 standings" },
-        { time: "8:30 – 8:35",  activity: "Team Naming (5 min) — NBA names (1st–4th) & College names (5th–8th)" },
-        { time: "8:35 – 8:50",  activity: "Warm-Up — Dynamic stretch + sprints" },
-        { time: "8:50 – 9:15",  activity: "Ball Handling Review — Crossover, In-&-Out, Behind the back" },
-        { time: "9:15 – 9:40",  activity: "Shooting Series — Form shots, mid-range, free-throw pairs" },
-        { time: "9:40 – 10:00", activity: "Footwork & Moves — Jab step, drive, jump stop" },
-        { time: "10:00 – 10:15",activity: "Break / Water" },
-      ]},
-      { section: "Team Concepts", items: [
-        { time: "10:15 – 10:45",activity: "4 Skill Stations — Pick-and-Roll, defensive rotations, 1-on-1, finishing" },
-        { time: "10:45 – 11:15",activity: "Team Offense Intro — Motion offense, spacing" },
-        { time: "11:15 – 11:45",activity: "5-on-5 Scrimmage (refereed)" },
-      ]},
-      { section: "Lunch", items: [
-        { time: "11:45 – 12:20",activity: "Lunch — Review Round 1 standings, preview today's matchups" },
-      ]},
-      { section: "Seeding Round 2 of 3", items: [
-        { time: "12:20 – 12:35",activity: "Team Practice / Game Prep" },
-        { time: "12:35 – 1:15", activity: "Seeding Game Round 2 — New matchups, all 4 games simultaneously" },
-        { time: "1:15 – 1:30",  activity: "Break / Water + Standings Update" },
-        { time: "1:30 – 2:00",  activity: "Fast Break Drills — 2-on-1, 3-on-2, transition defense" },
-        { time: "2:00 – 2:25",  activity: "Play-In / Skill Game" },
-        { time: "2:25 – 2:30",  activity: "Center Court Wrap-Up — Round 2 standings, tip of the day" },
-      ]},
+    label: "Day 2", date: "Tuesday, June 23", theme: "Team Play",
+    rows: [
+      { id: "2-1",  time: "7:30 AM",  activity: "Check-In & Warm-Up",                               note: "",                                          type: "normal"    },
+      { id: "2-2",  time: "8:00 AM",  activity: "TEAM FORMATION & NAMING (5 min)",                  note: "NBA: 1st-4th | College: 5th-8th",            type: "highlight" },
+      { id: "2-3",  time: "8:15 AM",  activity: "SKILL STATION — Post Moves & Low-Post Finishing",  note: "Both courts",                               type: "section"   },
+      { id: "2-4",  time: "9:00 AM",  activity: "SKILL STATION — Shooting Off Screens",             note: "Both courts",                               type: "section"   },
+      { id: "2-5",  time: "9:45 AM",  activity: "Water Break",                                      note: "5 min",                                     type: "break"     },
+      { id: "2-6",  time: "10:00 AM", activity: "Seeding Round 2 — NBA Division",                   note: "T1 vs T3 | T2 vs T4 | 2x12-min clock",     type: "game"      },
+      { id: "2-7",  time: "11:00 AM", activity: "Seeding Round 2 — College Division",               note: "T1 vs T3 | T2 vs T4 | 2x12-min clock",     type: "game"      },
+      { id: "2-8",  time: "12:00 PM", activity: "Lunch Break",                                      note: "60 min",                                    type: "break"     },
+      { id: "2-9",  time: "1:00 PM",  activity: "SKILL STATION — Transition Offense / Fast Break",  note: "Both courts",                               type: "section"   },
+      { id: "2-10", time: "1:45 PM",  activity: "SKILL STATION — 3-Point & Free Throw Practice",   note: "Both courts",                               type: "section"   },
+      { id: "2-11", time: "2:30 PM",  activity: "Championship Contest Preview & Practice",          note: "All campers",                               type: "normal"    },
+      { id: "2-12", time: "3:00 PM",  activity: "End of Day",                                       note: "",                                          type: "highlight" },
     ],
   },
   {
-    day: 3, label: "Day 3 — Advanced Skills + Seeding Round 3 (Final)", date: "Tuesday, June 24, 2025",
-    blocks: [
-      { section: "Morning Skills", items: [
-        { time: "8:00 – 8:30",  activity: "Coaches Meeting — Review standings, plan final seeding round" },
-        { time: "8:30 – 8:45",  activity: "Warm-Up — Dynamic stretch + partner defensive slides" },
-        { time: "8:45 – 9:10",  activity: "Advanced Ball Handling — Combo moves, speed dribble, Figure-8" },
-        { time: "9:10 – 9:35",  activity: "Shooting — Game-speed reps, catch-and-shoot, pull-up, corner 3s" },
-        { time: "9:35 – 10:00", activity: "Post Moves — Drop step, up & under, power layup" },
-        { time: "10:00 – 10:15",activity: "Break / Water" },
-      ]},
-      { section: "Team Defense & Competitions", items: [
-        { time: "10:15 – 10:45",activity: "Defensive Concepts — Ball pressure, deny wing, help & recover" },
-        { time: "10:45 – 11:15",activity: "Defense Competition — Best stop = 1 point for team" },
-        { time: "11:15 – 11:45",activity: "Free Shooting / Team Walkthrough" },
-      ]},
-      { section: "Lunch", items: [
-        { time: "11:45 – 12:20",activity: "Lunch — Players nominate individual event competitors" },
-      ]},
-      { section: "Seeding Round 3 of 3 (Final)", items: [
-        { time: "12:20 – 12:35",activity: "Team Practice / Final Game Prep" },
-        { time: "12:35 – 1:15", activity: "Seeding Game Round 3 (Final) — FINAL standings calculated" },
-        { time: "1:15 – 1:30",  activity: "Break / Water + Final Standings Calculated" },
-        { time: "1:30 – 1:55",  activity: "Championship Bracket Reveal — Seeds 1–4 announced" },
-        { time: "1:55 – 2:20",  activity: "Championship Day Prep + Preview" },
-        { time: "2:20 – 2:30",  activity: "Center Court Wrap-Up — Bracket announced, tip: compete with heart" },
-      ]},
+    label: "Day 3", date: "Wednesday, June 24", theme: "Advanced Skills",
+    rows: [
+      { id: "3-1",  time: "7:30 AM",  activity: "Check-In & Warm-Up",                          note: "",                                          type: "normal"    },
+      { id: "3-2",  time: "8:00 AM",  activity: "SKILL STATION — Pick & Roll Offense",         note: "Both courts",                               type: "section"   },
+      { id: "3-3",  time: "8:45 AM",  activity: "SKILL STATION — Fast Break & Transition D",   note: "Both courts",                               type: "section"   },
+      { id: "3-4",  time: "9:30 AM",  activity: "Seeding Round 3 — NBA Division",              note: "T1 vs T4 | T2 vs T3 | 2x12-min clock",     type: "game"      },
+      { id: "3-5",  time: "10:30 AM", activity: "Water Break",                                 note: "5 min",                                     type: "break"     },
+      { id: "3-6",  time: "10:45 AM", activity: "Seeding Round 3 — College Division",          note: "T1 vs T4 | T2 vs T3 | 2x12-min clock",     type: "game"      },
+      { id: "3-7",  time: "11:45 AM", activity: "Championship Day Preview / Lineup Cards",     note: "Teams nominate players for each contest",   type: "highlight" },
+      { id: "3-8",  time: "12:15 PM", activity: "Lunch Break",                                 note: "60 min",                                    type: "break"     },
+      { id: "3-9",  time: "1:15 PM",  activity: "Individual Contest Practice / Shootaround",   note: "All courts",                                type: "normal"    },
+      { id: "3-10", time: "2:15 PM",  activity: "Final Standings Announced",                   note: "All teams",                                 type: "highlight" },
+      { id: "3-11", time: "2:30 PM",  activity: "Cool Down & Championship Day Prep",           note: "",                                          type: "normal"    },
+      { id: "3-12", time: "3:00 PM",  activity: "End of Day",                                  note: "",                                          type: "highlight" },
     ],
   },
   {
-    day: 4, label: "Day 4 — 🏆 Championship Day", date: "Wednesday, June 25, 2025",
-    blocks: [
-      { section: "Setup & Warmup", items: [
-        { time: "7:30 – 8:00",  activity: "Early Setup — Bracket posted, trophies staged, event stations ready" },
-        { time: "8:00 – 8:20",  activity: "All-Camp Championship Warmup — Full camp at center court" },
-        { time: "8:20 – 8:30",  activity: "Lineup Cards & Team Huddles" },
-      ]},
-      { section: "Individual Skill Contests", items: [
-        { time: "8:30 – 9:00",  activity: "Free Throw Contest — Best of 10, NBA on Court A, College on Court C" },
-        { time: "9:00 – 9:35",  activity: "3-Point Shooting Contest — 5 balls from 3 spots, top scores advance" },
-        { time: "9:35 – 10:20", activity: "1-on-1 Challenge — Single-elimination bracket, first to 3 baskets" },
-        { time: "10:20 – 10:30",activity: "Break / Water" },
-        { time: "10:30 – 11:10",activity: "3-on-3 Tournament — Round-robin, first to 7" },
-        { time: "11:10 – 11:30",activity: "3-Point Contest Finals — Top scorers compete for championship" },
-      ]},
-      { section: "Championship Lunch", items: [
-        { time: "11:55 – 12:35",activity: "Lunch + Individual Results Announced — Winners recognized at center court" },
-      ]},
-      { section: "🏆 Championship Games", items: [
-        { time: "12:35 – 12:45",activity: "Championship Game Intro — All campers gather, player walk-outs" },
-        { time: "12:45 – 1:25", activity: "Semifinal Games — #1 vs #4 and #2 vs #3 in both divisions simultaneously" },
-        { time: "1:25 – 1:35",  activity: "Break + Winners Advance / Bracket Updated" },
-        { time: "1:35 – 2:15",  activity: "Championship Game + Consolation Game (simultaneously, both divisions)" },
-      ]},
-      { section: "Awards Ceremony", items: [
-        { time: "2:15 – 2:50",  activity: "Awards & Closing Ceremony — Team trophies, individual awards, MVP" },
-        { time: "2:50 – 3:00",  activity: "Camp Closing — Group photo, final words, camp dismissed" },
-      ]},
+    label: "Championship", date: "Thursday, June 25", theme: "Championship Day",
+    rows: [
+      { id: "4-1",  time: "7:30 AM",  activity: "Doors Open & Warm-Up",                  note: "",                                               type: "normal"    },
+      { id: "4-2",  time: "8:00 AM",  activity: "Opening Ceremony",                      note: "All campers",                                    type: "highlight" },
+      { id: "4-3",  time: "8:15 AM",  activity: "KNOCKOUT CONTEST — All Camp",           note: "Last one standing wins!",                        type: "game"      },
+      { id: "4-4",  time: "9:00 AM",  activity: "FREE THROW CONTEST",                    note: "Best of 10, 2 at a time | Tie = Sudden Death",   type: "game"      },
+      { id: "4-5",  time: "9:30 AM",  activity: "3-POINT CONTEST",                       note: "3 balls at 5 spots | 1 min per shooter",         type: "game"      },
+      { id: "4-6",  time: "10:00 AM", activity: "1-ON-1 CONTEST",                        note: "First to 15 points (2s and 3s count)",           type: "game"      },
+      { id: "4-7",  time: "10:30 AM", activity: "3-ON-3 CONTEST",                        note: "First to 21 points (2s and 3s count)",           type: "game"      },
+      { id: "4-8",  time: "11:15 AM", activity: "LAYUP CONTEST (Team Event)",            note: "Right 1 min + Left 1 min | Team total wins",     type: "game"      },
+      { id: "4-9",  time: "12:00 PM", activity: "Lunch / Bracket Reveal",                note: "60 min",                                         type: "break"     },
+      { id: "4-10", time: "12:15 PM", activity: "SEMIFINAL GAMES — NBA Division",        note: "#1 vs #4 | #2 vs #3 | 2x12-min clock",          type: "game"      },
+      { id: "4-11", time: "12:55 PM", activity: "SEMIFINAL GAMES — College Division",    note: "#1 vs #4 | #2 vs #3 | 2x12-min clock",          type: "game"      },
+      { id: "4-12", time: "1:10 PM",  activity: "CHAMPIONSHIP GAME — NBA Division",      note: "Semifinal winners | 2x20-min clock",              type: "highlight" },
+      { id: "4-13", time: "1:50 PM",  activity: "CHAMPIONSHIP GAME — College Division",  note: "Semifinal winners | 2x20-min clock",              type: "highlight" },
+      { id: "4-14", time: "2:30 PM",  activity: "AWARDS CEREMONY",                       note: "Trophies, medals & camp awards",                 type: "highlight" },
+      { id: "4-15", time: "2:50 PM",  activity: "Photos & Closing Remarks",              note: "",                                               type: "normal"    },
+      { id: "4-16", time: "3:00 PM",  activity: "Dismissal",                             note: "",                                               type: "highlight" },
     ],
   },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function standingsByDivision(teams: CampTeam[], div: Division) {
-  return [...teams.filter(t => t.division === div)].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    const pdA = a.pointsFor - a.pointsAgainst;
-    const pdB = b.pointsFor - b.pointsAgainst;
-    return pdB - pdA;
-  });
+const STORAGE_KEY = "hilhi-camp-2026";
+
+// ─── Row background styles ──────────────────────────────────────────
+function rowBg(type: RowType) {
+  if (type === "section")   return "bg-[#1B2A5E]/70 border-l-4 border-[#F4A800]";
+  if (type === "game")      return "bg-[#F4A800]/8 border-l-4 border-[#F4A800]/40";
+  if (type === "break")     return "bg-white/3 opacity-60";
+  if (type === "highlight") return "bg-[#E03A3A]/8 border-l-4 border-[#E03A3A]/40";
+  return "hover:bg-white/4";
 }
 
-function Seed({ n }: { n: number }) {
-  const colors = ["bg-yellow-500", "bg-gray-400", "bg-amber-700", "bg-gray-600"];
-  return <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-black text-white ${colors[n-1] ?? "bg-gray-700"}`}>{n}</span>;
+function timeColor(type: RowType) {
+  return type === "section" ? "text-[#F4A800] font-bold" : "text-white/35";
 }
 
-export default function CampSchedulePage() {
-  const [data,       setData]       = useState<CampScheduleData | null>(null);
-  const [openDay,    setOpenDay]    = useState<number | null>(null);
-  const [activeTab,  setActiveTab]  = useState<"schedule"|"teams"|"standings"|"bracket"|"events">("schedule");
+function actColor(type: RowType) {
+  if (type === "section")   return "text-[#F4A800] font-bold";
+  if (type === "highlight") return "text-white font-semibold";
+  if (type === "game")      return "text-white font-medium";
+  if (type === "break")     return "text-white/40 italic";
+  return "text-white/75";
+}
 
+// ─── Main Component ─────────────────────────────────────────────────
+export default function CampHubPage() {
+  const [schedule, setSchedule]   = useState<DayData[]>(DEFAULT_SCHEDULE);
+  const [activeDay, setActiveDay] = useState(0);
+  const [editMode, setEditMode]   = useState(false);
+  const [isLive, setIsLive]       = useState(false);
+  const [liveDay, setLiveDay]     = useState(-1);
+  const [showAdmin, setShowAdmin] = useState(true);
+  const [saved, setSaved]         = useState(false);
+
+  // Load from localStorage on mount
   useEffect(() => {
-    fetch("/api/camp-schedule")
-      .then(r => r.json())
-      .then(d => {
-        setData(d);
-        if (d.currentDay > 0) setOpenDay(d.currentDay);
-        else setOpenDay(1);
-      })
-      .catch(() => {});
-    // Refresh every 60s for live updates
-    const iv = setInterval(() => {
-      fetch("/api/camp-schedule").then(r => r.json()).then(setData).catch(() => {});
-    }, 60000);
-    return () => clearInterval(iv);
+    try {
+      const s = localStorage.getItem(STORAGE_KEY);
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (parsed.schedule) setSchedule(parsed.schedule);
+        if (parsed.isLive !== undefined) setIsLive(parsed.isLive);
+        if (parsed.liveDay !== undefined) setLiveDay(parsed.liveDay);
+      }
+    } catch {}
   }, []);
 
-  if (!data) return (
-    <div className="min-h-screen bg-[#080D1A] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  // Save to localStorage
+  const persist = useCallback((newSchedule: DayData[], newIsLive: boolean, newLiveDay: number) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schedule: newSchedule, isLive: newIsLive, liveDay: newLiveDay }));
+    } catch {}
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }, []);
 
-  if (!data.active) return (
-    <main className="min-h-screen bg-[#080D1A] text-white flex flex-col">
-      <DynamicTitle pageKey="campSchedule" fallback="Camp Schedule | Hilhi Youth Basketball" />
-      <Navbar />
-      <div className="flex-1 flex items-center justify-center px-4">
-        <div className="text-center">
-          <div className="text-6xl mb-6">🏀</div>
-          <h1 className="text-4xl font-black text-white mb-3">Camp Schedule</h1>
-          <p className="text-gray-400 text-lg mb-2">Coming Soon</p>
-          <p className="text-gray-600 text-sm">The camp schedule will be posted here once the camp begins.</p>
-          <a href="/events" className="inline-flex items-center gap-2 mt-8 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all text-sm">
-            View Camp Events
-          </a>
-        </div>
-        {/* ── INDIVIDUAL EVENTS TAB ── */}
-        {activeTab === "events" && (
-          !(data.individualEvents ?? []).length ? (
-            <div className="glass rounded-2xl border border-white/10 p-12 text-center">
-              <div className="text-5xl mb-3">🎯</div>
-              <p className="text-gray-400 font-bold">Individual event lineup cards will be posted on Championship Day.</p>
-              <p className="text-gray-600 text-sm mt-1">Teams submit their nominees before 8:30 AM on Day 4.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {(["NBA","College"] as Division[]).map(div => {
-                const events = (data.individualEvents ?? []).filter(e => e.division === div);
-                if (!events.length) return null;
-                return (
-                  <div key={div}>
-                    <h3 className="text-white font-black text-lg mb-3 flex items-center gap-2">
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${div === "NBA" ? "bg-orange-500/20 text-orange-400" : "bg-blue-500/20 text-blue-400"}`}>{div} Division</span>
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {events.map(evt => (
-                        <div key={evt.id} className="glass rounded-2xl border border-white/10 p-5">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-white font-black text-base">{evt.name}</span>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                              evt.status === "live" ? "bg-green-500/20 text-green-400" :
-                              evt.status === "complete" ? "bg-gray-500/20 text-gray-400" :
-                              "bg-blue-500/20 text-blue-400"
-                            }`}>
-                              {evt.status === "live" ? "🔴 Live" : evt.status === "complete" ? "✅ Done" : "Upcoming"}
-                            </span>
-                          </div>
+  // Update a row field
+  function updateRow(dayIdx: number, rowId: string, field: keyof ScheduleRow, value: string) {
+    const next = schedule.map((d, di) => di !== dayIdx ? d : {
+      ...d,
+      rows: d.rows.map(r => r.id === rowId ? { ...r, [field]: value } : r),
+    });
+    setSchedule(next);
+    persist(next, isLive, liveDay);
+  }
 
-                          {evt.nominees.length > 0 && (
-                            <div className="space-y-2 mb-3">
-                              {evt.nominees.map(nom => {
-                                const team = data.teams.find(t => t.id === nom.teamId);
-                                if (!team || !nom.players.length) return null;
-                                return (
-                                  <div key={nom.teamId} className="flex items-start gap-2">
-                                    <span className="text-gray-500 text-xs font-semibold w-20 flex-shrink-0 pt-0.5">{team.name}</span>
-                                    <div className="flex flex-wrap gap-1">
-                                      {nom.players.map((p, i) => (
-                                        <span key={i} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-xs">{p}</span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+  // Delete a row
+  function deleteRow(dayIdx: number, rowId: string) {
+    const next = schedule.map((d, di) => di !== dayIdx ? d : {
+      ...d, rows: d.rows.filter(r => r.id !== rowId),
+    });
+    setSchedule(next);
+    persist(next, isLive, liveDay);
+  }
 
-                          {evt.status === "complete" && evt.winner && (
-                            <div className="pt-3 border-t border-white/10 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">🥇</span>
-                                <span className="text-yellow-400 font-black text-sm">{evt.winner}</span>
-                              </div>
-                              {evt.runnerUp && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">🥈</span>
-                                  <span className="text-gray-300 font-semibold text-sm">{evt.runnerUp}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        )}
+  // Add a row
+  function addRow(dayIdx: number) {
+    const next = schedule.map((d, di) => di !== dayIdx ? d : {
+      ...d, rows: [...d.rows, { id: `${dayIdx}-${Date.now()}`, time: "", activity: "New Event", note: "", type: "normal" as RowType }],
+    });
+    setSchedule(next);
+    persist(next, isLive, liveDay);
+  }
 
-      </div>
-      <Footer />
-    </main>
-  );
+  // Live toggle
+  function toggleLive(val: boolean) {
+    setIsLive(val);
+    const newLiveDay = val && liveDay < 0 ? 0 : liveDay;
+    setLiveDay(newLiveDay);
+    persist(schedule, val, newLiveDay);
+  }
 
-  const nbaDivision     = standingsByDivision(data.teams, "NBA");
-  const collegeDivision = standingsByDivision(data.teams, "College");
+  // Cycle live day
+  function cycleLiveDay() {
+    if (!isLive) return;
+    const next = (liveDay + 1) % 4;
+    setLiveDay(next);
+    persist(schedule, isLive, next);
+  }
+
+  // Reset
+  function resetSchedule() {
+    if (!confirm("Reset to original schedule? All edits will be lost.")) return;
+    const fresh = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE));
+    setSchedule(fresh);
+    persist(fresh, isLive, liveDay);
+  }
+
+  const current = schedule[activeDay];
 
   return (
-    <main className="min-h-screen bg-[#080D1A] text-white">
-      <Navbar />
+    <div className="min-h-screen bg-[#080C14] text-white" style={{ fontFamily: "system-ui, sans-serif" }}>
 
-      {/* Hero */}
-      <section className="pt-28 pb-12 px-4">
-        <div className="max-w-5xl mx-auto text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-black uppercase tracking-widest mb-4">
-              🏀 Live Camp Hub
-            </span>
-            <h1 className="text-4xl sm:text-6xl font-black text-white mb-3">
-              {data.campName} <span className="text-orange-400">{data.campYear}</span>
-            </h1>
-            <p className="text-gray-400 text-lg">June 22–25, 2025 · Follow the action in real time</p>
-            {data.currentDay > 0 && (
-              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 border border-green-500/30 text-green-400 font-bold text-sm">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                Day {data.currentDay} is Live!
-              </div>
-            )}
-          </motion.div>
-        </div>
-      </section>
+      {/* ── ADMIN BAR ── */}
+      {showAdmin && (
+        <div className="sticky top-0 z-50 bg-[#111827] border-b-2 border-[#F4A800] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[#F4A800] text-xs font-black uppercase tracking-widest">
+            Admin Controls {saved && <span className="ml-2 text-green-400 normal-case">Saved!</span>}
+          </span>
 
-      {/* Announcement Banner */}
-      {data.announcement && (
-        <div className="max-w-5xl mx-auto px-4 mb-6">
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-yellow-500/10 border border-yellow-500/30">
-            <Megaphone className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-            <p className="text-yellow-200 font-semibold text-sm whitespace-pre-wrap">{data.announcement}</p>
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Live / Public toggle */}
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded ${isLive ? "bg-[#E03A3A] text-white" : "bg-white/10 text-white/40"}`}>
+                {isLive ? "LIVE" : "PUBLIC"}
+              </span>
+              <button
+                onClick={() => toggleLive(!isLive)}
+                className={`w-11 h-6 rounded-full transition-colors relative ${isLive ? "bg-[#E03A3A]" : "bg-white/20"}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${isLive ? "left-5" : "left-0.5"}`} />
+              </button>
+              <span className="text-white/50 text-xs">LIVE</span>
+            </div>
+
+            {/* Edit toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-white/50 text-xs">Edit Schedule</span>
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className={`w-11 h-6 rounded-full transition-colors relative ${editMode ? "bg-green-600" : "bg-white/20"}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${editMode ? "left-5" : "left-0.5"}`} />
+              </button>
+            </div>
+
+            <button onClick={resetSchedule} className="text-xs text-white/40 hover:text-white/70 border border-white/20 px-2.5 py-1 rounded-md transition-colors">
+              Reset
+            </button>
+            <button onClick={() => setShowAdmin(false)} className="text-xs text-white/40 hover:text-white/70 border border-white/20 px-2.5 py-1 rounded-md transition-colors">
+              Hide
+            </button>
           </div>
         </div>
       )}
 
-      {/* Tab Nav */}
-      <div className="max-w-5xl mx-auto px-4 mb-6">
-        <div className="flex gap-1 p-1 glass rounded-2xl border border-white/10">
-          {(["schedule","teams","standings","bracket","events"] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all capitalize ${activeTab === tab ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "text-gray-400 hover:text-white"}`}>
-              {tab === "schedule" ? "📅 Schedule" : tab === "teams" ? "👥 Teams" : tab === "standings" ? "📊 Standings" : tab === "bracket" ? "🏆 Bracket" : "🎯 Events"}
+      {!showAdmin && (
+        <button onClick={() => setShowAdmin(true)} className="fixed bottom-4 right-4 z-50 bg-[#1B2A5E] border-2 border-[#F4A800] text-[#F4A800] text-xs font-black px-3 py-2 rounded-lg shadow-xl">
+          Admin
+        </button>
+      )}
+
+      {/* Edit mode banner */}
+      {editMode && (
+        <div className="bg-[#F4A800]/15 border-b border-[#F4A800]/30 py-2 text-center text-[#F4A800] text-xs font-bold tracking-wide">
+          EDIT MODE ON — Click any field below to change it
+        </div>
+      )}
+
+      {/* ── HERO ── */}
+      <div className="relative bg-gradient-to-b from-[#0D1520] to-[#080C14] px-4 pt-10 pb-8 text-center overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% -20%, rgba(244,168,0,.1) 0%, transparent 60%)" }} />
+        <div className="relative z-10 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-bold mb-5 tracking-wider">
+            <span className={`w-2 h-2 rounded-full ${isLive ? "bg-orange-400 animate-pulse" : "bg-white/30"}`} />
+            {isLive ? "LIVE CAMP HUB" : "CAMP SCHEDULE HUB"}
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black uppercase leading-tight mb-2">Hilhi Summer Youth Hoop Camp</h1>
+          <div className="text-5xl md:text-7xl font-black mb-3" style={{ color: "#F4A800" }}>2026</div>
+          <p className="text-white/45 mb-5">June 22–25, 2026 · Follow the action in real time</p>
+          <div className="flex flex-wrap justify-center gap-2 mb-5">
+            <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">Grades 1st–8th</span>
+            <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">7:30 AM – 3:00 PM</span>
+            <span className="text-xs px-3 py-1.5 rounded-full font-bold" style={{ background: "#F4A800", color: "#0B0F1A" }}>NBA Teams: 1st–4th Grade</span>
+            <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#E03A3A]">College Teams: 5th–8th Grade</span>
+          </div>
+          {/* Live day indicator */}
+          <button
+            onClick={cycleLiveDay}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm border-none cursor-pointer transition-all ${isLive && liveDay >= 0 ? "bg-green-600 shadow-lg shadow-green-900/40" : "bg-white/10 text-white/40"}`}
+            title={isLive ? "Click to change live day" : "Turn on LIVE in admin bar first"}
+          >
+            <span className={`w-2 h-2 rounded-full ${isLive && liveDay >= 0 ? "bg-white animate-pulse" : "bg-white/30"}`} />
+            {isLive && liveDay >= 0 ? `Day ${liveDay + 1} is Live!` : "No Live Day Set"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── TAB BAR ── */}
+      <div className="sticky top-0 z-40 bg-[#0D1520]/95 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-4xl mx-auto flex overflow-x-auto">
+          {schedule.map((d, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveDay(i)}
+              className={`relative flex-shrink-0 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${
+                activeDay === i ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/70"
+              }`}
+            >
+              {d.label}
+              {i === 3 && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-black bg-[#E03A3A] text-white">FINALS</span>}
+              {isLive && liveDay === i && (
+                <span className="absolute top-2 right-1.5 w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              )}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 pb-24 space-y-4">
+      {/* ── SCHEDULE CONTENT ── */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
 
-        {/* ── SCHEDULE TAB ── */}
-        {activeTab === "schedule" && DAYS.map(d => (
-          <div key={d.day} className={`glass rounded-2xl border overflow-hidden transition-all ${d.day === data.currentDay ? "border-orange-500/40" : "border-white/10"}`}>
-            <button onClick={() => setOpenDay(openDay === d.day ? null : d.day)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition-colors">
-              <div className="flex items-center gap-3 text-left">
-                {d.day === data.currentDay && <span className="w-2.5 h-2.5 bg-orange-400 rounded-full animate-pulse flex-shrink-0" />}
-                <div>
-                  <div className="text-white font-black text-base">{d.label}</div>
-                  <div className="text-gray-500 text-xs mt-0.5 flex items-center gap-1"><Calendar className="w-3 h-3" />{d.date}</div>
+        {/* Day header */}
+        <div className="mb-4">
+          <h2 className="text-lg font-black uppercase" style={{ color: "#F4A800" }}>
+            {current.label}
+            {activeDay === 3 && <span className="ml-2 text-sm text-[#E03A3A]">— Championship Day</span>}
+          </h2>
+          <p className="text-xs text-white/35 mt-0.5">{current.date}, 2026 · {current.theme}</p>
+        </div>
+
+        {/* ── SCHEDULE TABLE ── */}
+        <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
+
+          {/* Column headers */}
+          <div className={`grid px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-white/30 bg-white/5 border-b border-white/10 ${editMode ? "grid-cols-[90px_1fr_1fr_32px]" : "grid-cols-[90px_1fr_1fr]"}`}>
+            <div>Time</div>
+            <div>Activity</div>
+            <div>Notes</div>
+            {editMode && <div />}
+          </div>
+
+          {/* Rows */}
+          {current.rows.map((row) => (
+            <div
+              key={row.id}
+              className={`grid px-4 py-2.5 border-b border-white/5 last:border-0 items-start ${rowBg(row.type)} ${editMode ? "grid-cols-[90px_1fr_1fr_32px]" : "grid-cols-[90px_1fr_1fr]"}`}
+            >
+              {/* Time */}
+              {editMode ? (
+                <input
+                  value={row.time}
+                  onChange={e => updateRow(activeDay, row.id, "time", e.target.value)}
+                  className="w-full bg-white/10 border border-white/20 rounded-md px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-[#F4A800]/60"
+                />
+              ) : (
+                <div className={`text-xs font-mono pt-0.5 ${timeColor(row.type)}`}>{row.time}</div>
+              )}
+
+              {/* Activity */}
+              {editMode ? (
+                <div className="px-1 space-y-1">
+                  <input
+                    value={row.activity}
+                    onChange={e => updateRow(activeDay, row.id, "activity", e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-md px-2 py-1 text-xs text-white focus:outline-none focus:border-[#F4A800]/60"
+                  />
+                  <select
+                    value={row.type}
+                    onChange={e => updateRow(activeDay, row.id, "type", e.target.value)}
+                    className="w-full bg-[#111827] border border-white/20 rounded-md px-2 py-1 text-[10px] text-white/60 focus:outline-none"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="section">Section Header</option>
+                    <option value="game">Game</option>
+                    <option value="break">Break / Lunch</option>
+                    <option value="highlight">Highlight</option>
+                  </select>
                 </div>
-              </div>
-              {openDay === d.day ? <ChevronUp className="w-5 h-5 text-gray-500 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />}
+              ) : (
+                <div className={`text-xs leading-snug ${actColor(row.type)}`}>
+                  {row.activity}
+                  {row.note && <div className="text-[11px] text-white/28 mt-0.5 sm:hidden">{row.note}</div>}
+                </div>
+              )}
+
+              {/* Note */}
+              {editMode ? (
+                <input
+                  value={row.note}
+                  onChange={e => updateRow(activeDay, row.id, "note", e.target.value)}
+                  placeholder="notes..."
+                  className="w-full mx-1 bg-white/10 border border-white/20 rounded-md px-2 py-1 text-xs text-white/55 focus:outline-none focus:border-[#F4A800]/60"
+                />
+              ) : (
+                <div className="text-[11px] text-white/28 hidden sm:block pt-0.5 leading-relaxed">{row.note}</div>
+              )}
+
+              {/* Delete */}
+              {editMode && (
+                <button onClick={() => deleteRow(activeDay, row.id)} className="text-white/20 hover:text-red-400 transition-colors text-sm self-center">
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+
+          {/* Add row */}
+          {editMode && (
+            <button
+              onClick={() => addRow(activeDay)}
+              className="w-full py-3 text-xs text-white/30 hover:text-[#F4A800] hover:bg-white/3 transition-all border-t border-white/5 flex items-center justify-center gap-1.5"
+            >
+              + Add row to {current.label}
             </button>
+          )}
+        </div>
 
-            {openDay === d.day && (
-              <div className="border-t border-white/10 px-5 py-4 space-y-5">
-                {d.blocks.map(block => (
-                  <div key={block.section}>
-                    <div className="text-xs font-black text-orange-400 uppercase tracking-widest mb-2">{block.section}</div>
-                    <div className="space-y-1">
-                      {block.items.map((item, i) => (
-                        <div key={i} className="flex gap-4 py-1.5 border-b border-white/5 last:border-0">
-                          <div className="flex-shrink-0 w-28 flex items-center gap-1 text-blue-400 text-xs font-bold">
-                            <Clock className="w-3 h-3 flex-shrink-0" />{item.time}
-                          </div>
-                          <div className="text-gray-300 text-sm">{item.activity}</div>
-                        </div>
-                      ))}
+        {/* ── Seeding (Days 1-3) ── */}
+        {activeDay < 3 && (
+          <div className="mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-2">Seeding Schedule — Both Divisions</h3>
+            <div className="rounded-xl border border-white/10 overflow-hidden bg-white/2">
+              {[
+                { label: "Round 1 — Jun 22", games: "Team A vs Team B · Team C vs Team D" },
+                { label: "Round 2 — Jun 23", games: "Team A vs Team C · Team B vs Team D" },
+                { label: "Round 3 — Jun 24", games: "Team A vs Team D · Team B vs Team C" },
+              ].map((r, i) => (
+                <div key={i} className={`flex items-center gap-3 px-4 py-3 border-b border-white/4 last:border-0 ${i === activeDay ? "bg-[#F4A800]/8" : ""}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${i === activeDay ? "bg-[#F4A800] text-black" : "bg-white/10 text-white/40"}`}>{i + 1}</div>
+                  <div>
+                    <div className="text-sm font-semibold text-white/75">{r.label}</div>
+                    <div className="text-xs text-white/28 mt-0.5">{r.games}</div>
+                  </div>
+                  {i === activeDay && <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-[#E03A3A]">TODAY</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Championship Bracket ── */}
+        {activeDay === 3 && (
+          <div className="mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-2">Championship Bracket</h3>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {[
+                { name: "NBA Division", grade: "1st-4th Grade", color: "#1B2A5E", accent: "#F4A800" },
+                { name: "College Division", grade: "5th-8th Grade", color: "#E03A3A", accent: "#fff" },
+              ].map(d => (
+                <div key={d.name} className="rounded-xl border border-white/10 overflow-hidden">
+                  <div className="px-4 py-2.5 text-sm font-black uppercase" style={{ background: d.color, color: d.accent }}>
+                    {d.name} <span className="font-normal text-[11px] opacity-60">· {d.grade}</span>
+                  </div>
+                  <div className="p-4 bg-white/3 space-y-3">
+                    <p className="text-[10px] font-bold uppercase text-white/28 mb-1">Semifinals — 12:15 PM</p>
+                    {[["#1","#4"],["#2","#3"]].map(([a,b],i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/35">{a} Seed</div>
+                        <span className="text-white/20 text-[10px]">vs</span>
+                        <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/35">{b} Seed</div>
+                        <span className="text-white/20">›</span>
+                        <div className="flex-1 border border-dashed border-white/25 rounded py-1.5 text-center text-white/28">Winner</div>
+                      </div>
+                    ))}
+                    <p className="text-[10px] font-bold uppercase text-white/28 mt-2 mb-1">Championship — 1:10 PM</p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/28">SF1 Win</div>
+                      <span className="text-white/20 text-[10px]">vs</span>
+                      <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/28">SF2 Win</div>
+                      <span className="text-white/20">›</span>
+                      <div className="flex-1 rounded py-1.5 text-center text-xs font-black" style={{ background: `${d.color}30`, border: `1px solid ${d.accent}`, color: d.accent }}>CHAMP</div>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Contest Rules ── */}
+        {activeDay === 3 && (
+          <div className="mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-2">Individual Contest Rules</h3>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {[
+                { abbr:"FT",  name:"Free Throw",      sub:"1-2 players/team", rule:"Best of 10 shots, 2 at a time. Tie goes to sudden death.", color:"#1B4FC4" },
+                { abbr:"3PT", name:"3-Point Contest", sub:"1-2 players/team", rule:"3 balls at 5 spots around arc. 1 minute per shooter.", color:"#C41B1B" },
+                { abbr:"1v1", name:"1-on-1",          sub:"1 player/team",    rule:"First to 15 points. 2-pointers and 3-pointers count.", color:"#1B7A3C" },
+                { abbr:"3v3", name:"3-on-3",          sub:"3 players/team",   rule:"First to 21 points. 2-pointers and 3-pointers count.", color:"#7B3F00" },
+                { abbr:"LAY", name:"Layup Contest",   sub:"Full team",        rule:"Right hand 1 min + Left hand 1 min. Team total wins.", color:"#5B21B6" },
+                { abbr:"KO",  name:"Knockout",        sub:"ALL campers",      rule:"Everyone in line. Make your shot before the person behind you. Last standing wins!", color:"#B91C1C" },
+              ].map(c => (
+                <div key={c.name} className="rounded-xl overflow-hidden border border-white/10">
+                  <div className="flex items-center gap-3 px-3 py-2.5" style={{ background: c.color }}>
+                    <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black">{c.abbr}</div>
+                    <div><div className="text-sm font-bold">{c.name}</div><div className="text-[11px] opacity-60">{c.sub}</div></div>
+                  </div>
+                  <div className="px-3 py-2.5 bg-white/4 text-xs text-white/50 leading-relaxed">{c.rule}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── 4-Day Overview ── */}
+        <div className="rounded-xl border border-white/10 overflow-hidden">
+          <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/28 bg-white/3 border-b border-white/10">
+            4-Day Camp Overview
+          </div>
+          {schedule.map((d, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveDay(i)}
+              className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0" style={{ background: i === 3 ? "#E03A3A" : "#1B2A5E" }}>
+                <span className="text-[9px] opacity-60 leading-none">Jun</span>
+                <span className="text-base font-black leading-tight">{22 + i}</span>
               </div>
-            )}
-          </div>
-        ))}
-
-        {/* ── TEAMS TAB ── */}
-        {activeTab === "teams" && (
-          data.teams.length === 0 ? (
-            <div className="glass rounded-2xl border border-white/10 p-12 text-center">
-              <Users className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-              <p className="text-gray-400 font-bold">Teams haven&apos;t been announced yet.</p>
-              <p className="text-gray-600 text-sm mt-1">Check back on Day 1 after team assignments!</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {(["NBA","College"] as Division[]).map(div => {
-                const divTeams = data.teams.filter(t => t.division === div);
-                if (!divTeams.length) return null;
-                return (
-                  <div key={div}>
-                    <h3 className="text-white font-black text-lg mb-3 flex items-center gap-2">
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${div === "NBA" ? "bg-orange-500/20 text-orange-400" : "bg-blue-500/20 text-blue-400"}`}>{div} Division</span>
-                      <span className="text-gray-500 text-sm font-normal">{div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade"}</span>
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {divTeams.map(team => (
-                        <div key={team.id} className="glass rounded-2xl border border-white/10 p-5">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <div className="text-white font-black text-xl">{team.name || "TBA"}</div>
-                              {team.coach && <div className="text-gray-500 text-xs mt-0.5">Coach: {team.coach}</div>}
-                            </div>
-                            <div className="text-right">
-                              <div className="text-white font-black text-lg">{team.wins}–{team.losses}</div>
-                              <div className="text-gray-500 text-xs">W–L</div>
-                            </div>
-                          </div>
-                          {team.players.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {team.players.map((p, i) => (
-                                <span key={i} className="px-2.5 py-1 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-xs font-medium">{p}</span>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-gray-600 text-xs italic">Roster TBA</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        )}
-
-        {/* ── STANDINGS TAB ── */}
-        {activeTab === "standings" && (
-          data.teams.length === 0 ? (
-            <div className="glass rounded-2xl border border-white/10 p-12 text-center">
-              <Trophy className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-              <p className="text-gray-400 font-bold">Standings will be posted after games begin.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {([["NBA","1st – 4th Grade"], ["College","5th – 8th Grade"]] as [Division, string][]).map(([div, label]) => {
-                const sorted = standingsByDivision(data.teams, div);
-                if (!sorted.length) return null;
-                return (
-                  <div key={div} className="glass rounded-2xl border border-white/10 overflow-hidden">
-                    <div className={`px-5 py-3 flex items-center gap-2 border-b border-white/10 ${div === "NBA" ? "bg-orange-500/10" : "bg-blue-500/10"}`}>
-                      <span className={`font-black text-base ${div === "NBA" ? "text-orange-400" : "text-blue-400"}`}>{div} Division</span>
-                      <span className="text-gray-500 text-sm">{label}</span>
-                    </div>
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-white/5 bg-white/5">
-                          <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Seed</th>
-                          <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Team</th>
-                          <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">W</th>
-                          <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">L</th>
-                          <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">PF</th>
-                          <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">PA</th>
-                          <th className="px-3 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">PD</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sorted.map((team, i) => (
-                          <tr key={team.id} className={`border-b border-white/5 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
-                            <td className="px-5 py-3"><Seed n={i+1} /></td>
-                            <td className="px-5 py-3 text-white font-bold text-sm">{team.name}</td>
-                            <td className="px-3 py-3 text-center text-green-400 font-black text-sm">{team.wins}</td>
-                            <td className="px-3 py-3 text-center text-red-400 font-black text-sm">{team.losses}</td>
-                            <td className="px-3 py-3 text-center text-gray-400 text-sm">{team.pointsFor}</td>
-                            <td className="px-3 py-3 text-center text-gray-400 text-sm">{team.pointsAgainst}</td>
-                            <td className={`px-3 py-3 text-center font-bold text-sm ${(team.pointsFor - team.pointsAgainst) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                              {team.pointsFor - team.pointsAgainst > 0 ? "+" : ""}{team.pointsFor - team.pointsAgainst}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="px-5 py-2 text-gray-600 text-xs border-t border-white/5">
-                      W = Wins · L = Losses · PF = Points For · PA = Points Against · PD = Point Differential
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        )}
-
-        {/* ── BRACKET TAB ── */}
-        {activeTab === "bracket" && (
-          <div className="space-y-8">
-            {(["NBA","College"] as Division[]).map(div => {
-              const accentColor = div === "NBA" ? "text-orange-400" : "text-blue-400";
-              const bgColor     = div === "NBA" ? "bg-orange-500/10" : "bg-blue-500/10";
-              const gradeLabel  = div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade";
-              const getTeam     = (id: string) => data.teams.find(t => t.id === id);
-
-              const semis  = data.bracketGames.filter(g => g.division === div && g.round === "semi");
-              const finals = data.bracketGames.filter(g => g.division === div && g.round === "final");
-              const thirds = data.bracketGames.filter(g => g.division === div && g.round === "3rd");
-
-              // Build 2 semi slots (real game or placeholder)
-              const semiSlots = [0, 1].map(i => semis[i] ?? null);
-              const finalGame = finals[0] ?? null;
-              const thirdGame = thirds[0] ?? null;
-
-              // Render one team row inside a game box
-              const TeamRow = ({ name, score, winner, isChamp }: { name: string; score: number | null; winner: boolean; isChamp: boolean }) => (
-                <div className={`flex items-center justify-between px-3 py-2 border-b last:border-0 border-white/10 ${winner && isChamp ? "bg-yellow-500/10" : ""}`}>
-                  <span className={`text-sm font-bold truncate max-w-[130px] ${winner && isChamp ? "text-yellow-300" : winner ? "text-white" : name === "TBA" ? "text-gray-600 italic font-normal" : "text-gray-300"}`}>
-                    {winner && isChamp && "🏆 "}{name}
-                  </span>
-                  <span className={`text-base font-black ml-2 flex-shrink-0 ${winner && isChamp ? "text-yellow-400" : winner ? "text-white" : "text-gray-700"}`}>
-                    {score !== null ? score : "—"}
-                  </span>
-                </div>
-              );
-
-              // Render a full game box (real or placeholder)
-              const GameCard = ({ game, label, isChamp, isThird }: {
-                game: (typeof semis)[0] | null; label: string; isChamp?: boolean; isThird?: boolean;
-              }) => {
-                const borderClass = isChamp ? "border-yellow-500/40" : "border-white/15";
-                const headerBg    = isChamp ? "bg-yellow-500/15" : "bg-white/5";
-                const labelColor  = isChamp ? "text-yellow-400" : isThird ? "text-gray-500" : accentColor;
-                if (!game) {
-                  // Placeholder
-                  return (
-                    <div className={`rounded-xl overflow-hidden border ${borderClass}`} style={{ minWidth: 165 }}>
-                      <div className={`px-3 py-1.5 flex items-center justify-between ${headerBg}`}>
-                        <span className={`text-[10px] font-black uppercase tracking-wider ${labelColor}`}>{label}</span>
-                        <span className="text-[10px] text-gray-700">Upcoming</span>
-                      </div>
-                      <div className="bg-[#070c18]">
-                        <TeamRow name="TBA" score={null} winner={false} isChamp={!!isChamp} />
-                        <TeamRow name="TBA" score={null} winner={false} isChamp={!!isChamp} />
-                      </div>
-                    </div>
-                  );
-                }
-                const t1   = getTeam(game.team1Id);
-                const t2   = getTeam(game.team2Id);
-                const s1   = game.score1, s2 = game.score2;
-                const done = game.status === "final";
-                const w1   = done && s1 !== null && s2 !== null && s1 > s2;
-                const w2   = done && s1 !== null && s2 !== null && s2 > s1;
-                return (
-                  <div className={`rounded-xl overflow-hidden border ${borderClass}`} style={{ minWidth: 165 }}>
-                    <div className={`px-3 py-1.5 flex items-center justify-between ${headerBg}`}>
-                      <span className={`text-[10px] font-black uppercase tracking-wider ${labelColor}`}>{label}</span>
-                      {game.status === "live" && (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-red-400">
-                          <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />LIVE
-                        </span>
-                      )}
-                      {done && <span className="text-[10px] text-gray-600 font-bold">FINAL</span>}
-                      {game.status === "scheduled" && !done && <span className="text-[10px] text-gray-700">Upcoming</span>}
-                    </div>
-                    <div className="bg-[#070c18]">
-                      <TeamRow name={t1?.name ?? "TBA"} score={s1} winner={w1} isChamp={!!isChamp} />
-                      <TeamRow name={t2?.name ?? "TBA"} score={s2} winner={w2} isChamp={!!isChamp} />
-                    </div>
-                    {game.court && <div className="px-3 py-1 bg-white/[0.03] text-[10px] text-gray-600">Court {game.court}</div>}
-                  </div>
-                );
-              };
-
-              return (
-                <div key={div} className="glass rounded-2xl border border-white/10 overflow-hidden">
-                  {/* Division header */}
-                  <div className={`px-5 py-3 border-b border-white/10 ${bgColor}`}>
-                    <span className={`font-black text-base ${accentColor}`}>{div} Division Championship Bracket</span>
-                    <span className="text-gray-500 text-xs ml-2">{gradeLabel}</span>
-                  </div>
-
-                  <div className="p-5">
-                    {/* ── Visual bracket tree ── always shown ── */}
-                    <div className="overflow-x-auto pb-2">
-                      <div className="flex items-stretch gap-0" style={{ minWidth: 520 }}>
-
-                        {/* Column 1 — Semifinals */}
-                        <div className="flex flex-col justify-around gap-6 flex-shrink-0" style={{ width: 190 }}>
-                          <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1 text-center">Semifinals</div>
-                          {semiSlots.map((g, idx) => (
-                            <GameCard key={idx} game={g} label={`Semi ${idx + 1}`} />
-                          ))}
-                        </div>
-
-                        {/* Connector lines */}
-                        <div className="flex flex-col justify-around flex-shrink-0" style={{ width: 50 }}>
-                          <div className="flex flex-col items-center" style={{ height: "50%" }}>
-                            <div style={{ flex: 1 }} />
-                            <div className="w-full flex">
-                              <div className="flex-1 border-t-2 border-r-2 border-white/20 rounded-tr-lg" style={{ height: 32 }} />
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-center" style={{ height: "50%" }}>
-                            <div className="w-full flex">
-                              <div className="flex-1 border-b-2 border-r-2 border-white/20 rounded-br-lg" style={{ height: 32 }} />
-                            </div>
-                            <div style={{ flex: 1 }} />
-                          </div>
-                        </div>
-
-                        {/* Column 2 — Championship */}
-                        <div className="flex flex-col justify-center flex-shrink-0" style={{ width: 190 }}>
-                          <div className="text-[10px] font-black text-yellow-500/70 uppercase tracking-widest mb-2 text-center">🏆 Championship</div>
-                          <GameCard game={finalGame} label="Championship" isChamp />
-                        </div>
-
-                      </div>
-                    </div>
-
-                    {/* 3rd place game — always shown below */}
-                    <div className="mt-6 pt-5 border-t border-white/10">
-                      <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">3rd Place Game</div>
-                      <div style={{ maxWidth: 190 }}>
-                        <GameCard game={thirdGame} label="3rd Place" isThird />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {/* ── INDIVIDUAL EVENTS TAB ── */}
-        {activeTab === "events" && (
-          !(data.individualEvents ?? []).length ? (
-            <div className="glass rounded-2xl border border-white/10 p-12 text-center">
-              <div className="text-5xl mb-3">🎯</div>
-              <p className="text-gray-400 font-bold">Individual event lineup cards will be posted on Championship Day.</p>
-              <p className="text-gray-600 text-sm mt-1">Teams submit their nominees before 8:30 AM on Day 4.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {(["NBA","College"] as Division[]).map(div => {
-                const events = (data.individualEvents ?? []).filter(e => e.division === div);
-                if (!events.length) return null;
-                return (
-                  <div key={div}>
-                    <h3 className="text-white font-black text-lg mb-3 flex items-center gap-2">
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${div === "NBA" ? "bg-orange-500/20 text-orange-400" : "bg-blue-500/20 text-blue-400"}`}>{div} Division</span>
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {events.map(evt => (
-                        <div key={evt.id} className="glass rounded-2xl border border-white/10 p-5">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-white font-black text-base">{evt.name}</span>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                              evt.status === "live" ? "bg-green-500/20 text-green-400" :
-                              evt.status === "complete" ? "bg-gray-500/20 text-gray-400" :
-                              "bg-blue-500/20 text-blue-400"
-                            }`}>
-                              {evt.status === "live" ? "🔴 Live" : evt.status === "complete" ? "✅ Done" : "Upcoming"}
-                            </span>
-                          </div>
-
-                          {evt.nominees.length > 0 && (
-                            <div className="space-y-2 mb-3">
-                              {evt.nominees.map(nom => {
-                                const team = data.teams.find(t => t.id === nom.teamId);
-                                if (!team || !nom.players.length) return null;
-                                return (
-                                  <div key={nom.teamId} className="flex items-start gap-2">
-                                    <span className="text-gray-500 text-xs font-semibold w-20 flex-shrink-0 pt-0.5">{team.name}</span>
-                                    <div className="flex flex-wrap gap-1">
-                                      {nom.players.map((p, i) => (
-                                        <span key={i} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-xs">{p}</span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {evt.status === "complete" && evt.winner && (
-                            <div className="pt-3 border-t border-white/10 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">🥇</span>
-                                <span className="text-yellow-400 font-black text-sm">{evt.winner}</span>
-                              </div>
-                              {evt.runnerUp && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">🥈</span>
-                                  <span className="text-gray-300 font-semibold text-sm">{evt.runnerUp}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        )}
-
+              <div className="flex-1">
+                <div className="text-sm font-bold text-white/75">{d.label}{i === 3 ? " — Championship" : ""}</div>
+                <div className="text-xs text-white/28">{d.date}, 2026 · {d.theme}</div>
+              </div>
+              {isLive && liveDay === i && <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-600">LIVE</span>}
+              <span className="text-white/20">›</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <Footer />
-    </main>
+
+      <footer className="bg-[#0D1520] border-t border-white/10 py-6 text-center">
+        <div className="text-base font-black uppercase"><span style={{ color: "#F4A800" }}>HILHI</span> Youth Hoop Camp 2026</div>
+        <div className="text-xs text-white/28 mt-1">June 22–25, 2026 · Grades 1st–8th · NBA: 1st–4th · College: 5th–8th</div>
+      </footer>
+    </div>
   );
 }

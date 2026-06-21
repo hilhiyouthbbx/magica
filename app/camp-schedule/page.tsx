@@ -126,9 +126,9 @@ export default function CampHubPage() {
   const [isLive, setIsLive]       = useState(false);
   const [liveDay, setLiveDay]     = useState(-1);
 
-  // Load schedule from API, fall back to default
-  useEffect(() => {
-    fetch("/api/camp-schedule")
+  // Fetch live status and schedule from API — no cache
+  function fetchStatus() {
+    fetch("/api/camp-schedule", { cache: "no-store" })
       .then(r => r.json())
       .then((d: { dailySchedule?: DayData[]; isLive?: boolean; liveDay?: number }) => {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
@@ -138,8 +138,20 @@ export default function CampHubPage() {
         if (d.liveDay !== undefined) setLiveDay(d.liveDay);
       })
       .catch(() => {
-        // API unavailable — stay on DEFAULT_SCHEDULE
+        // API unavailable — stay on defaults
       });
+  }
+
+  // Load on mount, poll every 30 s, and re-fetch when tab regains focus
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30_000);
+    const onFocus = () => fetchStatus();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   const current = schedule[activeDay];

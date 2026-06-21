@@ -131,17 +131,45 @@ export default function CampHubPage() {
   const [showAdmin, setShowAdmin] = useState(true);
   const [saved, setSaved]         = useState(false);
 
-  // Load from localStorage on mount
+  // Load schedule from API (admin hub changes), fall back to localStorage
   useEffect(() => {
+    // Always restore isLive / liveDay from localStorage first
     try {
       const s = localStorage.getItem(STORAGE_KEY);
       if (s) {
         const parsed = JSON.parse(s);
-        if (parsed.schedule) setSchedule(parsed.schedule);
-        if (parsed.isLive !== undefined) setIsLive(parsed.isLive);
+        if (parsed.isLive  !== undefined) setIsLive(parsed.isLive);
         if (parsed.liveDay !== undefined) setLiveDay(parsed.liveDay);
       }
     } catch {}
+
+    // Fetch schedule from server — this is what the admin hub saves to
+    fetch("/api/camp-schedule")
+      .then(r => r.json())
+      .then((d: { dailySchedule?: DayData[] }) => {
+        if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
+          setSchedule(d.dailySchedule);
+        } else {
+          // No server schedule yet — fall back to localStorage
+          try {
+            const s = localStorage.getItem(STORAGE_KEY);
+            if (s) {
+              const parsed = JSON.parse(s);
+              if (parsed.schedule) setSchedule(parsed.schedule);
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {
+        // API unavailable — fall back to localStorage
+        try {
+          const s = localStorage.getItem(STORAGE_KEY);
+          if (s) {
+            const parsed = JSON.parse(s);
+            if (parsed.schedule) setSchedule(parsed.schedule);
+          }
+        } catch {}
+      });
   }, []);
 
   // Save to localStorage

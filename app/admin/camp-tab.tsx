@@ -1048,7 +1048,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       )}
 
       {/* ── SCHEDULE ── */}
-      {section === "schedule" && <ScheduleTab />}
+      {section === "schedule" && <ScheduleTab adminKey={adminKey} />}
 
       {/* ── SETTINGS ── */}
       {section === "settings" && (

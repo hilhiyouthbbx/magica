@@ -40,17 +40,7 @@ function fromMins(total: number): string {
   return `${h12}:${m.toString().padStart(2, "0")} ${ap}`;
 }
 
-// Shift all rows from `startIdx` onward by `deltaMins`
-function shiftTimes(rows: ScheduleRow[], startIdx: number, deltaMins: number): ScheduleRow[] {
-  return rows.map((r, i) => {
-    if (i < startIdx) return r;
-    const mins = toMins(r.time);
-    if (mins < 0) return r;
-    return { ...r, time: fromMins(mins + deltaMins) };
-  });
-}
-
-// ─── Default Schedule Data ────────────────────────────────────────────────────
+// ─── Default Schedule ─────────────────────────────────────────────────────────
 const DEFAULT: DayData[] = [
   {
     label: "Day 1", date: "Monday, June 22",
@@ -65,7 +55,7 @@ const DEFAULT: DayData[] = [
       { id:"1-8",  time:"11:00 AM", activity:"Seeding Round 1 — NBA Division",                note:"2x12-min clock | 1st-4th Grade",   type:"game"      },
       { id:"1-9",  time:"11:30 AM", activity:"Seeding Round 1 — College Division",            note:"2x12-min clock | 5th-8th Grade",   type:"game"      },
       { id:"1-10", time:"12:00 PM", activity:"Lunch Break",                                   note:"45 min",                           type:"break"     },
-      { id:"1-11", time:"12:45 PM",  activity:"SKILL STATION — Shooting Form & Arc",           note:"Both courts",                      type:"section"   },
+      { id:"1-11", time:"12:45 PM", activity:"SKILL STATION — Shooting Form & Arc",           note:"Both courts",                      type:"section"   },
       { id:"1-12", time:"1:30 PM",  activity:"SKILL STATION — Defensive Positioning",         note:"Both courts",                      type:"section"   },
       { id:"1-13", time:"2:15 PM",  activity:"Cool Down & Camp Debrief",                      note:"",                                 type:"normal"    },
       { id:"1-14", time:"2:45 PM",  activity:"End of Day",                                    note:"",                                 type:"highlight" },
@@ -75,14 +65,14 @@ const DEFAULT: DayData[] = [
     label: "Day 2", date: "Tuesday, June 23",
     rows: [
       { id:"2-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
-      { id:"2-2",  time:"8:00 AM",  activity:"TEAM FORMATION & NAMING (5 min)",                  note:"NBA: 1st-4th | College: 5th-8th",         type:"highlight" },
+      { id:"2-2",  time:"8:00 AM",  activity:"TEAM FORMATION & NAMING",                          note:"NBA: 1st-4th | College: 5th-8th",         type:"highlight" },
       { id:"2-3",  time:"8:15 AM",  activity:"SKILL STATION — Post Moves & Low-Post Finishing",  note:"Both courts",                             type:"section"   },
       { id:"2-4",  time:"9:00 AM",  activity:"SKILL STATION — Shooting Off Screens",             note:"Both courts",                             type:"section"   },
       { id:"2-5",  time:"9:45 AM",  activity:"Water Break",                                      note:"5 min",                                   type:"break"     },
       { id:"2-6",  time:"10:00 AM", activity:"Seeding Round 2 — NBA Division",                   note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
       { id:"2-7",  time:"11:00 AM", activity:"Seeding Round 2 — College Division",               note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
       { id:"2-8",  time:"12:00 PM", activity:"Lunch Break",                                      note:"45 min",                                  type:"break"     },
-      { id:"2-9",  time:"12:45 PM",  activity:"SKILL STATION — Transition Offense / Fast Break",  note:"Both courts",                             type:"section"   },
+      { id:"2-9",  time:"12:45 PM", activity:"SKILL STATION — Transition Offense / Fast Break",  note:"Both courts",                             type:"section"   },
       { id:"2-10", time:"1:30 PM",  activity:"SKILL STATION — 3-Point & Free Throw Practice",   note:"Both courts",                             type:"section"   },
       { id:"2-11", time:"2:15 PM",  activity:"Championship Contest Preview & Practice",          note:"All campers",                             type:"normal"    },
       { id:"2-12", time:"2:45 PM",  activity:"End of Day",                                       note:"",                                        type:"highlight" },
@@ -118,17 +108,15 @@ const DEFAULT: DayData[] = [
       { id:"4-8",  time:"11:15 AM", activity:"LAYUP CONTEST (Team Event)",            note:"Right 1 min + Left 1 min | Team total wins",    type:"game"      },
       { id:"4-9",  time:"12:00 PM", activity:"Lunch / Bracket Reveal",                note:"45 min",                                        type:"break"     },
       { id:"4-10", time:"12:45 PM", activity:"SEMIFINAL GAMES — NBA Division",        note:"#1 vs #4 | #2 vs #3 | 2x12-min clock",         type:"game"      },
-      { id:"4-11", time:"1:25 PM", activity:"SEMIFINAL GAMES — College Division",    note:"#1 vs #4 | #2 vs #3 | 2x12-min clock",         type:"game"      },
-      { id:"4-12", time:"1:40 PM",  activity:"CHAMPIONSHIP GAME — NBA Division",      note:"Semifinal winners | 2x20-min clock",             type:"highlight" },
-      { id:"4-13", time:"2:20 PM",  activity:"CHAMPIONSHIP GAME — College Division",  note:"Semifinal winners | 2x20-min clock",             type:"highlight" },
+      { id:"4-11", time:"1:25 PM",  activity:"SEMIFINAL GAMES — College Division",    note:"#1 vs #4 | #2 vs #3 | 2x12-min clock",         type:"game"      },
+      { id:"4-12", time:"1:40 PM",  activity:"CHAMPIONSHIP GAME — NBA Division",      note:"Semifinal winners | 2x20-min clock",            type:"highlight" },
+      { id:"4-13", time:"2:20 PM",  activity:"CHAMPIONSHIP GAME — College Division",  note:"Semifinal winners | 2x20-min clock",            type:"highlight" },
       { id:"4-14", time:"3:00 PM",  activity:"AWARDS CEREMONY",                       note:"Trophies, medals & camp awards",                type:"highlight" },
       { id:"4-15", time:"3:20 PM",  activity:"Photos & Closing Remarks",              note:"",                                              type:"normal"    },
       { id:"4-16", time:"3:30 PM",  activity:"Dismissal",                             note:"",                                              type:"highlight" },
     ],
   },
 ];
-
-const STORAGE_KEY = "hilhi-schedule-2026";
 
 // ─── Row color helpers ────────────────────────────────────────────────────────
 function rowBg(type: RowType, selected: boolean) {
@@ -150,26 +138,41 @@ function actColor(type: RowType) {
   return "text-gray-300";
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export function ScheduleTab() {
+// ─── Component ────────────────────────────────────────────────────────────────
+export function ScheduleTab({ adminKey }: { adminKey: string }) {
   const [days, setDays]             = useState<DayData[]>(DEFAULT);
   const [activeDay, setActiveDay]   = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editBuf, setEditBuf]       = useState<ScheduleRow | null>(null);
   const [autoShift, setAutoShift]   = useState(true);
   const [flash, setFlash]           = useState("");
+  const [loading, setLoading]       = useState(true);
 
-  // Load saved schedule
+  // ── Load from server on mount ──
   useEffect(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEY);
-      if (s) setDays(JSON.parse(s));
-    } catch {}
+    setLoading(true);
+    fetch("/api/camp-schedule")
+      .then(r => r.json())
+      .then((d: { dailySchedule?: DayData[] }) => {
+        if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
+          setDays(d.dailySchedule);
+        }
+        // else keep DEFAULT
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  function persist(next: DayData[]) {
+  // ── Save to server ──
+  async function persist(next: DayData[]) {
     setDays(next);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    try {
+      await fetch(`/api/camp-schedule?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dailySchedule: next }),
+      });
+    } catch {}
   }
 
   function notify(msg: string) {
@@ -179,10 +182,9 @@ export function ScheduleTab() {
 
   const current = days[activeDay];
 
-  // ── Select a row to edit ──
+  // ── Select a row ──
   function selectRow(row: ScheduleRow) {
     if (selectedId === row.id) {
-      // Clicking again deselects
       setSelectedId(null);
       setEditBuf(null);
     } else {
@@ -191,7 +193,7 @@ export function ScheduleTab() {
     }
   }
 
-  // ── Save edits for the selected row ──
+  // ── Commit edits ──
   function commitEdit() {
     if (!editBuf) return;
     const rows = current.rows;
@@ -200,7 +202,6 @@ export function ScheduleTab() {
 
     let newRows = rows.map(r => r.id === editBuf.id ? { ...editBuf } : r);
 
-    // If time changed and autoShift is on, shift subsequent rows
     if (autoShift) {
       const oldMins = toMins(rows[idx].time);
       const newMins = toMins(editBuf.time);
@@ -216,13 +217,14 @@ export function ScheduleTab() {
       }
     }
 
-    persist(days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows }));
+    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
+    persist(nextDays);
     setSelectedId(null);
     setEditBuf(null);
-    if (!flash) notify("✓ Saved");
+    if (!flash) notify("✓ Saved to server");
   }
 
-  // ── Delete selected row (auto-adjust times) ──
+  // ── Delete with auto-adjust ──
   function deleteSelected() {
     if (!selectedId) return;
     const rows = current.rows;
@@ -232,30 +234,29 @@ export function ScheduleTab() {
     let newRows = rows.filter(r => r.id !== selectedId);
 
     if (autoShift && idx < rows.length - 1) {
-      // Duration = gap between deleted row and next row
       const deletedMins = toMins(rows[idx].time);
       const nextMins    = toMins(rows[idx + 1].time);
       if (deletedMins >= 0 && nextMins >= 0) {
         const duration = nextMins - deletedMins;
-        // Shift everything from idx onward back by that duration
         newRows = newRows.map((r, i) => {
           if (i < idx) return r;
           const m = toMins(r.time);
           if (m < 0) return r;
           return { ...r, time: fromMins(m - duration) };
         });
-        notify(`🗑 Removed "${rows[idx].activity}" · shifted ${newRows.length - idx} rows back ${duration} min`);
+        notify(`🗑 Removed · shifted ${newRows.length - idx} rows back ${duration} min`);
       }
     } else {
       notify(`🗑 Removed "${rows[idx].activity}"`);
     }
 
-    persist(days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows }));
+    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
+    persist(nextDays);
     setSelectedId(null);
     setEditBuf(null);
   }
 
-  // ── Add row below selected (or at end) ──
+  // ── Add row ──
   function addRow() {
     const rows = current.rows;
     let insertIdx = rows.length;
@@ -265,7 +266,6 @@ export function ScheduleTab() {
       const idx = rows.findIndex(r => r.id === selectedId);
       if (idx >= 0) {
         insertIdx = idx + 1;
-        // Default time = midpoint between this and next row
         const curMins  = toMins(rows[idx].time);
         const nextMins = idx + 1 < rows.length ? toMins(rows[idx + 1].time) : curMins + 30;
         if (curMins >= 0 && nextMins >= 0) defaultTime = fromMins(Math.round((curMins + nextMins) / 2));
@@ -280,19 +280,29 @@ export function ScheduleTab() {
       time: defaultTime, activity: "New Event", note: "", type: "normal",
     };
     const newRows = [...rows.slice(0, insertIdx), newRow, ...rows.slice(insertIdx)];
-    persist(days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows }));
+    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
+    persist(nextDays);
     setSelectedId(newRow.id);
     setEditBuf({ ...newRow });
   }
 
   function reset() {
-    if (!confirm("Reset to original schedule? All edits will be lost.")) return;
+    if (!confirm("Reset to original schedule? This will update the public page too.")) return;
     persist(JSON.parse(JSON.stringify(DEFAULT)));
     setSelectedId(null);
     setEditBuf(null);
+    notify("✓ Reset to default");
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-gray-500 text-sm">
+        Loading schedule…
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
 
@@ -309,7 +319,7 @@ export function ScheduleTab() {
         </div>
 
         <div className="flex items-center gap-2">
-          {flash && <span className="text-sm text-blue-300 font-medium">{flash}</span>}
+          {flash && <span className="text-sm text-blue-300 font-medium animate-pulse">{flash}</span>}
           <button onClick={addRow}
             className="px-3 py-2 bg-white/8 hover:bg-white/12 border border-white/15 rounded-lg text-sm text-gray-300 hover:text-white transition-all">
             + Add Row
@@ -327,13 +337,9 @@ export function ScheduleTab() {
           className={`relative w-10 h-5 rounded-full transition-colors ${autoShift ? "bg-blue-600" : "bg-gray-700"}`}>
           <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${autoShift ? "left-5" : "left-0.5"}`} />
         </button>
-        <span className="text-sm text-gray-300 font-medium">
-          Auto-adjust times
-        </span>
+        <span className="text-sm text-gray-300 font-medium">Auto-adjust times</span>
         <span className="text-xs text-gray-600">
-          {autoShift
-            ? "ON — deleting or moving a row shifts all times below it automatically"
-            : "OFF — only the selected row changes"}
+          {autoShift ? "ON — deletes and time changes shift all rows below automatically" : "OFF — only the selected row changes"}
         </span>
       </div>
 
@@ -342,7 +348,6 @@ export function ScheduleTab() {
         {/* ── Schedule table ── */}
         <div className="flex-1 rounded-2xl border border-white/10 overflow-hidden bg-[#0f1117]">
 
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/10">
             <div>
               <span className="text-white font-bold">{current.label}</span>
@@ -351,95 +356,59 @@ export function ScheduleTab() {
             <span className="text-xs text-gray-600">{current.rows.length} events · click any row to edit</span>
           </div>
 
-          {/* Rows */}
           {current.rows.map((row) => {
-            const isSelected = selectedId === row.id;
+            const isSel = selectedId === row.id;
             return (
-              <div key={row.id}
-                onClick={() => selectRow(row)}
-                className={`grid grid-cols-[90px_1fr_auto] items-start px-4 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-all ${rowBg(row.type, isSelected)}`}>
-
-                {/* Time */}
-                <div className={`text-xs font-mono pt-0.5 ${isSelected ? "text-blue-300" : timeColor(row.type)}`}>
-                  {row.time}
-                </div>
-
-                {/* Activity + note */}
+              <div key={row.id} onClick={() => selectRow(row)}
+                className={`grid grid-cols-[90px_1fr_auto] items-start px-4 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-all ${rowBg(row.type, isSel)}`}>
+                <div className={`text-xs font-mono pt-0.5 ${isSel ? "text-blue-300" : timeColor(row.type)}`}>{row.time}</div>
                 <div>
-                  <div className={`text-sm leading-snug ${isSelected ? "text-white font-medium" : actColor(row.type)}`}>
-                    {row.activity}
-                  </div>
-                  {row.note && (
-                    <div className={`text-xs mt-0.5 ${isSelected ? "text-blue-300/70" : "text-gray-600"}`}>
-                      {row.note}
-                    </div>
-                  )}
+                  <div className={`text-sm leading-snug ${isSel ? "text-white font-medium" : actColor(row.type)}`}>{row.activity}</div>
+                  {row.note && <div className={`text-xs mt-0.5 ${isSel ? "text-blue-300/70" : "text-gray-600"}`}>{row.note}</div>}
                 </div>
-
-                {/* Edit indicator */}
-                <div className={`text-sm pl-2 transition-opacity ${isSelected ? "opacity-100 text-blue-400" : "opacity-0 group-hover:opacity-40 text-gray-600"}`}>
-                  ✏️
-                </div>
+                <div className={`text-sm pl-2 ${isSel ? "opacity-100 text-blue-400" : "opacity-0"}`}>✏️</div>
               </div>
             );
           })}
 
-          {/* Add row at bottom */}
           <button onClick={addRow}
             className="w-full py-3 text-sm text-gray-700 hover:text-blue-400 hover:bg-white/3 transition-all border-t border-white/5 flex items-center justify-center gap-1">
             <span className="text-lg leading-none">+</span> add row
           </button>
         </div>
 
-        {/* ── Edit Panel (shown when a row is selected) ── */}
+        {/* ── Edit Panel ── */}
         {editBuf && (
           <div className="w-72 shrink-0 rounded-2xl border border-blue-500/30 bg-[#0f1729] p-4 space-y-3 sticky top-4">
-
             <div className="flex items-center justify-between">
               <h3 className="text-white font-bold text-sm">Edit Row</h3>
-              <button onClick={() => { setSelectedId(null); setEditBuf(null); }}
-                className="text-gray-500 hover:text-white text-lg leading-none">×</button>
+              <button onClick={() => { setSelectedId(null); setEditBuf(null); }} className="text-gray-500 hover:text-white text-lg leading-none">×</button>
             </div>
 
-            {/* Time */}
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Time</label>
-              <input
-                value={editBuf.time}
-                onChange={e => setEditBuf({ ...editBuf, time: e.target.value })}
+              <input value={editBuf.time} onChange={e => setEditBuf({ ...editBuf, time: e.target.value })}
                 placeholder="9:00 AM"
-                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-blue-500/60"
-              />
-              {autoShift && <p className="text-xs text-blue-400/70 mt-1">⏱ Changing time will shift all rows below</p>}
+                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-blue-500/60" />
+              {autoShift && <p className="text-xs text-blue-400/70 mt-1">⏱ Changing time shifts all rows below</p>}
             </div>
 
-            {/* Activity */}
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Activity</label>
-              <input
-                value={editBuf.activity}
-                onChange={e => setEditBuf({ ...editBuf, activity: e.target.value })}
-                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/60"
-              />
+              <input value={editBuf.activity} onChange={e => setEditBuf({ ...editBuf, activity: e.target.value })}
+                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/60" />
             </div>
 
-            {/* Note */}
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Note</label>
-              <input
-                value={editBuf.note}
-                onChange={e => setEditBuf({ ...editBuf, note: e.target.value })}
+              <input value={editBuf.note} onChange={e => setEditBuf({ ...editBuf, note: e.target.value })}
                 placeholder="Optional detail..."
-                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-gray-300 placeholder-gray-700 focus:outline-none focus:border-blue-500/60"
-              />
+                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-gray-300 placeholder-gray-700 focus:outline-none focus:border-blue-500/60" />
             </div>
 
-            {/* Row type */}
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Row Style</label>
-              <select
-                value={editBuf.type}
-                onChange={e => setEditBuf({ ...editBuf, type: e.target.value as RowType })}
+              <select value={editBuf.type} onChange={e => setEditBuf({ ...editBuf, type: e.target.value as RowType })}
                 className="w-full px-3 py-2 bg-[#1a1f2e] border border-white/15 rounded-lg text-sm text-gray-300 focus:outline-none cursor-pointer">
                 <option value="normal">Normal</option>
                 <option value="section">Section header (gold)</option>
@@ -449,7 +418,6 @@ export function ScheduleTab() {
               </select>
             </div>
 
-            {/* Action buttons */}
             <div className="flex gap-2 pt-1">
               <button onClick={commitEdit}
                 className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-all">
@@ -457,8 +425,7 @@ export function ScheduleTab() {
               </button>
               <button onClick={deleteSelected}
                 className="flex-1 py-2.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 hover:text-red-300 text-sm font-bold rounded-lg transition-all">
-                Delete
-                {autoShift && <span className="text-xs font-normal ml-1">+ adjust</span>}
+                Delete{autoShift && <span className="text-xs font-normal ml-1">+ adjust</span>}
               </button>
             </div>
           </div>

@@ -162,17 +162,20 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
   const [autoShift, setAutoShift]   = useState(true);
   const [flash, setFlash]           = useState("");
   const [loading, setLoading]       = useState(true);
+  const [isLive, setIsLive]         = useState(false);
+  const [liveDay, setLiveDay]       = useState(-1);
 
   // ── Load from server on mount ──
   useEffect(() => {
     setLoading(true);
     fetch("/api/camp-schedule")
       .then(r => r.json())
-      .then((d: { dailySchedule?: DayData[] }) => {
+      .then((d: { dailySchedule?: DayData[]; isLive?: boolean; liveDay?: number }) => {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
           setDays(d.dailySchedule);
         }
-        // else keep DEFAULT
+        if (d.isLive !== undefined) setIsLive(d.isLive);
+        if (d.liveDay !== undefined) setLiveDay(d.liveDay);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -187,6 +190,19 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dailySchedule: next }),
       });
+    } catch {}
+  }
+
+  async function persistLive(live: boolean, day: number) {
+    setIsLive(live);
+    setLiveDay(day);
+    try {
+      await fetch(`/api/camp-schedule?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isLive: live, liveDay: day }),
+      });
+      notify(live ? `🔴 LIVE — ${day >= 0 ? "Day " + (day + 1) : "On Air"}` : "⚫ Off Air — schedule is public");
     } catch {}
   }
 
@@ -320,6 +336,44 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
 
   return (
     <div className="space-y-4">
+
+      {/* ── Live Controls ── */}
+      <div className={`flex flex-wrap items-center gap-4 px-4 py-3 rounded-xl border transition-colors ${isLive ? "bg-red-950/40 border-red-700/50" : "bg-[#1a1f2e] border-white/10"}`}>
+        <span className={`text-xs font-black uppercase tracking-widest ${isLive ? "text-red-400" : "text-gray-500"}`}>
+          {isLive ? "🔴 LIVE" : "📡 Broadcast"}
+        </span>
+
+        {/* On/Off toggle */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">Off Air</span>
+          <button
+            onClick={() => persistLive(!isLive, isLive ? liveDay : (liveDay >= 0 ? liveDay : 0))}
+            className={`relative w-11 h-6 rounded-full transition-colors ${isLive ? "bg-red-600" : "bg-gray-700"}`}>
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${isLive ? "left-5" : "left-0.5"}`} />
+          </button>
+          <span className={`text-xs font-bold ${isLive ? "text-red-400" : "text-gray-600"}`}>{isLive ? "LIVE" : "PUBLIC"}</span>
+        </div>
+
+        {/* Active day picker — only when live */}
+        {isLive && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Active day:</span>
+            {days.map((d, i) => (
+              <button key={i}
+                onClick={() => persistLive(true, i)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${liveDay === i ? "bg-red-600 text-white shadow shadow-red-900/50" : "bg-white/8 text-gray-500 hover:text-white hover:bg-white/12"}`}>
+                {i < 3 ? `D${i + 1}` : "Champ"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isLive && liveDay >= 0 && (
+          <span className="ml-auto text-xs text-red-300 font-medium">
+            Showing live: {days[liveDay]?.label ?? ""}
+          </span>
+        )}
+      </div>
 
       {/* ── Day tabs + controls ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ScheduleTab } from "./ScheduleTab";
 import {
   Plus, Save, Trash2, X, Loader2, CheckCircle,
   Users, GripVertical, RefreshCw, Mail
@@ -22,7 +21,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [data,        setData]        = useState<CampScheduleData | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [saved,       setSaved]       = useState(false);
-  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"bracket"|"events"|"schedule"|"settings">("teams");
+  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"bracket"|"events"|"settings">("teams");
   const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
   const [rosterLoad,  setRosterLoad]  = useState(false);
   const [dragOver,    setDragOver]    = useState<string | null>(null);
@@ -369,7 +368,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           ["standings", "📊 Standings"],
           ["bracket",   "🏆 Bracket"],
           ["events",    "🎯 Individual Events"],
-          ["schedule",  "📅 Schedule"],
           ["settings",  "⚙️ Settings"],
         ] as const).map(([s, label]) => (
           <button key={s} onClick={() => setSection(s)}
@@ -1046,9 +1044,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           ))}
         </div>
       )}
-
-      {/* ── SCHEDULE ── */}
-      {section === "schedule" && <ScheduleTab />}
 
       {/* ── SETTINGS ── */}
       {section === "settings" && (

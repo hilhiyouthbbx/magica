@@ -379,7 +379,7 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
 
         {/* ── Edit Panel ── */}
         {editBuf && (
-          <div className="w-72 shrink-0 rounded-2xl border border-blue-500/30 bg-[#0f1729] p-4 space-y-3 sticky top-4">
+          <div className="w-72 shrink-0 rounded-2xl border border-blue-500/40 bg-[#162035] p-4 space-y-3 sticky top-4">
             <div className="flex items-center justify-between">
               <h3 className="text-white font-bold text-sm">Edit Row</h3>
               <button onClick={() => { setSelectedId(null); setEditBuf(null); }} className="text-gray-500 hover:text-white text-lg leading-none">×</button>
@@ -389,27 +389,27 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Time</label>
               <input value={editBuf.time} onChange={e => setEditBuf({ ...editBuf, time: e.target.value })}
                 placeholder="9:00 AM"
-                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-blue-500/60" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
               {autoShift && <p className="text-xs text-blue-400/70 mt-1">⏱ Changing time shifts all rows below</p>}
             </div>
 
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Activity</label>
               <input value={editBuf.activity} onChange={e => setEditBuf({ ...editBuf, activity: e.target.value })}
-                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500/60" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
             </div>
 
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Note</label>
               <input value={editBuf.note} onChange={e => setEditBuf({ ...editBuf, note: e.target.value })}
                 placeholder="Optional detail..."
-                className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-sm text-gray-300 placeholder-gray-700 focus:outline-none focus:border-blue-500/60" />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
             </div>
 
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Row Style</label>
               <select value={editBuf.type} onChange={e => setEditBuf({ ...editBuf, type: e.target.value as RowType })}
-                className="w-full px-3 py-2 bg-[#1a1f2e] border border-white/15 rounded-lg text-sm text-gray-300 focus:outline-none cursor-pointer">
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer">
                 <option value="normal">Normal</option>
                 <option value="section">Section header (gold)</option>
                 <option value="game">Game / Contest (gold outline)</option>

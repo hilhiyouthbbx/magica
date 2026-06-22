@@ -1002,21 +1002,33 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
   // ── Check-in helpers ──────────────────────────────────────────────────────
   async function toggleCheckIn(contactId: string, day: DayKey, checked: boolean) {
-    const updated = {
-      ...checkIns,
+    // Optimistic update — functional form avoids stale-closure race conditions
+    setCheckIns(prev => ({
+      ...prev,
       [contactId]: {
-        ...(checkIns[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+        ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
         [day]: checked,
       },
-    };
-    setCheckIns(updated); // optimistic
-    const res = await fetch(`/api/camp-checkin?key=${adminKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "toggle", contactId, day, checked }),
-    });
-    const json = await res.json() as { checkIns?: CheckInMap };
-    if (json.checkIns) setCheckIns(json.checkIns);
+    }));
+    try {
+      await fetch(`/api/camp-checkin?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle", contactId, day, checked }),
+      });
+      // Do NOT setCheckIns from the server response — doing so overwrites any
+      // optimistic updates that happened while this request was in-flight,
+      // causing previously-checked names to visually reset.
+    } catch {
+      // On network error, revert this toggle
+      setCheckIns(prev => ({
+        ...prev,
+        [contactId]: {
+          ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+          [day]: !checked,
+        },
+      }));
+    }
   }
 
   async function sendAbsentEmails() {

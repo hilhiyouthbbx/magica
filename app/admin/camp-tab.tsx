@@ -31,6 +31,7 @@ interface ScheduleRow {
 interface DayData {
   label: string;
   date: string;
+  theme: string;
   rows: ScheduleRow[];
 }
 
@@ -58,7 +59,7 @@ function fromMins(total: number): string {
 // ─── Default Schedule ─────────────────────────────────────────────────────────
 const DEFAULT: DayData[] = [
   {
-    label: "Day 1", date: "Monday, June 22",
+    label: "Day 1", date: "Monday, June 22", theme: "Fundamentals",
     rows: [
       { id:"1-1",  time:"8:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
       { id:"1-2",  time:"9:00 AM",  activity:"Welcome, Camp Overview & Introductions",        note:"All campers",                      type:"highlight" },
@@ -77,7 +78,7 @@ const DEFAULT: DayData[] = [
     ],
   },
   {
-    label: "Day 2", date: "Tuesday, June 23",
+    label: "Day 2", date: "Tuesday, June 23", theme: "Teamwork & Competition",
     rows: [
       { id:"2-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
       { id:"2-2",  time:"9:00 AM",  activity:"TEAM FORMATION & NAMING",                          note:"NBA: 1st-4th | College: 5th-8th",         type:"highlight" },
@@ -95,7 +96,7 @@ const DEFAULT: DayData[] = [
     ],
   },
   {
-    label: "Day 3", date: "Wednesday, June 24",
+    label: "Day 3", date: "Wednesday, June 24", theme: "Championship Prep",
     rows: [
       { id:"3-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                         note:"",                                        type:"normal"    },
       { id:"3-2",  time:"9:00 AM",  activity:"SKILL STATION — Pick & Roll Offense",        note:"Both courts",                             type:"section"   },
@@ -112,7 +113,7 @@ const DEFAULT: DayData[] = [
     ],
   },
   {
-    label: "Championship", date: "Thursday, June 25",
+    label: "Championship", date: "Thursday, June 25", theme: "Championship Day",
     rows: [
       { id:"4-1",  time:"8:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                                type:"normal"    },
       { id:"4-2",  time:"9:00 AM",  activity:"Opening Ceremony",                      note:"All campers",                                     type:"highlight" },

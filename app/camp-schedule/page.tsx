@@ -265,7 +265,7 @@ export default function CampHubPage() {
       <tr style="${typeLabel(row.type)}">
         <td class="tc">${row.time}</td>
         <td class="ac">${row.activity}</td>
-        <td class="nc">${row.note}</td>
+        <td class="nc">${row.note ?? ''}</td>
       </tr>`).join("");
 
     const html = `<!DOCTYPE html>
@@ -301,8 +301,8 @@ export default function CampHubPage() {
 <body>
   <div class="header">
     <h1>🏀 Hilhi Youth Basketball Camp 2026</h1>
-    <div class="day-title">${current.label} — ${current.theme}</div>
-    <div class="meta">${current.date}, 2026 · Hillsboro, OR · 8:30 AM – 3:00 PM</div>
+    <div class="day-title">${current.label} — ${current.theme ?? ''}</div>
+    <div class="meta">${current.date ?? ''}, 2026 · Hillsboro, OR · 8:30 AM – 3:00 PM</div>
     <div class="badges">
       <span class="badge badge-gray">Grades 1st–8th</span>
       <span class="badge badge-gold">NBA Division · 1st–4th Grade</span>

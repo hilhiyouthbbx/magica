@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import {
   Plus, Save, Trash2, X, Loader2, CheckCircle,
-  Users, GripVertical, RefreshCw, Mail, Edit
+  Users, GripVertical, RefreshCw, Mail, Edit, ChevronUp, ChevronDown
 } from "lucide-react";
 import type {
   CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
@@ -158,6 +158,8 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
   const [days, setDays]             = useState<DayData[]>(DEFAULT);
   const [activeDay, setActiveDay]   = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dragRowId,  setDragRowId]  = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [editBuf, setEditBuf]       = useState<ScheduleRow | null>(null);
   const [autoShift, setAutoShift]   = useState(true);
   const [flash, setFlash]           = useState("");
@@ -298,6 +300,38 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
     persist(nextDays);
     setSelectedId(null);
     setEditBuf(null);
+  }
+
+
+  // ── Move row up / down ──
+  function moveRow(dir: "up" | "down", rowId?: string) {
+    const id = rowId ?? selectedId;
+    if (!id) return;
+    const rows = current.rows;
+    const idx  = rows.findIndex(r => r.id === id);
+    if (idx < 0) return;
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= rows.length) return;
+    const newRows = [...rows];
+    [newRows[idx], newRows[swapIdx]] = [newRows[swapIdx], newRows[idx]];
+    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
+    persist(nextDays);
+  }
+
+  // ── Drag-to-reorder ──
+  function onDropRow(targetId: string) {
+    if (!dragRowId || dragRowId === targetId) { setDragRowId(null); setDragOverId(null); return; }
+    const rows = current.rows;
+    const fromIdx = rows.findIndex(r => r.id === dragRowId);
+    const toIdx   = rows.findIndex(r => r.id === targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const newRows = [...rows];
+    const [moved] = newRows.splice(fromIdx, 1);
+    newRows.splice(toIdx, 0, moved);
+    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
+    persist(nextDays);
+    setDragRowId(null);
+    setDragOverId(null);
   }
 
   // ── Add row ──
@@ -465,17 +499,46 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
             <span className="text-xs text-gray-600">{current.rows.length} events · click any row to edit</span>
           </div>
 
-          {current.rows.map((row) => {
-            const isSel = selectedId === row.id;
+          {current.rows.map((row, rowIdx) => {
+            const isSel   = selectedId === row.id;
+            const isDragging = dragRowId === row.id;
+            const isDragOver = dragOverId === row.id && dragRowId !== row.id;
             return (
-              <div key={row.id} onClick={() => selectRow(row)}
-                className={`grid grid-cols-[90px_1fr_auto] items-start px-4 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-all ${rowBg(row.type, isSel)}`}>
-                <div className={`text-xs font-mono pt-0.5 ${isSel ? "text-blue-300" : timeColor(row.type)}`}>{row.time}</div>
+              <div key={row.id}
+                draggable
+                onDragStart={e => { e.dataTransfer.effectAllowed = "move"; setDragRowId(row.id); }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverId(row.id); }}
+                onDrop={e => { e.preventDefault(); onDropRow(row.id); }}
+                onDragEnd={() => { setDragRowId(null); setDragOverId(null); }}
+                onClick={() => selectRow(row)}
+                className={`grid grid-cols-[28px_90px_1fr_56px] items-center px-2 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-all select-none
+                  ${isDragOver ? "border-t-2 border-t-blue-400 bg-blue-900/20" : ""}
+                  ${isDragging ? "opacity-40" : ""}
+                  ${rowBg(row.type, isSel)}`}>
+                {/* Drag grip */}
+                <div className="flex items-center justify-center text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing">
+                  <GripVertical className="w-4 h-4" />
+                </div>
+                <div className={`text-xs font-mono ${isSel ? "text-blue-300" : timeColor(row.type)}`}>{row.time}</div>
                 <div>
                   <div className={`text-sm leading-snug ${isSel ? "text-white font-medium" : actColor(row.type)}`}>{row.activity}</div>
                   {row.note && <div className={`text-xs mt-0.5 ${isSel ? "text-blue-300/70" : "text-gray-600"}`}>{row.note}</div>}
                 </div>
-                <div className={`text-sm pl-2 ${isSel ? "opacity-100 text-blue-400" : "opacity-0"}`}>✏️</div>
+                {/* Up / Down arrows — always visible */}
+                <div className="flex flex-col items-center gap-0.5 pl-1">
+                  <button onClick={e => { e.stopPropagation(); selectRow(row); moveRow("up", row.id); }}
+                    disabled={rowIdx === 0}
+                    className={`transition-colors leading-none rounded p-0.5 disabled:opacity-20 disabled:cursor-not-allowed
+                      ${isSel ? "text-blue-300 hover:text-blue-100" : "text-gray-500 hover:text-gray-300"}`}>
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); selectRow(row); moveRow("down", row.id); }}
+                    disabled={rowIdx === current.rows.length - 1}
+                    className={`transition-colors leading-none rounded p-0.5 disabled:opacity-20 disabled:cursor-not-allowed
+                      ${isSel ? "text-blue-300 hover:text-blue-100" : "text-gray-500 hover:text-gray-300"}`}>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -505,6 +568,20 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
               <button onClick={deleteSelected}
                 className="flex-1 py-2.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 hover:text-red-300 text-sm font-bold rounded-lg transition-all">
                 🗑 Delete{autoShift && <span className="text-xs font-normal ml-1">+ shift</span>}
+              </button>
+            </div>
+
+            {/* ── Move up / down ── */}
+            <div className="flex gap-2">
+              <button onClick={() => moveRow("up")}
+                disabled={current.rows.findIndex(r => r.id === editBuf.id) === 0}
+                className="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-sm rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronUp className="w-4 h-4" /> Move Up
+              </button>
+              <button onClick={() => moveRow("down")}
+                disabled={current.rows.findIndex(r => r.id === editBuf.id) === current.rows.length - 1}
+                className="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-sm rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+                Move Down <ChevronDown className="w-4 h-4" />
               </button>
             </div>
 

@@ -170,12 +170,13 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
     setLoading(true);
     fetch("/api/camp-schedule")
       .then(r => r.json())
-      .then((d: { dailySchedule?: DayData[]; isLive?: boolean; liveDay?: number }) => {
+      .then((d: { dailySchedule?: DayData[]; active?: boolean; currentDay?: number }) => {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
           setDays(d.dailySchedule);
         }
-        if (d.isLive !== undefined) setIsLive(d.isLive);
-        if (d.liveDay !== undefined) setLiveDay(d.liveDay);
+        if (d.active !== undefined) setIsLive(d.active);
+        // currentDay is 1-4 in storage; convert to 0-indexed (-1 = none)
+        if (d.currentDay !== undefined) setLiveDay(d.currentDay > 0 ? d.currentDay - 1 : -1);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -200,7 +201,8 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
       const res = await fetch(`/api/camp-schedule?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isLive: live, liveDay: day }),
+        // Use the real CampScheduleData fields: active + currentDay (1-indexed, 0=none)
+        body: JSON.stringify({ active: live, currentDay: live ? day + 1 : 0 }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

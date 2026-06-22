@@ -130,12 +130,13 @@ export default function CampHubPage() {
   function fetchStatus() {
     fetch("/api/camp-schedule", { cache: "no-store" })
       .then(r => r.json())
-      .then((d: { dailySchedule?: DayData[]; isLive?: boolean; liveDay?: number }) => {
+      .then((d: { dailySchedule?: DayData[]; active?: boolean; currentDay?: number }) => {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
           setSchedule(d.dailySchedule);
         }
-        if (d.isLive !== undefined) setIsLive(d.isLive);
-        if (d.liveDay !== undefined) setLiveDay(d.liveDay);
+        // active = live mode on/off; currentDay is 1-indexed (0 = none)
+        if (d.active !== undefined) setIsLive(d.active);
+        if (d.currentDay !== undefined) setLiveDay(d.currentDay > 0 ? d.currentDay - 1 : -1);
       })
       .catch(() => {
         // API unavailable — stay on defaults

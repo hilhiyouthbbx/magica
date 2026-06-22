@@ -183,7 +183,7 @@ export default function CampHubPage() {
   const [seedingGames, setSeedingGames] = useState<SeedingGame[]>([]);
   const [individualEvents, setIndividualEvents] = useState<IndividualEvent[]>([]);
   // Top-level view toggle
-  const [activeView, setActiveView] = useState<"schedule" | "rosters">("schedule");
+  const [activeView, setActiveView] = useState<"schedule" | "rosters" | "brackets">("schedule");
 
   const fetchStatus = useCallback(() => {
     fetch("/api/camp-schedule", { cache: "no-store" })
@@ -289,6 +289,12 @@ export default function CampHubPage() {
             >
               👥 Teams
             </button>
+            <button
+              onClick={() => setActiveView("brackets")}
+              className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "brackets" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
+            >
+              🏆 Brackets
+            </button>
           </div>
           {schedule.map((d, i) => (
             <button
@@ -385,6 +391,226 @@ export default function CampHubPage() {
         )}
 
         {/* ── SCHEDULE VIEW ── */}
+        {activeView === "brackets" && (() => {
+          const teamName = (id: string) => teams.find(t => t.id === id)?.name || "";
+
+          function GameCard({ game, accent }: { game: BracketGame; accent: string }) {
+            const t1 = teamName(game.team1Id) || "TBD";
+            const t2 = teamName(game.team2Id) || "TBD";
+            const done = game.status === "final";
+            const live = game.status === "live";
+            const w1 = done && game.score1 !== null && game.score2 !== null && game.score1 > game.score2;
+            const w2 = done && game.score1 !== null && game.score2 !== null && game.score2 > game.score1;
+            return (
+              <div className={`rounded-xl border overflow-hidden text-sm ${live ? "border-red-500/60 shadow shadow-red-500/10" : "border-white/10"}`}>
+                {live && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-red-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Live Now</span>
+                  </div>
+                )}
+                {done && <div className="px-3 py-1 bg-white/5 text-[10px] font-bold text-white/30 uppercase tracking-widest">Final</div>}
+                <div className="bg-white/3 divide-y divide-white/5">
+                  {([{name: t1, score: game.score1, win: w1}, {name: t2, score: game.score2, win: w2}]).map((row, ri) => (
+                    <div key={ri} className={`flex items-center justify-between px-4 py-2.5 ${row.win ? "bg-white/5" : ""}`}>
+                      <span className={`font-bold flex-1 ${row.win ? "text-white" : "text-white/55"}`}>{row.name}</span>
+                      <div className="flex items-center gap-2">
+                        {row.score !== null
+                          ? <span className={`text-xl font-black ${row.win ? "text-white" : "text-white/35"}`}>{row.score}</span>
+                          : <span className="text-white/20 text-xs">—</span>}
+                        {row.win && <span className="text-[10px] font-black px-1.5 py-0.5 rounded" style={{ background: accent, color: "#000" }}>W</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {game.court && <div className="px-4 py-1 text-[10px] text-white/20 border-t border-white/5">{game.court}</div>}
+              </div>
+            );
+          }
+
+          const CONTESTS = [
+            { name: "Knockout",           abbr:"KO",  time:"8:15 AM",  color:"#7C1B1B", rule:"Last one standing wins!", allCamp: true },
+            { name: "Free Throw Contest", abbr:"FT",  time:"9:00 AM",  color:"#1B3C8A", rule:"Best of 10. Tie = sudden death." },
+            { name: "3-Point Contest",    abbr:"3PT", time:"9:30 AM",  color:"#1B5E38", rule:"3 balls at 5 spots, 1 min." },
+            { name: "1-on-1 Challenge",   abbr:"1v1", time:"10:00 AM", color:"#5B2A8A", rule:"First to 15 pts. 2s & 3s count." },
+            { name: "3-on-3 Tournament",  abbr:"3v3", time:"10:30 AM", color:"#7A4A00", rule:"First to 21 pts. 2s & 3s count." },
+            { name: "Layup Contest",      abbr:"LAY", time:"11:15 AM", color:"#1A5A5A", rule:"R-hand 1min + L-hand 1min, team total." },
+          ] as const;
+
+          return (
+            <div className="max-w-4xl mx-auto px-4 py-6 space-y-8">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-6 rounded-full bg-[#F4A800]" />
+                  <h2 className="text-base font-black uppercase text-white tracking-wide">🏆 Championship Bracket</h2>
+                  <span className="text-[11px] text-white/30 font-medium">Championship Day · June 25</span>
+                </div>
+                {bracketGames.length === 0 && (
+                  <div className="rounded-2xl border border-white/8 bg-white/3 px-6 py-8 text-center">
+                    <div className="text-4xl mb-3">🏆</div>
+                    <p className="text-white/50 text-sm font-semibold">Brackets will be revealed after seeding rounds complete</p>
+                    <p className="text-white/25 text-xs mt-1">Check back on Championship Day — June 25</p>
+                  </div>
+                )}
+                {bracketGames.length > 0 && (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {(["NBA", "College"] as const).map(div => {
+                      const divColor = div === "NBA" ? "#1B2A5E" : "#7B1212";
+                      const accent   = div === "NBA" ? "#F4A800" : "#FECACA";
+                      const semis  = bracketGames.filter(g => g.division === div && g.round === "semi");
+                      const finals = bracketGames.filter(g => g.division === div && g.round === "final");
+                      const thirds = bracketGames.filter(g => g.division === div && g.round === "3rd");
+                      return (
+                        <div key={div} className="rounded-2xl border border-white/10 overflow-hidden">
+                          <div className="px-4 py-3 flex items-center justify-between" style={{ background: divColor }}>
+                            <div>
+                              <div className="text-sm font-black text-white uppercase">{div} Division</div>
+                              <div className="text-[11px] opacity-50 text-white">{div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade"}</div>
+                            </div>
+                            <div className="text-2xl font-black opacity-20 text-white">{div === "NBA" ? "🟡" : "🔴"}</div>
+                          </div>
+                          <div className="bg-[#080C14] p-4 space-y-4">
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-widest text-white/25 mb-2">Semifinals — 12:45 PM</div>
+                              {semis.length > 0 ? (
+                                <div className="space-y-2">{semis.map(g => <GameCard key={g.id} game={g} accent={accent} />)}</div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {[["#1 Seed","#4 Seed"],["#2 Seed","#3 Seed"]].map(([a,b],i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                      <div className="flex-1 border border-dashed border-white/10 rounded-lg py-2 px-3 text-xs text-white/30 font-semibold">{a}</div>
+                                      <span className="text-white/20 text-[10px] font-bold">vs</span>
+                                      <div className="flex-1 border border-dashed border-white/10 rounded-lg py-2 px-3 text-xs text-white/30 font-semibold">{b}</div>
+                                      <span className="text-white/15 text-[10px]">→</span>
+                                      <div className="w-24 border border-dashed border-white/8 rounded-lg py-2 px-2 text-[10px] text-white/20 text-center">Winner</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: `${accent}99` }}>
+                                🏆 Championship — 2:05 PM
+                              </div>
+                              {finals.length > 0 ? (
+                                finals.map(g => <GameCard key={g.id} game={g} accent={accent} />)
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 border border-dashed rounded-lg py-2.5 px-3 text-xs text-center font-semibold text-white/25"
+                                    style={{ borderColor: `${accent}40` }}>SF1 Winner</div>
+                                  <span className="text-white/20 text-[10px] font-bold">vs</span>
+                                  <div className="flex-1 border border-dashed rounded-lg py-2.5 px-3 text-xs text-center font-semibold text-white/25"
+                                    style={{ borderColor: `${accent}40` }}>SF2 Winner</div>
+                                  <span className="text-white/15 text-[10px]">→</span>
+                                  <div className="w-24 border rounded-lg py-2.5 px-2 text-xs font-black text-center"
+                                    style={{ borderColor: accent, color: accent, background: `${accent}15` }}>CHAMP 🏆</div>
+                                </div>
+                              )}
+                            </div>
+                            {thirds.length > 0 && (
+                              <div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-white/25 mb-2">3rd Place</div>
+                                {thirds.map(g => <GameCard key={g.id} game={g} accent="#94A3B8" />)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-6 rounded-full bg-[#E03A3A]" />
+                  <h2 className="text-base font-black uppercase text-white tracking-wide">🎯 Individual Contests</h2>
+                </div>
+                <div className="space-y-3">
+                  {CONTESTS.map(contest => {
+                    const evts = individualEvents.filter(e => e.name === contest.name);
+                    const nbaEvt = evts.find(e => e.division === "NBA");
+                    const colEvt = evts.find(e => e.division === "College");
+                    const anyLive     = evts.some(e => e.status === "live");
+                    const anyComplete = evts.some(e => e.status === "complete");
+                    const allCamp = "allCamp" in contest && contest.allCamp;
+                    return (
+                      <div key={contest.name} className="rounded-2xl border border-white/10 overflow-hidden">
+                        <div className="flex items-center gap-3 px-4 py-3" style={{ background: contest.color }}>
+                          <div className="w-10 h-10 rounded-xl bg-black/20 flex flex-col items-center justify-center flex-shrink-0">
+                            <span className="text-[11px] font-black text-white leading-none">{contest.abbr}</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-black text-white">{contest.name}</div>
+                            <div className="text-[11px] text-white/50">{contest.time} · {contest.rule}</div>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {anyLive     && <span className="text-[10px] font-black px-2 py-0.5 rounded bg-white/20 text-white animate-pulse">LIVE</span>}
+                            {anyComplete && <span className="text-[10px] font-black px-2 py-0.5 rounded bg-black/30 text-white/60">DONE</span>}
+                            {!anyLive && !anyComplete && <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-black/20 text-white/40">UPCOMING</span>}
+                          </div>
+                        </div>
+                        <div className="bg-white/2 px-4 py-3">
+                          {allCamp ? (
+                            anyComplete && evts[0]?.winner ? (
+                              <div className="flex flex-wrap gap-4">
+                                <div className="flex items-center gap-2"><span className="text-2xl">🥇</span><span className="text-white font-black">{evts[0].winner}</span></div>
+                                {evts[0].runnerUp && <div className="flex items-center gap-2"><span className="text-2xl">🥈</span><span className="text-white/60 font-semibold">{evts[0].runnerUp}</span></div>}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-white/35 italic">All campers participate · Last one standing wins 🏆</p>
+                            )
+                          ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                              {(["NBA","College"] as const).map(div => {
+                                const evt = div === "NBA" ? nbaEvt : colEvt;
+                                const divColor = div === "NBA" ? "#1B2A5E" : "#7B1212";
+                                return (
+                                  <div key={div} className="rounded-xl overflow-hidden border border-white/8">
+                                    <div className="px-3 py-1.5 text-[10px] font-black uppercase text-white/60" style={{ background: divColor }}>
+                                      {div} Division
+                                    </div>
+                                    <div className="p-2 space-y-1">
+                                      {evt?.nominees && evt.nominees.length > 0 ? (
+                                        evt.nominees.map((nom, ni) => {
+                                          const teamLabel = teams.find(t => t.id === nom.teamId)?.name || nom.teamId;
+                                          return (
+                                            <div key={ni} className="bg-white/3 rounded-lg px-2 py-1.5">
+                                              <div className="text-[10px] text-white/35 font-bold mb-0.5">{teamLabel}</div>
+                                              {nom.players.filter(Boolean).map((p, pi) => {
+                                                const isWinner = evt!.status === "complete" && p === evt!.winner;
+                                                const isRunner = evt!.status === "complete" && p === evt!.runnerUp;
+                                                return (
+                                                  <div key={pi} className={`flex items-center gap-1 text-xs py-0.5 ${isWinner ? "text-white font-bold" : "text-white/60"}`}>
+                                                    {isWinner && <span>🥇</span>}
+                                                    {isRunner && <span>🥈</span>}
+                                                    {!isWinner && !isRunner && <span className="text-white/25">·</span>}
+                                                    {p}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          );
+                                        })
+                                      ) : (
+                                        <p className="text-[11px] text-white/25 italic px-1">Nominees TBD</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {activeView === "schedule" && (<>
 
         {/* Day header */}

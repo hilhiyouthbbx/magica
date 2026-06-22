@@ -327,7 +327,7 @@ export default function CampHubPage() {
   <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
   <script>window.onload=()=>{window.print();}</script>
 </body>
-</html>\`;
+</html>`;
 
     const win = window.open("", "_blank");
     if (!win) { alert("Please allow pop-ups to download the schedule."); return; }

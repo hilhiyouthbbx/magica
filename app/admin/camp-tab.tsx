@@ -1635,7 +1635,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           {/* Delete */}
                           <button onClick={() => removeSeedingGame(game.id)}
                             className="p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10">
-                            <Trash className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ))}

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import {
   Plus, Save, Trash2, X, Loader2, CheckCircle,
-  Users, GripVertical, RefreshCw, Mail
+  Users, GripVertical, RefreshCw, Mail, Edit
 } from "lucide-react";
 import type {
   CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
@@ -556,7 +556,11 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [saved,       setSaved]       = useState(false);
   const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"bracket"|"events"|"schedule"|"settings">("teams");
   const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
+  const [rawContacts, setRawContacts] = useState<Record<string, string>[]>([]);
   const [rosterLoad,  setRosterLoad]  = useState(false);
+  const [editingCamper,     setEditingCamper]     = useState<Record<string,string> | null>(null);
+  const [editCamperPatch,   setEditCamperPatch]   = useState<Record<string,string>>({});
+  const [editCamperSaving,  setEditCamperSaving]  = useState(false);
   const [dragOver,    setDragOver]    = useState<string | null>(null);
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
   const [rosterError,  setRosterError]  = useState<string>("");
@@ -601,6 +605,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       }
       const raw = await res.json() as unknown;
       const all: Record<string, string>[] = Array.isArray(raw) ? raw : (raw as { contacts?: Record<string, string>[] }).contacts ?? [];
+      setRawContacts(all); // keep full contact data for inline editing
 
       // Filter to camp registrations + format
       function parseGradeNum(g: string | undefined): number {
@@ -815,6 +820,55 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     if (!stillAssigned) {
       const cam = roster.find(r => r.displayName === playerName || r.fullName === playerName);
       if (cam) setAssignedIds(prev => { const s = new Set(prev); s.delete(cam.id); return s; });
+    }
+  }
+
+
+  // ── Inline camper contact editing ──────────────────────────────────────────
+  function openEditCamper(cam: CamperRosterEntry) {
+    const raw = rawContacts.find(c => c.id === cam.id) ?? { id: cam.id, camperName: cam.fullName };
+    setEditingCamper(raw);
+    setEditCamperPatch({});
+  }
+
+  async function saveCamperEdit() {
+    if (!editingCamper) return;
+    setEditCamperSaving(true);
+    try {
+      const patch = editCamperPatch;
+      await fetch(`/api/admin/contacts?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id: editingCamper.id, patch }),
+      });
+      // Update rawContacts and roster in memory
+      setRawContacts(prev => prev.map(c => c.id === editingCamper.id ? { ...c, ...patch } : c));
+      setRoster(prev => prev.map(c => {
+        if (c.id !== editingCamper.id) return c;
+        const newFull = patch.camperName ?? editingCamper.camperName ?? c.fullName;
+        const newGrade = patch.grade ?? editingCamper.grade ?? c.grade;
+        const newPay = patch.paymentStatus ?? editingCamper.paymentStatus ?? c.paymentStatus;
+        const fmt = (full: string) => {
+          const parts = full.trim().split(/\s+/);
+          if (parts.length < 2 || !parts[0]) return parts[0] || "Unknown";
+          return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+        };
+        const parseGN = (g: string) => { const m = g.match(/\d+/); return m ? parseInt(m[0], 10) : 99; };
+        return {
+          ...c,
+          fullName: newFull,
+          displayName: fmt(newFull),
+          grade: newGrade,
+          gradeNum: parseGN(newGrade),
+          paymentStatus: newPay,
+          confirmed: /paid|free|manual payment approved|approved/i.test(newPay) || newPay === "",
+        };
+      }));
+      setEditingCamper(null);
+    } catch {
+      alert("Save failed — check network connection.");
+    } finally {
+      setEditCamperSaving(false);
     }
   }
 
@@ -1099,7 +1153,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                               draggable={isDraggable}
                               onDragStart={isDraggable ? e => handleDragStart(e, cam) : undefined}
                               title={isDraggable ? `${cam.fullName}${cam.grade ? " · " + cam.grade : ""} — drag to a team` : cam.fullName}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold select-none transition-all border ${
+                              className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold select-none transition-all border ${
                                 !isDraggable
                                   ? "bg-orange-500/10 border-orange-500/30 text-orange-300 cursor-default"
                                   : isAssigned
@@ -1110,6 +1164,13 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                               {isDraggable && <GripVertical className="w-3 h-3 opacity-40 flex-shrink-0" />}
                               {cam.displayName}
                               {isDraggable && isAssigned && <span className="text-green-500 text-[10px] ml-0.5">✓</span>}
+                              <button
+                                onClick={e => { e.stopPropagation(); openEditCamper(cam); }}
+                                onMouseDown={e => e.stopPropagation()}
+                                className="ml-0.5 text-current opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity flex-shrink-0"
+                                title="Edit contact">
+                                <Edit className="w-3 h-3" />
+                              </button>
                             </div>
                           );
                         })}
@@ -1661,6 +1722,114 @@ export function CampTab({ adminKey }: { adminKey: string }) {
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl transition-all">
             <Save className="w-4 h-4" /> Save Settings
           </button>
+        </div>
+      )}
+
+      {/* ── Inline Camper Edit Modal ── */}
+      {editingCamper && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setEditingCamper(null)}>
+          <div className="bg-[#0D1520] border border-white/15 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <h3 className="text-white font-black text-base">Edit Camper</h3>
+                <p className="text-gray-500 text-xs mt-0.5">{editingCamper.camperName || "—"}</p>
+              </div>
+              <button onClick={() => setEditingCamper(null)} className="text-gray-500 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Camper info */}
+              <div>
+                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Camper Info</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([ ["Camper Name", "camperName"], ["Grade", "grade"], ["Shirt Size", "shirtSize"] ] as const).map(([label, key]) => (
+                    <div key={key}>
+                      <label className="block text-gray-400 text-xs font-semibold mb-1">{label}</label>
+                      <input
+                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                        value={editCamperPatch[key] ?? editingCamper[key] ?? ""}
+                        onChange={e => setEditCamperPatch(p => ({ ...p, [key]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="block text-gray-400 text-xs font-semibold mb-1">Gender</label>
+                    <select
+                      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                      value={editCamperPatch.gender ?? editingCamper.gender ?? ""}
+                      onChange={e => setEditCamperPatch(p => ({ ...p, gender: e.target.value }))}>
+                      <option value="">Select</option>
+                      <option value="Boys">Boys</option>
+                      <option value="Girls">Girls</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Parent contact */}
+              <div>
+                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Parent / Guardian</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([ ["Parent Name", "name"], ["Email", "email"], ["Phone", "phone"] ] as const).map(([label, key]) => (
+                    <div key={key}>
+                      <label className="block text-gray-400 text-xs font-semibold mb-1">{label}</label>
+                      <input
+                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                        value={editCamperPatch[key] ?? editingCamper[key] ?? ""}
+                        onChange={e => setEditCamperPatch(p => ({ ...p, [key]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Emergency + Payment */}
+              <div>
+                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Emergency & Payment</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([ ["Emergency Contact", "emergencyContact"], ["Emergency Phone", "emergencyPhone"], ["Payment Status", "paymentStatus"], ["Amount Paid ($)", "amountPaid"] ] as const).map(([label, key]) => (
+                    <div key={key}>
+                      <label className="block text-gray-400 text-xs font-semibold mb-1">{label}</label>
+                      <input
+                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                        value={editCamperPatch[key] ?? editingCamper[key] ?? ""}
+                        onChange={e => setEditCamperPatch(p => ({ ...p, [key]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-gray-400 text-xs font-semibold mb-1">Notes</label>
+                <textarea rows={2}
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                  value={editCamperPatch.notes ?? editingCamper.notes ?? ""}
+                  onChange={e => setEditCamperPatch(p => ({ ...p, notes: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-5 py-4 border-t border-white/10">
+              <button onClick={saveCamperEdit} disabled={editCamperSaving}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all text-sm">
+                {editCamperSaving
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                  : <><Save className="w-4 h-4" /> Save Changes</>}
+              </button>
+              <button onClick={() => setEditingCamper(null)}
+                className="px-5 py-2.5 border border-white/20 text-gray-400 hover:text-white rounded-xl text-sm font-semibold transition-all">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

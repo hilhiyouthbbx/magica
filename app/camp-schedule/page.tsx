@@ -111,6 +111,40 @@ interface CampTeam {
   pointsAgainst: number;
 }
 
+interface SeedingGame {
+  id: string;
+  round: 1 | 2 | 3;
+  division: "NBA" | "College";
+  team1Id: string;
+  team2Id: string;
+  score1: number | null;
+  score2: number | null;
+  court: string;
+  status: "scheduled" | "live" | "final";
+}
+
+interface BracketGame {
+  id: string;
+  round: "semi" | "final" | "3rd";
+  division: "NBA" | "College";
+  team1Id: string;
+  team2Id: string;
+  score1: number | null;
+  score2: number | null;
+  court: string;
+  status: "scheduled" | "live" | "final";
+}
+
+interface IndividualEvent {
+  id: string;
+  name: string;
+  division: "NBA" | "College";
+  nominees: { teamId: string; players: string[] }[];
+  winner?: string;
+  runnerUp?: string;
+  status: "upcoming" | "live" | "complete";
+}
+
 // ─── Row styling ─────────────────────────────────────────────────────
 function rowBg(type: RowType) {
   if (type === "section")   return "bg-[#1B2A5E]/70 border-l-4 border-[#F4A800]";
@@ -144,17 +178,24 @@ export default function CampHubPage() {
   const autoSelected = useRef(false);
   // Teams for the Rosters tab
   const [teams, setTeams] = useState<CampTeam[]>([]);
+  // Championship game data
+  const [bracketGames, setBracketGames] = useState<BracketGame[]>([]);
+  const [seedingGames, setSeedingGames] = useState<SeedingGame[]>([]);
+  const [individualEvents, setIndividualEvents] = useState<IndividualEvent[]>([]);
   // Top-level view toggle
   const [activeView, setActiveView] = useState<"schedule" | "rosters">("schedule");
 
   const fetchStatus = useCallback(() => {
     fetch("/api/camp-schedule", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d: { dailySchedule?: DayData[]; active?: boolean; currentDay?: number; teams?: CampTeam[] }) => {
+      .then((d: { dailySchedule?: DayData[]; active?: boolean; currentDay?: number; teams?: CampTeam[]; bracketGames?: BracketGame[]; seedingGames?: SeedingGame[]; individualEvents?: IndividualEvent[] }) => {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
           setSchedule(d.dailySchedule);
         }
         if (d.teams && Array.isArray(d.teams)) setTeams(d.teams);
+        if (d.bracketGames && Array.isArray(d.bracketGames)) setBracketGames(d.bracketGames);
+        if (d.seedingGames && Array.isArray(d.seedingGames)) setSeedingGames(d.seedingGames);
+        if (d.individualEvents && Array.isArray(d.individualEvents)) setIndividualEvents(d.individualEvents);
         const active = d.active === true;
         const through = typeof d.currentDay === "number" ? d.currentDay : 0;
         setIsActive(active);
@@ -389,94 +430,255 @@ export default function CampHubPage() {
         )}
 
         {/* Seeding schedule — Days 1-3 */}
-        {isDayUnlocked(activeDay) && activeDay < 3 && (
-          <div className="mb-6">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-2">Seeding Schedule — Both Divisions</h3>
-            <div className="rounded-xl border border-white/10 overflow-hidden bg-white/2">
-              {[
-                { label: "Round 1 — Jun 22", games: "Team A vs Team B · Team C vs Team D" },
-                { label: "Round 2 — Jun 23", games: "Team A vs Team C · Team B vs Team D" },
-                { label: "Round 3 — Jun 24", games: "Team A vs Team D · Team B vs Team C" },
-              ].map((r, i) => (
-                <div key={i} className={`flex items-center gap-3 px-4 py-3 border-b border-white/4 last:border-0 ${i === activeDay ? "bg-[#F4A800]/8" : ""}`}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${i === activeDay ? "bg-[#F4A800] text-black" : "bg-white/10 text-white/40"}`}>{i + 1}</div>
-                  <div>
-                    <div className="text-sm font-semibold text-white/75">{r.label}</div>
-                    <div className="text-xs text-white/28 mt-0.5">{r.games}</div>
-                  </div>
-                  {i === activeDay && <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-[#E03A3A]">TODAY</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Championship bracket */}
-        {isDayUnlocked(activeDay) && activeDay === 3 && (
-          <div className="mb-6">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-2">Championship Bracket</h3>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {[
-                { name: "NBA Division", grade: "1st-4th", color: "#1B2A5E", accent: "#F4A800" },
-                { name: "College Division", grade: "5th-8th", color: "#E03A3A", accent: "#fff" },
-              ].map((div) => (
-                <div key={div.name} className="rounded-xl border border-white/10 overflow-hidden">
-                  <div className="px-4 py-2.5 text-sm font-black uppercase" style={{ background: div.color, color: div.accent }}>
-                    {div.name} <span className="font-normal text-[11px] opacity-60">· {div.grade} Grade</span>
-                  </div>
-                  <div className="p-4 bg-white/3 space-y-3">
-                    <p className="text-[10px] font-bold uppercase text-white/28 mb-1">Semifinals — 12:45 PM</p>
-                    {[["#1","#4"],["#2","#3"]].map(([a,b],i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs">
-                        <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/35">{a} Seed</div>
-                        <span className="text-white/20 text-[10px]">vs</span>
-                        <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/35">{b} Seed</div>
-                        <span className="text-white/20">›</span>
-                        <div className="flex-1 border border-dashed border-white/25 rounded py-1.5 text-center text-white/28">Winner</div>
+        {isDayUnlocked(activeDay) && activeDay < 3 && (() => {
+          // Highlight TODAY based on the actual calendar date, not which tab is open
+          const campDay = ["2026-06-22","2026-06-23","2026-06-24"].indexOf(
+            new Date().toLocaleDateString("en-CA") // "YYYY-MM-DD" in local time
+          );
+          return (
+            <div className="mb-6">
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-2">Seeding Schedule — Both Divisions</h3>
+              <div className="rounded-xl border border-white/10 overflow-hidden bg-white/2">
+                {[
+                  { label: "Round 1 — Mon Jun 22", games: "Team A vs Team B · Team C vs Team D" },
+                  { label: "Round 2 — Tue Jun 23", games: "Team A vs Team C · Team B vs Team D" },
+                  { label: "Round 3 — Wed Jun 24", games: "Team A vs Team D · Team B vs Team C" },
+                ].map((r, i) => {
+                  const isToday = i === campDay;
+                  const isPast  = campDay > i;
+                  return (
+                    <div key={i} className={`flex items-center gap-3 px-4 py-3 border-b border-white/4 last:border-0 ${isToday ? "bg-[#F4A800]/8" : ""}`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${isToday ? "bg-[#F4A800] text-black" : isPast ? "bg-green-800 text-green-300" : "bg-white/10 text-white/40"}`}>{isPast ? "✓" : i + 1}</div>
+                      <div>
+                        <div className={`text-sm font-semibold ${isPast ? "text-white/35 line-through" : "text-white/75"}`}>{r.label}</div>
+                        <div className="text-xs text-white/28 mt-0.5">{r.games}</div>
                       </div>
-                    ))}
-                    <p className="text-[10px] font-bold uppercase text-white/28 mt-2 mb-1">Championship — 2:05 PM</p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/28">SF1 Win</div>
-                      <span className="text-white/20 text-[10px]">vs</span>
-                      <div className="flex-1 border border-dashed border-white/15 rounded py-1.5 text-center text-white/28">SF2 Win</div>
-                      <span className="text-white/20">›</span>
-                      <div className="flex-1 rounded py-1.5 text-center text-xs font-black" style={{ background: `${div.color}30`, border: `1px solid ${div.accent}`, color: div.accent }}>CHAMP</div>
+                      {isToday && <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-[#E03A3A]">TODAY</span>}
+                      {isPast  && <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-white/30">DONE</span>}
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
-        {/* Contest rules */}
-        {isDayUnlocked(activeDay) && activeDay === 3 && (
-          <div className="mb-6">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-2">Individual Contest Rules</h3>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {[
-                { abbr:"FT",  name:"Free Throw",      sub:"1-2 players/team", rule:"Best of 10 shots, 2 at a time. Tie = sudden death.", color:"#1B4FC4" },
-                { abbr:"3PT", name:"3-Point Contest", sub:"1-2 players/team", rule:"3 balls at 5 spots. 1 minute per shooter.", color:"#C41B1B" },
-                { abbr:"1v1", name:"1-on-1",          sub:"1 player/team",    rule:"First to 15 points. 2s and 3s count.", color:"#1B7A3C" },
-                { abbr:"3v3", name:"3-on-3",          sub:"3 players/team",   rule:"First to 21 points. 2s and 3s count.", color:"#7B3F00" },
-                { abbr:"LAY", name:"Layup Contest",   sub:"Full team",        rule:"Right hand 1 min + Left hand 1 min. Team total wins.", color:"#5B21B6" },
-                { abbr:"KO",  name:"Knockout",        sub:"ALL campers",      rule:"Last one standing wins!", color:"#B91C1C" },
-              ].map((c) => (
-                <div key={c.name} className="rounded-xl overflow-hidden border border-white/10">
-                  <div className="flex items-center gap-3 px-3 py-2.5" style={{ background: c.color }}>
-                    <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black">{c.abbr}</div>
-                    <div>
-                      <div className="text-sm font-bold">{c.name}</div>
-                      <div className="text-[11px] opacity-60">{c.sub}</div>
-                    </div>
+        {/* Championship — bracket + contests (live data) */}
+        {isDayUnlocked(activeDay) && activeDay === 3 && (() => {
+          // Helper: resolve team name from id
+          const teamName = (id: string) => teams.find(t => t.id === id)?.name || id || "TBD";
+
+          // Game card component inline
+          function GameCard({ game, accentColor }: { game: BracketGame; accentColor: string }) {
+            const t1 = teamName(game.team1Id);
+            const t2 = teamName(game.team2Id);
+            const isFinal = game.status === "final";
+            const isLive  = game.status === "live";
+            const w1 = isFinal && game.score1 !== null && game.score2 !== null && game.score1 > game.score2;
+            const w2 = isFinal && game.score1 !== null && game.score2 !== null && game.score2 > game.score1;
+            return (
+              <div className={`rounded-xl border overflow-hidden ${isLive ? "border-[#E03A3A]/60 shadow-lg shadow-[#E03A3A]/10" : "border-white/10"}`}>
+                {isLive && (
+                  <div className="px-3 py-1 bg-[#E03A3A] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    <span className="text-[10px] font-black uppercase text-white tracking-widest">Live Now</span>
                   </div>
-                  <div className="px-3 py-2.5 bg-white/4 text-xs text-white/50 leading-relaxed">{c.rule}</div>
+                )}
+                {isFinal && (
+                  <div className="px-3 py-1 bg-white/5 text-[10px] font-bold uppercase text-white/30 tracking-widest">Final</div>
+                )}
+                <div className="bg-white/3 divide-y divide-white/5">
+                  {/* Team 1 */}
+                  <div className={`flex items-center justify-between px-4 py-2.5 ${w1 ? "bg-white/5" : ""}`}>
+                    <span className={`text-sm font-bold ${w1 ? "text-white" : "text-white/60"}`}>{t1 || "TBD"}</span>
+                    {game.score1 !== null && (
+                      <span className={`text-lg font-black ${w1 ? "text-white" : "text-white/40"}`}>{game.score1}</span>
+                    )}
+                    {game.score1 === null && !isFinal && (
+                      <span className="text-xs text-white/20">—</span>
+                    )}
+                    {w1 && <span className="ml-2 text-[10px] font-black px-1.5 py-0.5 rounded" style={{ background: accentColor, color: "#0B0F1A" }}>W</span>}
+                  </div>
+                  {/* Team 2 */}
+                  <div className={`flex items-center justify-between px-4 py-2.5 ${w2 ? "bg-white/5" : ""}`}>
+                    <span className={`text-sm font-bold ${w2 ? "text-white" : "text-white/60"}`}>{t2 || "TBD"}</span>
+                    {game.score2 !== null && (
+                      <span className={`text-lg font-black ${w2 ? "text-white" : "text-white/40"}`}>{game.score2}</span>
+                    )}
+                    {game.score2 === null && !isFinal && (
+                      <span className="text-xs text-white/20">—</span>
+                    )}
+                    {w2 && <span className="ml-2 text-[10px] font-black px-1.5 py-0.5 rounded" style={{ background: accentColor, color: "#0B0F1A" }}>W</span>}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+                {game.court && (
+                  <div className="px-4 py-1.5 text-[10px] text-white/20 border-t border-white/5">{game.court}</div>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <>
+              {/* ── Semifinals ── */}
+              {(["NBA", "College"] as const).map(div => {
+                const semis = bracketGames.filter(g => g.division === div && g.round === "semi");
+                const finals = bracketGames.filter(g => g.division === div && g.round === "final");
+                const divColor = div === "NBA" ? "#1B2A5E" : "#7B1212";
+                const accent   = div === "NBA" ? "#F4A800" : "#fff";
+                const hasGames = semis.length > 0 || finals.length > 0;
+
+                return (
+                  <div key={div} className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full`}
+                        style={{ background: divColor, color: accent }}>
+                        {div} Division
+                      </span>
+                      <span className="text-white/28 text-xs">{div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade"}</span>
+                    </div>
+
+                    {!hasGames ? (
+                      /* No bracket games set yet — show seeding-based placeholder */
+                      <div className="rounded-xl border border-white/10 overflow-hidden">
+                        <div className="p-3 text-[10px] font-bold uppercase text-white/28 tracking-widest border-b border-white/5"
+                          style={{ background: `${divColor}60` }}>
+                          Semifinals — 12:45 PM
+                        </div>
+                        <div className="bg-white/3 divide-y divide-white/5">
+                          {[["#1 Seed","#4 Seed"],["#2 Seed","#3 Seed"]].map(([a,b],i) => (
+                            <div key={i} className="flex items-center justify-between px-4 py-2.5">
+                              <div className="flex-1 text-sm text-white/35 font-semibold">{a}</div>
+                              <span className="text-white/20 text-xs mx-3">vs</span>
+                              <div className="flex-1 text-sm text-white/35 font-semibold text-right">{b}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="p-3 text-[10px] font-bold uppercase text-white/28 tracking-widest border-y border-white/5"
+                          style={{ background: `${divColor}60` }}>
+                          Championship — 2:05 PM
+                        </div>
+                        <div className="bg-white/3 px-4 py-2.5">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-white/25 font-semibold">SF1 Winner</div>
+                            <span className="text-white/20 text-xs mx-3">vs</span>
+                            <div className="text-sm text-white/25 font-semibold">SF2 Winner</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {semis.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest">Semifinals — 12:45 PM</p>
+                            {semis.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
+                          </>
+                        )}
+                        {finals.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest mt-4">🏆 Championship Game — 2:05 PM</p>
+                            {finals.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* ── Individual Contests ── */}
+              <div className="mb-6">
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-3">Individual Contests</h3>
+                {(() => {
+                  const CONTEST_META: Record<string, { abbr: string; rule: string; color: string; time: string }> = {
+                    "Knockout":          { abbr:"KO",  rule:"Last one standing wins!",                              color:"#B91C1C", time:"8:15 AM"  },
+                    "Free Throw Contest":{ abbr:"FT",  rule:"Best of 10 shots. Tie = sudden death.",               color:"#1B4FC4", time:"9:00 AM"  },
+                    "3-Point Contest":   { abbr:"3PT", rule:"3 balls at 5 spots. 1 minute per shooter.",           color:"#C41B1B", time:"9:30 AM"  },
+                    "1-on-1 Challenge":  { abbr:"1v1", rule:"First to 15 points. 2s and 3s count.",               color:"#1B7A3C", time:"10:00 AM" },
+                    "3-on-3 Tournament": { abbr:"3v3", rule:"First to 21 points. 2s and 3s count.",               color:"#7B3F00", time:"10:30 AM" },
+                    "Layup Contest":     { abbr:"LAY", rule:"Right hand 1 min + Left hand 1 min. Team total wins.",color:"#5B21B6", time:"11:15 AM" },
+                  };
+                  // Group events by name (both divisions together)
+                  const eventNames = Array.from(new Set([
+                    "Knockout","Free Throw Contest","3-Point Contest","1-on-1 Challenge","3-on-3 Tournament","Layup Contest"
+                  ]));
+                  return (
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {eventNames.map(evtName => {
+                        const meta = CONTEST_META[evtName] || { abbr: evtName.slice(0,3).toUpperCase(), rule: "", color: "#333", time: "" };
+                        // Find events matching this name across divisions
+                        const evts = individualEvents.filter(e => e.name === evtName);
+                        const anyComplete = evts.some(e => e.status === "complete");
+                        const anyLive    = evts.some(e => e.status === "live");
+                        return (
+                          <div key={evtName} className="rounded-xl overflow-hidden border border-white/10">
+                            <div className="flex items-center gap-3 px-3 py-2.5" style={{ background: meta.color }}>
+                              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black">{meta.abbr}</div>
+                              <div className="flex-1">
+                                <div className="text-sm font-bold">{evtName}</div>
+                                <div className="text-[11px] opacity-60">{meta.time}</div>
+                              </div>
+                              {anyLive    && <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 animate-pulse">LIVE</span>}
+                              {anyComplete && <span className="text-[9px] font-black px-2 py-0.5 rounded bg-black/30">DONE</span>}
+                            </div>
+                            <div className="bg-white/3">
+                              {anyComplete && evts.length > 0 ? (
+                                <div className="divide-y divide-white/5">
+                                  {evts.map(e => (
+                                    <div key={e.id} className="px-3 py-2">
+                                      <div className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-1">{e.division} Div</div>
+                                      {e.winner && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-base">🥇</span>
+                                          <span className="text-sm font-bold text-white">{e.winner}</span>
+                                        </div>
+                                      )}
+                                      {e.runnerUp && (
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className="text-base">🥈</span>
+                                          <span className="text-sm text-white/50">{e.runnerUp}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="px-3 py-2.5">
+                                  <div className="text-xs text-white/40 leading-relaxed">{meta.rule}</div>
+                                  {evts.length === 0 && (
+                                    <div className="text-[11px] text-white/20 mt-1 italic">Nominees TBA</div>
+                                  )}
+                                  {evts.length > 0 && evts.some(e => e.nominees.length > 0) && (
+                                    <div className="mt-2 space-y-1">
+                                      {evts.map(e => {
+                                        const nominated = e.nominees.flatMap(n => n.players.filter(p => p.trim()));
+                                        if (nominated.length === 0) return null;
+                                        return (
+                                          <div key={e.id}>
+                                            <div className="text-[10px] font-bold uppercase text-white/25 mb-0.5">{e.division}</div>
+                                            <div className="flex flex-wrap gap-1">
+                                              {nominated.map((p, pi) => (
+                                                <span key={pi} className="text-[11px] px-2 py-0.5 rounded bg-white/8 text-white/50">{p}</span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </>
+          );
+        })()}
 
         {/* 4-Day Overview */}
         <div className="rounded-xl border border-white/10 overflow-hidden">

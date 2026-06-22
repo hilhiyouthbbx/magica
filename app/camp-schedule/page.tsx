@@ -123,7 +123,7 @@ function actColor(type: RowType) {
 export default function CampHubPage() {
   const [schedule, setSchedule]   = useState<DayData[]>(DEFAULT_SCHEDULE);
   const [activeDay, setActiveDay] = useState(0);
-  const [isActive, setIsActive]   = useState(false);  // true = page visible to public
+  const [isLive, setIsLive]       = useState(false);   // true = schedule visible to public
   const [liveDay, setLiveDay]     = useState(-1);
   const [loaded, setLoaded]       = useState(false);   // hide page until API responds
 
@@ -135,11 +135,11 @@ export default function CampHubPage() {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
           setSchedule(d.dailySchedule);
         }
-        setIsActive(d.active === true);
+        setIsLive(d.active === true);
         setLiveDay(d.currentDay && d.currentDay > 0 ? d.currentDay - 1 : -1);
       })
       .catch(() => {
-        setIsActive(false);
+        setIsLive(false);
       })
       .finally(() => setLoaded(true));
   }
@@ -168,7 +168,7 @@ export default function CampHubPage() {
   }
 
   // ── Schedule is turned OFF — show "not available" screen ──
-  if (!isActive) {
+  if (!isLive) {
     return (
       <div className="min-h-screen bg-[#080C14] flex flex-col items-center justify-center text-center px-4" style={{ fontFamily: "system-ui, sans-serif" }}>
         <div className="text-6xl mb-6">🏀</div>

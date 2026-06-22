@@ -1001,6 +1001,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
             const confirmedRoster = roster.filter(cam => cam.confirmed);
             const gradeMap = new Map<number, { label: string; campers: CamperRosterEntry[] }>();
             confirmedRoster.forEach(cam => {
+              if (cam.gradeNum === 99) return; // skip unknown grade
               if (!gradeMap.has(cam.gradeNum)) gradeMap.set(cam.gradeNum, { label: gradeLabel(cam.grade), campers: [] });
               gradeMap.get(cam.gradeNum)!.campers.push(cam);
             });
@@ -1131,6 +1132,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
             function RosterGroup({ campers, draggable: isDraggable }: { campers: CamperRosterEntry[]; draggable: boolean }) {
               const gradeMap = new Map<number, { label: string; campers: CamperRosterEntry[] }>();
               campers.forEach(cam => {
+                if (cam.gradeNum === 99) return; // skip unknown grade
                 const key = cam.gradeNum;
                 if (!gradeMap.has(key)) gradeMap.set(key, { label: gradeLabel(cam.grade), campers: [] });
                 gradeMap.get(key)!.campers.push(cam);

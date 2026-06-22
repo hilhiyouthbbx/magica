@@ -250,6 +250,90 @@ export default function CampHubPage() {
     );
   }
 
+
+  // ── PDF Download ─────────────────────────────────────────────────
+  const handleDownloadPDF = () => {
+    const typeLabel = (type: RowType) => {
+      if (type === "section")   return "background:#1a3a8a;color:#F4A800;font-weight:700;";
+      if (type === "highlight") return "background:#3a0a0a;color:#fff;font-weight:700;";
+      if (type === "game")      return "background:#1a1200;color:#e8a000;";
+      if (type === "break")     return "color:#888;font-style:italic;";
+      return "color:#ccc;";
+    };
+
+    const dayHTML = (day: DayData) => {
+      const rows = day.rows.map(row => `
+        <tr style="${typeLabel(row.type)}">
+          <td style="padding:7px 12px;white-space:nowrap;font-size:13px;width:90px;">${row.time}</td>
+          <td style="padding:7px 12px;font-size:13px;font-weight:${row.type==="section"||row.type==="highlight"?"700":"400"};">${row.activity}</td>
+          <td style="padding:7px 12px;font-size:12px;color:#aaa;">${row.note}</td>
+        </tr>`).join("");
+      return `
+        <div class="day-block">
+          <div class="day-header">${day.label} <span style="font-weight:400;font-size:14px;color:#aaa;">· ${day.date}</span></div>
+          <table>
+            <thead><tr>
+              <th style="padding:6px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;">Time</th>
+              <th style="padding:6px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;">Activity</th>
+              <th style="padding:6px 12px;text-align:left;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;">Notes</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    };
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Hilhi Youth Basketball Camp 2026 — Schedule</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#111;padding:30px 36px;}
+    .header{text-align:center;border-bottom:3px solid #F4A800;padding-bottom:18px;margin-bottom:28px;}
+    .header h1{font-size:26px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#111;}
+    .header .year{font-size:32px;font-weight:900;color:#F4A800;}
+    .header .meta{font-size:13px;color:#555;margin-top:6px;}
+    .header .badges{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:10px;}
+    .header .badge{font-size:11px;padding:4px 12px;border-radius:20px;background:#f0f0f0;color:#333;font-weight:600;}
+    .header .badge.gold{background:#F4A800;color:#000;}
+    .header .badge.red{background:#c0392b;color:#fff;}
+    .day-block{margin-bottom:28px;break-inside:avoid;}
+    .day-header{font-size:17px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#111;
+      background:#f5f5f5;border-left:4px solid #F4A800;padding:8px 14px;margin-bottom:0;}
+    table{width:100%;border-collapse:collapse;border:1px solid #ddd;}
+    tbody tr:nth-child(even){filter:brightness(0.97);}
+    tbody tr{border-bottom:1px solid #e8e8e8;}
+    .footer{text-align:center;margin-top:28px;font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:14px;}
+    @media print{
+      body{padding:16px 20px;}
+      .day-block{break-inside:avoid;page-break-inside:avoid;}
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="year">🏀 HILHI YOUTH BASKETBALL CAMP</div>
+    <h1 style="font-size:22px;margin-top:4px;">2026 Camp Schedule</h1>
+    <div class="meta">June 22–25, 2026 · Hillsboro, OR · 8:30 AM – 3:00 PM Daily</div>
+    <div class="badges">
+      <span class="badge">Grades 1st–8th</span>
+      <span class="badge gold">NBA Division · 1st–4th Grade</span>
+      <span class="badge red">College Division · 5th–8th Grade</span>
+    </div>
+  </div>
+  ${schedule.map(dayHTML).join("")}
+  <div class="footer">hilhiyouthbbx.com · Printed from the Hilhi Youth Basketball Camp live schedule</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow pop-ups to download the schedule."); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
   // ── Full schedule page ──
   return (
     <div className="min-h-screen bg-[#080C14] text-white" style={{ fontFamily: "system-ui, sans-serif" }}>
@@ -269,6 +353,14 @@ export default function CampHubPage() {
             <span className="text-xs px-3 py-1.5 rounded-full font-bold" style={{ background: "#F4A800", color: "#0B0F1A" }}>NBA: 1st–4th Grade</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#E03A3A]">College: 5th–8th Grade</span>
           </div>
+            {/* Download PDF button */}
+            <button
+              onClick={handleDownloadPDF}
+              className="mt-4 flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#F4A800]/60 hover:text-[#F4A800] transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Schedule PDF
+            </button>
         </div>
       </div>
 

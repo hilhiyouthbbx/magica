@@ -369,12 +369,7 @@ export default function CampHubPage() {
         <div className="max-w-4xl mx-auto flex overflow-x-auto">
           {/* View toggle */}
           <div className="flex border-r border-white/10 mr-1 pr-1 flex-shrink-0">
-            <button
-              onClick={() => setActiveView("schedule")}
-              className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "schedule" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
-            >
-              📅 Schedule
-            </button>
+
             <button
               onClick={() => setActiveView("rosters")}
               className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "rosters" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}

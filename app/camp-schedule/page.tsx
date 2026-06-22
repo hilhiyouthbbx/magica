@@ -434,7 +434,12 @@ export default function CampHubPage() {
                               <div className="px-4 py-3 flex items-center justify-between" style={{ background: div === "NBA" ? "#1B2A5E" : "#E03A3A" }}>
                                 <div>
                                   <div className="text-base font-black text-white">{team.name || "TBD"}</div>
-                                  {team.coach && <div className="text-xs opacity-60 text-white mt-0.5">Coach: {team.coach}</div>}
+                                  {team.coach && (
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                      <span className="text-[10px] font-black uppercase tracking-widest text-white/50">Coach</span>
+                                      <span className="text-xs font-bold text-white/90">{team.coach}</span>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="text-right">
                                   <div className="text-2xl font-black text-white/20">{players.length}</div>

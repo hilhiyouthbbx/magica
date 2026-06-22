@@ -5,7 +5,7 @@ import {
   Users, GripVertical, RefreshCw, Mail, Edit, ChevronUp, ChevronDown
 } from "lucide-react";
 import type {
-  CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
+  CampScheduleData, CampTeam, BracketGame, SeedingGame, IndividualEvent, Division,
   CamperRosterEntry
 } from "@/lib/camp-schedule";
 import type { DayKey, CheckInMap } from "@/lib/camp-checkin";
@@ -631,7 +631,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [data,        setData]        = useState<CampScheduleData | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [saved,       setSaved]       = useState(false);
-  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"bracket"|"events"|"schedule"|"settings">("teams");
+  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"games"|"bracket"|"events"|"schedule"|"settings">("teams");
   const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
   const [rawContacts, setRawContacts] = useState<Record<string, string>[]>([]);
   const [rosterLoad,  setRosterLoad]  = useState(false);
@@ -786,6 +786,52 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   function removeTeam(id: string) {
     if (!data || !confirm("Remove this team?")) return;
     save({ teams: data.teams.filter(t => t.id !== id) });
+  }
+
+  // ── Seeding Game helpers ─────────────────────────────────────────────────
+
+  function addSeedingGame(division: Division, round: 1|2|3) {
+    if (!data) return;
+    const opts = data.teams.filter(t => t.division === division);
+    const g: SeedingGame = {
+      id: `sg-${Date.now()}`,
+      round, division,
+      team1Id: opts[0]?.id || "",
+      team2Id: opts[1]?.id || "",
+      score1: null, score2: null,
+      court: "Court A", status: "scheduled",
+    };
+    save({ seedingGames: [...data.seedingGames, g] });
+  }
+
+  function setSeedingField(id: string, field: keyof SeedingGame, val: unknown) {
+    if (!data) return;
+    const updated = data.seedingGames.map(g => g.id === id ? { ...g, [field]: val } : g);
+    setData({ ...data, seedingGames: updated });
+  }
+
+  async function saveSeedingGames() {
+    if (!data) return;
+    const games = data.seedingGames;
+    const teams = data.teams.map(t => ({
+      ...t, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0
+    }));
+    for (const g of games) {
+      if (g.status !== "final" || g.score1 === null || g.score2 === null) continue;
+      const t1 = teams.find(t => t.id === g.team1Id);
+      const t2 = teams.find(t => t.id === g.team2Id);
+      if (!t1 || !t2) continue;
+      t1.pointsFor += g.score1; t1.pointsAgainst += g.score2;
+      t2.pointsFor += g.score2; t2.pointsAgainst += g.score1;
+      if (g.score1 > g.score2) { t1.wins++; t2.losses++; }
+      else if (g.score2 > g.score1) { t2.wins++; t1.losses++; }
+    }
+    save({ seedingGames: games, teams });
+  }
+
+  function removeSeedingGame(id: string) {
+    if (!data || !confirm("Remove this game?")) return;
+    save({ seedingGames: data.seedingGames.filter(g => g.id !== id) });
   }
 
   // ── Bracket helpers ───────────────────────────────────────────────────────
@@ -1031,6 +1077,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           ["checkin",   "✅ Check-In"],
           ["teams",     "👥 Teams & Rosters"],
           ["standings", "📊 Standings"],
+          ["games",     "🏀 Pool Play"],
           ["bracket",   "🏆 Bracket"],
           ["events",    "🎯 Individual Events"],
           ["schedule",  "📅 Schedule"],

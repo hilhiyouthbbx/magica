@@ -60,75 +60,73 @@ const DEFAULT: DayData[] = [
   {
     label: "Day 1", date: "Monday, June 22",
     rows: [
-      { id:"1-1",  time:"7:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
-      { id:"1-2",  time:"8:00 AM",  activity:"Welcome, Camp Overview & Introductions",        note:"All campers",                      type:"highlight" },
-      { id:"1-3",  time:"8:15 AM",  activity:"Warm-Up & Dynamic Stretching",                  note:"",                                 type:"normal"    },
-      { id:"1-4",  time:"8:30 AM",  activity:"SKILL STATION — Ballhandling Fundamentals",     note:"Both courts",                      type:"section"   },
-      { id:"1-5",  time:"9:15 AM",  activity:"SKILL STATION — Footwork & Pivoting",           note:"Both courts",                      type:"section"   },
-      { id:"1-6",  time:"10:00 AM", activity:"SKILL STATION — Passing & Catching",            note:"Both courts",                      type:"section"   },
-      { id:"1-7",  time:"10:45 AM", activity:"Water Break",                                   note:"5 min",                            type:"break"     },
-      { id:"1-8",  time:"11:00 AM", activity:"Seeding Round 1 — NBA Division",                note:"2x12-min clock | 1st-4th Grade",   type:"game"      },
-      { id:"1-9",  time:"11:30 AM", activity:"Seeding Round 1 — College Division",            note:"2x12-min clock | 5th-8th Grade",   type:"game"      },
-      { id:"1-10", time:"12:00 PM", activity:"Lunch Break",                                   note:"45 min",                           type:"break"     },
-      { id:"1-11", time:"12:45 PM", activity:"SKILL STATION — Shooting Form & Arc",           note:"Both courts",                      type:"section"   },
-      { id:"1-12", time:"1:30 PM",  activity:"SKILL STATION — Defensive Positioning",         note:"Both courts",                      type:"section"   },
-      { id:"1-13", time:"2:15 PM",  activity:"Cool Down & Camp Debrief",                      note:"",                                 type:"normal"    },
-      { id:"1-14", time:"2:45 PM",  activity:"End of Day",                                    note:"",                                 type:"highlight" },
+      { id:"1-1",  time:"8:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
+      { id:"1-2",  time:"9:00 AM",  activity:"Welcome, Camp Overview & Introductions",        note:"All campers",                      type:"highlight" },
+      { id:"1-3",  time:"9:15 AM",  activity:"Warm-Up & Dynamic Stretching",                  note:"",                                 type:"normal"    },
+      { id:"1-4",  time:"9:30 AM",  activity:"SKILL STATION — Ballhandling Fundamentals",     note:"Both courts",                      type:"section"   },
+      { id:"1-5",  time:"10:15 AM", activity:"SKILL STATION — Footwork & Pivoting",           note:"Both courts",                      type:"section"   },
+      { id:"1-6",  time:"11:00 AM", activity:"SKILL STATION — Passing & Catching",            note:"Both courts",                      type:"section"   },
+      { id:"1-7",  time:"11:45 AM", activity:"Water Break",                                   note:"5 min",                            type:"break"     },
+      { id:"1-8",  time:"12:00 PM", activity:"Seeding Round 1 — NBA Division",                note:"2x12-min clock | 1st-4th Grade",   type:"game"      },
+      { id:"1-9",  time:"12:30 PM", activity:"Seeding Round 1 — College Division",            note:"2x12-min clock | 5th-8th Grade",   type:"game"      },
+      { id:"1-10", time:"1:00 PM",  activity:"Lunch Break",                                   note:"45 min",                           type:"break"     },
+      { id:"1-11", time:"1:45 PM",  activity:"SKILL STATION — Shooting Form & Arc",           note:"Both courts",                      type:"section"   },
+      { id:"1-12", time:"2:30 PM",  activity:"SKILL STATION — Defensive Positioning",         note:"Both courts",                      type:"section"   },
+      { id:"1-13", time:"2:50 PM",  activity:"Cool Down & Camp Debrief",                      note:"",                                 type:"normal"    },
+      { id:"1-14", time:"3:00 PM",  activity:"End of Day",                                    note:"",                                 type:"highlight" },
     ],
   },
   {
     label: "Day 2", date: "Tuesday, June 23",
     rows: [
-      { id:"2-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
-      { id:"2-2",  time:"8:00 AM",  activity:"TEAM FORMATION & NAMING",                          note:"NBA: 1st-4th | College: 5th-8th",         type:"highlight" },
-      { id:"2-3",  time:"8:15 AM",  activity:"SKILL STATION — Post Moves & Low-Post Finishing",  note:"Both courts",                             type:"section"   },
-      { id:"2-4",  time:"9:00 AM",  activity:"SKILL STATION — Shooting Off Screens",             note:"Both courts",                             type:"section"   },
-      { id:"2-5",  time:"9:45 AM",  activity:"Water Break",                                      note:"5 min",                                   type:"break"     },
-      { id:"2-6",  time:"10:00 AM", activity:"Seeding Round 2 — NBA Division",                   note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
-      { id:"2-7",  time:"11:00 AM", activity:"Seeding Round 2 — College Division",               note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
-      { id:"2-8",  time:"12:00 PM", activity:"Lunch Break",                                      note:"45 min",                                  type:"break"     },
-      { id:"2-9",  time:"12:45 PM", activity:"SKILL STATION — Transition Offense / Fast Break",  note:"Both courts",                             type:"section"   },
-      { id:"2-10", time:"1:30 PM",  activity:"SKILL STATION — 3-Point & Free Throw Practice",   note:"Both courts",                             type:"section"   },
-      { id:"2-11", time:"2:15 PM",  activity:"Championship Contest Preview & Practice",          note:"All campers",                             type:"normal"    },
-      { id:"2-12", time:"2:45 PM",  activity:"End of Day",                                       note:"",                                        type:"highlight" },
+      { id:"2-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
+      { id:"2-2",  time:"9:00 AM",  activity:"TEAM FORMATION & NAMING",                          note:"NBA: 1st-4th | College: 5th-8th",         type:"highlight" },
+      { id:"2-3",  time:"9:15 AM",  activity:"SKILL STATION — Post Moves & Low-Post Finishing",  note:"Both courts",                             type:"section"   },
+      { id:"2-4",  time:"10:00 AM", activity:"SKILL STATION — Shooting Off Screens",             note:"Both courts",                             type:"section"   },
+      { id:"2-5",  time:"10:45 AM", activity:"Water Break",                                      note:"5 min",                                   type:"break"     },
+      { id:"2-6",  time:"11:00 AM", activity:"Seeding Round 2 — NBA Division",                   note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
+      { id:"2-7",  time:"12:00 PM", activity:"Seeding Round 2 — College Division",               note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
+      { id:"2-8",  time:"1:00 PM",  activity:"Lunch Break",                                      note:"45 min",                                  type:"break"     },
+      { id:"2-9",  time:"1:45 PM",  activity:"SKILL STATION — Transition Offense / Fast Break",  note:"Both courts",                             type:"section"   },
+      { id:"2-10", time:"2:30 PM",  activity:"SKILL STATION — 3-Point & Free Throw Practice",   note:"Both courts",                             type:"section"   },
+      { id:"2-11", time:"2:50 PM",  activity:"Championship Contest Preview & Practice",          note:"All campers",                             type:"normal"    },
+      { id:"2-12", time:"3:00 PM",  activity:"End of Day",                                       note:"",                                        type:"highlight" },
     ],
   },
   {
     label: "Day 3", date: "Wednesday, June 24",
     rows: [
-      { id:"3-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                         note:"",                                        type:"normal"    },
-      { id:"3-2",  time:"8:00 AM",  activity:"SKILL STATION — Pick & Roll Offense",        note:"Both courts",                             type:"section"   },
-      { id:"3-3",  time:"8:45 AM",  activity:"SKILL STATION — Fast Break & Transition D",  note:"Both courts",                             type:"section"   },
-      { id:"3-4",  time:"9:30 AM",  activity:"Seeding Round 3 — NBA Division",             note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
-      { id:"3-5",  time:"10:30 AM", activity:"Water Break",                                note:"5 min",                                   type:"break"     },
-      { id:"3-6",  time:"10:45 AM", activity:"Seeding Round 3 — College Division",         note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
-      { id:"3-7",  time:"11:45 AM", activity:"Championship Day Preview / Lineup Cards",    note:"Teams nominate players for each contest", type:"highlight" },
-      { id:"3-8",  time:"12:15 PM", activity:"Lunch Break",                                note:"45 min",                                  type:"break"     },
-      { id:"3-9",  time:"1:00 PM",  activity:"Individual Contest Practice / Shootaround",  note:"All courts",                              type:"normal"    },
-      { id:"3-10", time:"2:00 PM",  activity:"Final Standings Announced",                  note:"All teams",                               type:"highlight" },
-      { id:"3-11", time:"2:15 PM",  activity:"Cool Down & Championship Day Prep",          note:"",                                        type:"normal"    },
-      { id:"3-12", time:"2:45 PM",  activity:"End of Day",                                 note:"",                                        type:"highlight" },
+      { id:"3-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                         note:"",                                        type:"normal"    },
+      { id:"3-2",  time:"9:00 AM",  activity:"SKILL STATION — Pick & Roll Offense",        note:"Both courts",                             type:"section"   },
+      { id:"3-3",  time:"9:45 AM",  activity:"SKILL STATION — Fast Break & Transition D",  note:"Both courts",                             type:"section"   },
+      { id:"3-4",  time:"10:30 AM", activity:"Seeding Round 3 — NBA Division",             note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
+      { id:"3-5",  time:"11:30 AM", activity:"Water Break",                                note:"5 min",                                   type:"break"     },
+      { id:"3-6",  time:"11:45 AM", activity:"Seeding Round 3 — College Division",         note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
+      { id:"3-7",  time:"12:45 PM", activity:"Championship Day Preview / Lineup Cards",    note:"Teams nominate players for each contest", type:"highlight" },
+      { id:"3-8",  time:"1:00 PM",  activity:"Lunch Break",                                note:"45 min",                                  type:"break"     },
+      { id:"3-9",  time:"1:45 PM",  activity:"Individual Contest Practice / Shootaround",  note:"All courts",                              type:"normal"    },
+      { id:"3-10", time:"2:30 PM",  activity:"Final Standings Announced",                  note:"All teams",                               type:"highlight" },
+      { id:"3-11", time:"2:45 PM",  activity:"Cool Down & Championship Day Prep",          note:"",                                        type:"normal"    },
+      { id:"3-12", time:"3:00 PM",  activity:"End of Day",                                 note:"",                                        type:"highlight" },
     ],
   },
   {
     label: "Championship", date: "Thursday, June 25",
     rows: [
-      { id:"4-1",  time:"7:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                              type:"normal"    },
-      { id:"4-2",  time:"8:00 AM",  activity:"Opening Ceremony",                      note:"All campers",                                   type:"highlight" },
-      { id:"4-3",  time:"8:15 AM",  activity:"KNOCKOUT CONTEST — All Camp",           note:"Last one standing wins!",                       type:"game"      },
-      { id:"4-4",  time:"9:00 AM",  activity:"FREE THROW CONTEST",                    note:"Best of 10, 2 at a time | Tie = Sudden Death",  type:"game"      },
-      { id:"4-5",  time:"9:30 AM",  activity:"3-POINT CONTEST",                       note:"3 balls at 5 spots | 1 min per shooter",        type:"game"      },
-      { id:"4-6",  time:"10:00 AM", activity:"1-ON-1 CONTEST",                        note:"First to 15 points (2s and 3s count)",          type:"game"      },
-      { id:"4-7",  time:"10:30 AM", activity:"3-ON-3 CONTEST",                        note:"First to 21 points (2s and 3s count)",          type:"game"      },
-      { id:"4-8",  time:"11:15 AM", activity:"LAYUP CONTEST (Team Event)",            note:"Right 1 min + Left 1 min | Team total wins",    type:"game"      },
-      { id:"4-9",  time:"12:00 PM", activity:"Lunch / Bracket Reveal",                note:"45 min",                                        type:"break"     },
-      { id:"4-10", time:"12:45 PM", activity:"SEMIFINAL GAMES — NBA Division",        note:"#1 vs #4 | #2 vs #3 | 2x12-min clock",         type:"game"      },
-      { id:"4-11", time:"1:25 PM",  activity:"SEMIFINAL GAMES — College Division",    note:"#1 vs #4 | #2 vs #3 | 2x12-min clock",         type:"game"      },
-      { id:"4-12", time:"1:40 PM",  activity:"CHAMPIONSHIP GAME — NBA Division",      note:"Semifinal winners | 2x20-min clock",            type:"highlight" },
-      { id:"4-13", time:"2:20 PM",  activity:"CHAMPIONSHIP GAME — College Division",  note:"Semifinal winners | 2x20-min clock",            type:"highlight" },
-      { id:"4-14", time:"3:00 PM",  activity:"AWARDS CEREMONY",                       note:"Trophies, medals & camp awards",                type:"highlight" },
-      { id:"4-15", time:"3:20 PM",  activity:"Photos & Closing Remarks",              note:"",                                              type:"normal"    },
-      { id:"4-16", time:"3:30 PM",  activity:"Dismissal",                             note:"",                                              type:"highlight" },
+      { id:"4-1",  time:"8:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                              type:"normal"    },
+      { id:"4-2",  time:"9:00 AM",  activity:"Opening Ceremony",                      note:"All campers",                                   type:"highlight" },
+      { id:"4-3",  time:"9:15 AM",  activity:"KNOCKOUT CONTEST — All Camp",           note:"Last one standing wins!",                       type:"game"      },
+      { id:"4-4",  time:"10:00 AM", activity:"FREE THROW CONTEST",                    note:"Best of 10, 2 at a time | Tie = Sudden Death",  type:"game"      },
+      { id:"4-5",  time:"10:30 AM", activity:"3-POINT CONTEST",                       note:"3 balls at 5 spots | 1 min per shooter",        type:"game"      },
+      { id:"4-6",  time:"11:00 AM", activity:"1-ON-1 CONTEST",                        note:"First to 15 points (2s and 3s count)",          type:"game"      },
+      { id:"4-7",  time:"11:30 AM", activity:"3-ON-3 CONTEST",                        note:"First to 21 points (2s and 3s count)",          type:"game"      },
+      { id:"4-8",  time:"12:15 PM", activity:"LAYUP CONTEST (Team Event)",            note:"Right 1 min + Left 1 min | Team total wins",    type:"game"      },
+      { id:"4-9",  time:"1:00 PM",  activity:"Lunch / Bracket Reveal",                note:"45 min",                                        type:"break"     },
+      { id:"4-10", time:"1:45 PM",  activity:"SEMIFINAL GAMES — NBA & College",       note:"Both courts simultaneously | 2x12-min clock",   type:"game"      },
+      { id:"4-11", time:"2:25 PM",  activity:"CHAMPIONSHIP GAMES — NBA & College",    note:"Both courts simultaneously | 2x20-min clock",   type:"highlight" },
+      { id:"4-12", time:"3:00 PM",  activity:"AWARDS CEREMONY",                       note:"Trophies, medals & camp awards",                type:"highlight" },
+      { id:"4-13", time:"3:20 PM",  activity:"Photos & Closing Remarks",              note:"",                                              type:"normal"    },
+      { id:"4-14", time:"3:30 PM",  activity:"Dismissal",                             note:"",                                              type:"highlight" },
     ],
   },
 ];
@@ -1666,22 +1664,45 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       <div>
                         <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                           Nominees — {evt.name === "3-on-3 Tournament" ? "3 players per team" : "up to 2 per team"}
+                          <span className="ml-2 text-gray-700 normal-case font-normal">drag a player chip into a slot</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {teams.map(team => {
                             const nom = evt.nominees.find(n => n.teamId === team.id);
+                            const roster = team.players.filter(p => p.trim());
                             return (
-                              <div key={team.id}>
-                                <label className="block text-xs font-semibold text-gray-400 mb-1.5">{team.name || "(unnamed)"}</label>
+                              <div key={team.id} className="bg-white/3 rounded-xl p-3 space-y-2 border border-white/8">
+                                <div className="text-xs font-black text-gray-300">{team.name || "(unnamed)"}</div>
+                                {roster.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 pb-2 border-b border-white/10">
+                                    {roster.map((player, pi) => (
+                                      <span key={pi} draggable
+                                        onDragStart={e => { e.dataTransfer.setData("text/plain", player); }}
+                                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-900/40 border border-blue-500/30 text-blue-300 cursor-grab active:cursor-grabbing hover:bg-blue-800/50 transition-colors select-none">
+                                        {player}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                                 <div className="space-y-1.5">
-                                  {Array.from({ length: slots }, (_, i) => (
-                                    <input key={i}
-                                      value={(nom?.players ?? [])[i] ?? ""}
-                                      onChange={e => setNominee(evt.id, team.id, i, e.target.value)}
-                                      placeholder={`Nominee ${i + 1}`}
-                                      className="w-full px-2.5 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700"
-                                    />
-                                  ))}
+                                  {Array.from({ length: slots }, (_, i) => {
+                                    const val = (nom?.players ?? [])[i] ?? "";
+                                    return (
+                                      <div key={i} className="relative group/slot"
+                                        onDragOver={e => e.preventDefault()}
+                                        onDrop={e => { e.preventDefault(); const p = e.dataTransfer.getData("text/plain"); if (p) setNominee(evt.id, team.id, i, p); }}>
+                                        <input value={val}
+                                          onChange={e => setNominee(evt.id, team.id, i, e.target.value)}
+                                          placeholder="Drop player or type name…"
+                                          className="w-full px-2.5 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700 group-hover/slot:border-blue-500/40"
+                                        />
+                                        {val && (
+                                          <button onClick={() => setNominee(evt.id, team.id, i, "")}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-red-400 transition-colors text-xs leading-none">×</button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );

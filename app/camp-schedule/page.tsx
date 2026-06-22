@@ -486,14 +486,7 @@ export default function CampHubPage() {
         {activeView === "brackets" && (() => {
           const teamName = (id: string) => teams.find(t => t.id === id)?.name || "";
 
-          function GameCard({ game, accent }: { game: BracketGame; accent: string }) {
-            const t1 = teamName(game.team1Id) || "TBD";
-            const t2 = teamName(game.team2Id) || "TBD";
-            const done = game.status === "final";
-            const live = game.status === "live";
-            const w1 = done && game.score1 !== null && game.score2 !== null && game.score1 > game.score2;
-            const w2 = done && game.score1 !== null && game.score2 !== null && game.score2 > game.score1;
-            return (
+          return (
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-10">
 
               {/* ── CHAMPIONSHIP BRACKET ── */}
@@ -674,7 +667,7 @@ export default function CampHubPage() {
                 ) : (
                   <div className="grid sm:grid-cols-2 gap-3">
                     {individualEvents.map(evt => {
-                      const allPlayers = evt.nominees.flatMap((n: EventNominee) => n.players);
+                      const allPlayers = evt.nominees.flatMap((n) => n.players);
                       return (
                         <div key={evt.id} className="rounded-xl border border-white/10 bg-white/2 overflow-hidden">
                           <div className="px-4 py-2.5 bg-white/4 border-b border-white/8 flex items-center justify-between">

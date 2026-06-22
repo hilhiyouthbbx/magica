@@ -1561,6 +1561,97 @@ export function CampTab({ adminKey }: { adminKey: string }) {
         </div>
       )}
 
+      {/* ── POOL PLAY ── */}
+      {section === "games" && (
+        <div className="space-y-6">
+          {(["NBA", "College"] as Division[]).map(div => (
+            <div key={div} className="glass rounded-2xl border border-white/10 p-5">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="text-white font-black text-base">{div} Division — Pool Play</h3>
+                <div className="flex flex-wrap gap-2">
+                  {([1, 2, 3] as const).map(r => (
+                    <button key={r} onClick={() => addSeedingGame(div, r)}
+                      className="px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 text-xs font-bold rounded-xl transition-all">
+                      + Round {r}
+                    </button>
+                  ))}
+                  <button onClick={saveSeedingGames}
+                    className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
+                    <Save className="w-3 h-3" /> Save &amp; Calc W/L
+                  </button>
+                </div>
+              </div>
+
+              {[1, 2, 3].map(round => {
+                const games = (data?.seedingGames ?? []).filter(g => g.division === div && g.round === round);
+                if (games.length === 0) return null;
+                return (
+                  <div key={round} className="mb-5">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 pb-2 border-b border-white/8">Round {round}</div>
+                    <div className="space-y-2">
+                      {games.map(game => (
+                        <div key={game.id} className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-white/3 border border-white/8">
+                          {/* Team 1 */}
+                          <select
+                            value={game.team1Id}
+                            onChange={e => setSeedingField(game.id, "team1Id", e.target.value)}
+                            className="flex-1 min-w-[120px] px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500">
+                            <option value="">Team 1…</option>
+                            {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
+                          </select>
+                          {/* Score 1 */}
+                          <input type="number" min={0} placeholder="–"
+                            value={game.score1 ?? ""}
+                            onChange={e => setSeedingField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
+                            className="w-14 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500" />
+                          <span className="text-white/30 text-xs font-black">vs</span>
+                          {/* Score 2 */}
+                          <input type="number" min={0} placeholder="–"
+                            value={game.score2 ?? ""}
+                            onChange={e => setSeedingField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
+                            className="w-14 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500" />
+                          {/* Team 2 */}
+                          <select
+                            value={game.team2Id}
+                            onChange={e => setSeedingField(game.id, "team2Id", e.target.value)}
+                            className="flex-1 min-w-[120px] px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500">
+                            <option value="">Team 2…</option>
+                            {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
+                          </select>
+                          {/* Status */}
+                          <select
+                            value={game.status}
+                            onChange={e => setSeedingField(game.id, "status", e.target.value)}
+                            className="px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500">
+                            <option value="scheduled">Scheduled</option>
+                            <option value="live">🔴 Live</option>
+                            <option value="final">Final</option>
+                          </select>
+                          {/* Court */}
+                          <input type="text" placeholder="Court"
+                            value={game.court}
+                            onChange={e => setSeedingField(game.id, "court", e.target.value)}
+                            className="w-20 px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500" />
+                          {/* Delete */}
+                          <button onClick={() => removeSeedingGame(game.id)}
+                            className="p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10">
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {(data?.seedingGames ?? []).filter(g => g.division === div).length === 0 && (
+                <p className="text-gray-600 text-sm">No games yet — use the Round buttons above to add pool play games. Each division needs 6 games total (3 rounds × 2 games).</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── BRACKET ── */}
       {section === "bracket" && (
         <div className="space-y-6">

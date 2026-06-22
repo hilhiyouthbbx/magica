@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import {
   Plus, Save, Trash2, X, Loader2, CheckCircle,
-  Users, GripVertical, RefreshCw, Mail, Edit
+  Users, GripVertical, RefreshCw, Mail, Edit, ChevronUp, ChevronDown
 } from "lucide-react";
 import type {
   CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
@@ -300,6 +300,21 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
     setEditBuf(null);
   }
 
+
+  // ── Move row up / down ──
+  function moveRow(dir: "up" | "down") {
+    if (!selectedId) return;
+    const rows = current.rows;
+    const idx  = rows.findIndex(r => r.id === selectedId);
+    if (idx < 0) return;
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= rows.length) return;
+    const newRows = [...rows];
+    [newRows[idx], newRows[swapIdx]] = [newRows[swapIdx], newRows[idx]];
+    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
+    persist(nextDays);
+  }
+
   // ── Add row ──
   function addRow() {
     const rows = current.rows;
@@ -475,7 +490,16 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
                   <div className={`text-sm leading-snug ${isSel ? "text-white font-medium" : actColor(row.type)}`}>{row.activity}</div>
                   {row.note && <div className={`text-xs mt-0.5 ${isSel ? "text-blue-300/70" : "text-gray-600"}`}>{row.note}</div>}
                 </div>
-                <div className={`text-sm pl-2 ${isSel ? "opacity-100 text-blue-400" : "opacity-0"}`}>✏️</div>
+                <div className={`flex flex-col items-center gap-0.5 pl-2 ${isSel ? "opacity-100" : "opacity-0"}`}>
+                  <button onClick={e => { e.stopPropagation(); moveRow("up"); }}
+                    className="text-gray-400 hover:text-blue-300 transition-colors leading-none">
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); moveRow("down"); }}
+                    className="text-gray-400 hover:text-blue-300 transition-colors leading-none">
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -505,6 +529,20 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
               <button onClick={deleteSelected}
                 className="flex-1 py-2.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 hover:text-red-300 text-sm font-bold rounded-lg transition-all">
                 🗑 Delete{autoShift && <span className="text-xs font-normal ml-1">+ shift</span>}
+              </button>
+            </div>
+
+            {/* ── Move up / down ── */}
+            <div className="flex gap-2">
+              <button onClick={() => moveRow("up")}
+                disabled={current.rows.findIndex(r => r.id === editBuf.id) === 0}
+                className="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-sm rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronUp className="w-4 h-4" /> Move Up
+              </button>
+              <button onClick={() => moveRow("down")}
+                disabled={current.rows.findIndex(r => r.id === editBuf.id) === current.rows.length - 1}
+                className="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-sm rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+                Move Down <ChevronDown className="w-4 h-4" />
               </button>
             </div>
 

@@ -794,7 +794,8 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     const cam: CamperRosterEntry = JSON.parse(raw) as CamperRosterEntry;
     const team = data.teams.find(t => t.id === teamId);
     if (!team) return;
-    const playerName = cam.displayName;
+    // Use fullName to avoid silent drop when two campers share the same "First L." display name
+    const playerName = cam.fullName;
     if (team.players.includes(playerName)) return;
     const arr = Array.from({ length: 6 }, (_, i) => team.players[i] ?? "");
     const emptyIdx = arr.findIndex(p => !p.trim());

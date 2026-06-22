@@ -98,6 +98,19 @@ const DEFAULT_SCHEDULE: DayData[] = [
   },
 ];
 
+
+interface CampTeam {
+  id: string;
+  name: string;
+  division: "NBA" | "College";
+  coach: string;
+  players: string[];
+  wins: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+}
+
 // ─── Row styling ─────────────────────────────────────────────────────
 function rowBg(type: RowType) {
   if (type === "section")   return "bg-[#1B2A5E]/70 border-l-4 border-[#F4A800]";
@@ -129,14 +142,19 @@ export default function CampHubPage() {
   const [loaded, setLoaded] = useState(false);
   // Only auto-select day tab on the very first API response; user picks after that
   const autoSelected = useRef(false);
+  // Teams for the Rosters tab
+  const [teams, setTeams] = useState<CampTeam[]>([]);
+  // Top-level view toggle
+  const [activeView, setActiveView] = useState<"schedule" | "rosters">("schedule");
 
   const fetchStatus = useCallback(() => {
     fetch("/api/camp-schedule", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d: { dailySchedule?: DayData[]; active?: boolean; currentDay?: number }) => {
+      .then((d: { dailySchedule?: DayData[]; active?: boolean; currentDay?: number; teams?: CampTeam[] }) => {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
           setSchedule(d.dailySchedule);
         }
+        if (d.teams && Array.isArray(d.teams)) setTeams(d.teams);
         const active = d.active === true;
         const through = typeof d.currentDay === "number" ? d.currentDay : 0;
         setIsActive(active);
@@ -216,6 +234,21 @@ export default function CampHubPage() {
       {/* TAB BAR */}
       <div className="sticky top-0 z-40 bg-[#0D1520]/95 backdrop-blur-md border-b border-white/10">
         <div className="max-w-4xl mx-auto flex overflow-x-auto">
+          {/* View toggle */}
+          <div className="flex border-r border-white/10 mr-1 pr-1 flex-shrink-0">
+            <button
+              onClick={() => setActiveView("schedule")}
+              className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "schedule" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
+            >
+              📅 Schedule
+            </button>
+            <button
+              onClick={() => setActiveView("rosters")}
+              className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "rosters" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
+            >
+              👥 Teams
+            </button>
+          </div>
           {schedule.map((d, i) => (
             <button
               key={i}
@@ -241,6 +274,77 @@ export default function CampHubPage() {
 
       {/* SCHEDULE CONTENT */}
       <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* ── ROSTERS VIEW ── */}
+        {activeView === "rosters" && (
+          <div>
+            {teams.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center rounded-2xl border border-white/10 bg-white/2">
+                <div className="text-4xl mb-4">🏀</div>
+                <h3 className="text-white font-black text-lg uppercase mb-2">Teams Coming Soon</h3>
+                <p className="text-white/35 text-sm max-w-xs">Team rosters will be posted before camp begins.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {(["NBA", "College"] as const).map(div => {
+                  const divTeams = teams.filter(t => t.division === div);
+                  if (divTeams.length === 0) return null;
+                  return (
+                    <div key={div}>
+                      <div className={`flex items-center gap-2 mb-3`}>
+                        <span className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full ${div === "NBA" ? "bg-[#1B2A5E] text-[#F4A800]" : "bg-[#E03A3A] text-white"}`}>{div} Division</span>
+                        <span className="text-white/28 text-xs">{div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade"}</span>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        {divTeams.map(team => {
+                          const players = team.players.filter(p => p.trim());
+                          return (
+                            <div key={team.id} className="rounded-2xl border border-white/10 overflow-hidden">
+                              {/* Team header */}
+                              <div className="px-4 py-3 flex items-center justify-between" style={{ background: div === "NBA" ? "#1B2A5E" : "#E03A3A" }}>
+                                <div>
+                                  <div className="text-base font-black text-white">{team.name || "TBD"}</div>
+                                  {team.coach && <div className="text-xs opacity-60 text-white mt-0.5">Coach: {team.coach}</div>}
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-2xl font-black text-white/20">{players.length}</div>
+                                  <div className="text-[10px] text-white/40 uppercase tracking-wider">players</div>
+                                </div>
+                              </div>
+                              {/* Player list */}
+                              <div className="bg-white/3 divide-y divide-white/5">
+                                {players.length === 0 ? (
+                                  <div className="px-4 py-3 text-xs text-white/25 italic">Roster not yet posted</div>
+                                ) : (
+                                  players.map((p, i) => (
+                                    <div key={i} className="px-4 py-2.5 flex items-center gap-3">
+                                      <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[11px] font-bold text-white/40 flex-shrink-0">{i + 1}</div>
+                                      <div className="text-sm text-white/75">{p}</div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                              {/* Record (show once games are played) */}
+                              {(team.wins > 0 || team.losses > 0) && (
+                                <div className="px-4 py-2 bg-white/5 flex gap-4 text-xs">
+                                  <span className="text-green-400 font-bold">{team.wins}W</span>
+                                  <span className="text-red-400 font-bold">{team.losses}L</span>
+                                  <span className="text-white/28">{team.pointsFor} PF / {team.pointsAgainst} PA</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── SCHEDULE VIEW ── */}
+        {activeView === "schedule" && (<>
 
         {/* Day header */}
         <div className="mb-4">
@@ -398,6 +502,7 @@ export default function CampHubPage() {
             </button>
           ))}
         </div>
+      </>)}
       </div>
 
       <footer className="bg-[#0D1520] border-t border-white/10 py-6 text-center">

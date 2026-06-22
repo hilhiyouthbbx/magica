@@ -350,43 +350,44 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
   return (
     <div className="space-y-4">
 
-      {/* ── Live Controls ── */}
-      <div className={`flex flex-wrap items-center gap-4 px-4 py-3 rounded-xl border transition-colors ${isLive ? "bg-red-950/40 border-red-700/50" : "bg-[#1a1f2e] border-white/10"}`}>
-        <span className={`text-xs font-black uppercase tracking-widest ${isLive ? "text-red-400" : "text-gray-500"}`}>
-          {isLive ? "🔴 LIVE" : "📡 Broadcast"}
-        </span>
+      {/* ── Public Visibility Controls ── */}
+      <div className={`flex flex-wrap items-center gap-4 px-4 py-3 rounded-xl border transition-colors ${isLive ? "bg-green-950/40 border-green-700/50" : "bg-[#1a1f2e] border-white/10"}`}>
 
-        {/* On/Off toggle */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Off Air</span>
-          <button
-            onClick={() => persistLive(!isLive, isLive ? liveDay : (liveDay >= 0 ? liveDay : 0))}
-            className={`relative w-11 h-6 rounded-full transition-colors ${isLive ? "bg-red-600" : "bg-gray-700"}`}>
-            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${isLive ? "left-5" : "left-0.5"}`} />
-          </button>
-          <span className={`text-xs font-bold ${isLive ? "text-red-400" : "text-gray-600"}`}>{isLive ? "LIVE" : "PUBLIC"}</span>
+        {/* Public/Hidden toggle */}
+        <div className="flex items-center gap-3">
+          <div>
+            <div className={`text-xs font-black uppercase tracking-widest ${isLive ? "text-green-400" : "text-gray-500"}`}>
+              {isLive ? "✅ Schedule is LIVE — public can see it" : "🔒 Schedule is HIDDEN — public sees blank page"}
+            </div>
+            <div className="text-[11px] text-gray-600 mt-0.5">Toggle to show or hide the schedule page from visitors</div>
+          </div>
         </div>
 
-        {/* Active day picker — only when live */}
-        {isLive && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Active day:</span>
-            {days.map((d, i) => (
-              <button key={i}
-                onClick={() => persistLive(true, i)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${liveDay === i ? "bg-red-600 text-white shadow shadow-red-900/50" : "bg-white/8 text-gray-500 hover:text-white hover:bg-white/12"}`}>
-                {i < 3 ? `D${i + 1}` : "Champ"}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {isLive && liveDay >= 0 && (
-          <span className="ml-auto text-xs text-red-300 font-medium">
-            Showing live: {days[liveDay]?.label ?? ""}
-          </span>
-        )}
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs text-gray-500">{isLive ? "Hide" : "Show"}</span>
+          <button
+            onClick={() => persistLive(!isLive, isLive ? liveDay : (liveDay >= 0 ? liveDay : 0))}
+            className={`relative w-14 h-7 rounded-full transition-colors ${isLive ? "bg-green-600" : "bg-gray-700"}`}>
+            <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${isLive ? "left-8" : "left-1"}`} />
+          </button>
+          <span className={`text-sm font-bold ${isLive ? "text-green-400" : "text-gray-600"}`}>{isLive ? "PUBLIC" : "HIDDEN"}</span>
+        </div>
       </div>
+
+      {/* ── Active Day indicator (only when public) ── */}
+      {isLive && (
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 bg-[#1a1f2e] rounded-xl border border-white/10">
+          <span className="text-xs text-gray-500 font-medium">Active day shown to public:</span>
+          {days.map((d, i) => (
+            <button key={i}
+              onClick={() => persistLive(true, i)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${liveDay === i ? "bg-blue-600 text-white" : "bg-white/8 text-gray-500 hover:text-white hover:bg-white/12"}`}>
+              {i < 3 ? `Day ${i + 1}` : "Championship"}
+            </button>
+          ))}
+          {liveDay < 0 && <span className="text-xs text-yellow-500">⚠ No day selected — pick one above</span>}
+        </div>
+      )}
 
       {/* ── Day tabs + controls ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -123,10 +123,11 @@ function actColor(type: RowType) {
 export default function CampHubPage() {
   const [schedule, setSchedule]   = useState<DayData[]>(DEFAULT_SCHEDULE);
   const [activeDay, setActiveDay] = useState(0);
-  const [isLive, setIsLive]       = useState(false);
+  const [isActive, setIsActive]   = useState(false);  // true = page visible to public
   const [liveDay, setLiveDay]     = useState(-1);
+  const [loaded, setLoaded]       = useState(false);   // hide page until API responds
 
-  // Fetch live status and schedule from API — no cache
+  // Fetch status from API — no cache
   function fetchStatus() {
     fetch("/api/camp-schedule", { cache: "no-store" })
       .then(r => r.json())
@@ -134,16 +135,16 @@ export default function CampHubPage() {
         if (d.dailySchedule && Array.isArray(d.dailySchedule) && d.dailySchedule.length > 0) {
           setSchedule(d.dailySchedule);
         }
-        // active = live mode on/off; currentDay is 1-indexed (0 = none)
-        if (d.active !== undefined) setIsLive(d.active);
-        if (d.currentDay !== undefined) setLiveDay(d.currentDay > 0 ? d.currentDay - 1 : -1);
+        setIsActive(d.active === true);
+        setLiveDay(d.currentDay && d.currentDay > 0 ? d.currentDay - 1 : -1);
       })
       .catch(() => {
-        // API unavailable — stay on defaults
-      });
+        setIsActive(false);
+      })
+      .finally(() => setLoaded(true));
   }
 
-  // Load on mount, poll every 30 s, and re-fetch when tab regains focus
+  // Load on mount, poll every 30 s, re-fetch on tab focus
   useEffect(() => {
     fetchStatus();
     const interval = setInterval(fetchStatus, 30_000);
@@ -156,6 +157,30 @@ export default function CampHubPage() {
   }, []);
 
   const current = schedule[activeDay];
+
+  // ── Show loading spinner until first API response ──
+  if (!loaded) {
+    return (
+      <div className="min-h-screen bg-[#080C14] flex items-center justify-center">
+        <div className="text-white/30 text-sm animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  // ── Schedule is turned OFF — show "not available" screen ──
+  if (!isActive) {
+    return (
+      <div className="min-h-screen bg-[#080C14] flex flex-col items-center justify-center text-center px-4" style={{ fontFamily: "system-ui, sans-serif" }}>
+        <div className="text-6xl mb-6">🏀</div>
+        <h1 className="text-3xl font-black uppercase text-white mb-2">Hilhi Youth Hoop Camp</h1>
+        <div className="text-4xl font-black mb-4" style={{ color: "#F4A800" }}>2026</div>
+        <p className="text-white/40 text-sm max-w-xs">
+          The camp schedule is not available right now. Check back soon!
+        </p>
+        <div className="mt-8 text-xs text-white/20">June 22–25, 2026 · Hillsboro, OR</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#080C14] text-white" style={{ fontFamily: "system-ui, sans-serif" }}>

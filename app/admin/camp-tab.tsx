@@ -1604,53 +1604,68 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                     <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 pb-2 border-b border-white/8">Round {round}</div>
                     <div className="space-y-2">
                       {games.map(game => (
-                        <div key={game.id} className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-white/3 border border-white/8">
-                          {/* Team 1 */}
-                          <select
-                            value={game.team1Id}
-                            onChange={e => setSeedingField(game.id, "team1Id", e.target.value)}
-                            className="flex-1 min-w-[120px] px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500">
-                            <option value="">Team 1…</option>
-                            {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
-                          </select>
-                          {/* Score 1 */}
-                          <input type="number" min={0} placeholder="–"
-                            value={game.score1 ?? ""}
-                            onChange={e => setSeedingField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
-                            className="w-14 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500" />
-                          <span className="text-white/30 text-xs font-black">vs</span>
-                          {/* Score 2 */}
-                          <input type="number" min={0} placeholder="–"
-                            value={game.score2 ?? ""}
-                            onChange={e => setSeedingField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
-                            className="w-14 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500" />
-                          {/* Team 2 */}
-                          <select
-                            value={game.team2Id}
-                            onChange={e => setSeedingField(game.id, "team2Id", e.target.value)}
-                            className="flex-1 min-w-[120px] px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500">
-                            <option value="">Team 2…</option>
-                            {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
-                          </select>
-                          {/* Status */}
-                          <select
-                            value={game.status}
-                            onChange={e => setSeedingField(game.id, "status", e.target.value)}
-                            className="px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500">
-                            <option value="scheduled">Scheduled</option>
-                            <option value="live">🔴 Live</option>
-                            <option value="final">Final</option>
-                          </select>
-                          {/* Court */}
-                          <input type="text" placeholder="Court"
-                            value={game.court}
-                            onChange={e => setSeedingField(game.id, "court", e.target.value)}
-                            className="w-20 px-2 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500" />
-                          {/* Delete */}
-                          <button onClick={() => removeSeedingGame(game.id)}
-                            className="p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div key={game.id} className="rounded-xl bg-white/3 border border-white/10 overflow-hidden">
+                          {/* Row 1 — Teams + Scores */}
+                          <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2 px-3 pt-3 pb-2">
+                            {/* Team 1 */}
+                            <select
+                              value={game.team1Id}
+                              onChange={e => setSeedingField(game.id, "team1Id", e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
+                              <option value="">— Select Team —</option>
+                              {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
+                            </select>
+                            {/* Score 1 */}
+                            <input type="number" min={0} placeholder="0"
+                              value={game.score1 ?? ""}
+                              onChange={e => setSeedingField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
+                              className="w-16 text-center px-2 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500" />
+                            <span className="text-white/25 text-sm font-black px-1">VS</span>
+                            {/* Score 2 */}
+                            <input type="number" min={0} placeholder="0"
+                              value={game.score2 ?? ""}
+                              onChange={e => setSeedingField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
+                              className="w-16 text-center px-2 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500" />
+                            {/* Team 2 */}
+                            <select
+                              value={game.team2Id}
+                              onChange={e => setSeedingField(game.id, "team2Id", e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
+                              <option value="">— Select Team —</option>
+                              {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
+                            </select>
+                          </div>
+                          {/* Row 2 — Court + Status + Delete */}
+                          <div className="flex items-center gap-2 px-3 pb-3 border-t border-white/6 pt-2">
+                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest shrink-0">Court</span>
+                            <select
+                              value={game.court}
+                              onChange={e => setSeedingField(game.id, "court", e.target.value)}
+                              className="px-3 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
+                              <option value="Court A">Court A</option>
+                              <option value="Court B">Court B</option>
+                              <option value="Court 1">Court 1</option>
+                              <option value="Court 2">Court 2</option>
+                              <option value="Main Court">Main Court</option>
+                              <option value="Gym A">Gym A</option>
+                              <option value="Gym B">Gym B</option>
+                              <option value="Both Courts">Both Courts</option>
+                            </select>
+                            <div className="flex-1" />
+                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest shrink-0">Status</span>
+                            <select
+                              value={game.status}
+                              onChange={e => setSeedingField(game.id, "status", e.target.value)}
+                              className="px-3 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
+                              <option value="scheduled">📅 Scheduled</option>
+                              <option value="live">🔴 Live</option>
+                              <option value="final">✅ Final</option>
+                            </select>
+                            <button onClick={() => removeSeedingGame(game.id)}
+                              className="p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10 ml-1">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

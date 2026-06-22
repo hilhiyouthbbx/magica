@@ -261,69 +261,60 @@ export default function CampHubPage() {
       return "color:#333;";
     };
 
-    const dayHTML = (day: DayData, idx: number) => {
-      const accent = idx === 3 ? "#c0392b" : "#F4A800";
-      const rows = day.rows.map(row => `
-        <tr style="${typeLabel(row.type)}">
-          <td class="tc">${row.time}</td>
-          <td class="ac">${row.activity}</td>
-          <td class="nc">${row.note}</td>
-        </tr>`).join("");
-      return `
-        <div class="day-block">
-          <div class="day-header" style="border-left:3px solid ${accent};">
-            ${day.label} <span class="day-sub">· ${day.date} · ${day.theme}</span>
-          </div>
-          <table><tbody>${rows}</tbody></table>
-        </div>`;
-    };
+    const rows = current.rows.map(row => `
+      <tr style="${typeLabel(row.type)}">
+        <td class="tc">${row.time}</td>
+        <td class="ac">${row.activity}</td>
+        <td class="nc">${row.note}</td>
+      </tr>`).join("");
 
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8"/>
-  <title>Hilhi Youth Basketball Camp 2026 — Schedule</title>
+  <title>Hilhi Youth Basketball Camp 2026 — ${current.label}</title>
   <style>
-    @page{size:letter landscape;margin:7mm 9mm;}
+    @page{size:letter portrait;margin:12mm 14mm;}
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Segoe UI',Arial,sans-serif;font-size:8.2px;color:#111;background:#fff;}
-    .header{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #F4A800;padding-bottom:5px;margin-bottom:7px;}
-    .header-left h1{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#111;}
-    .header-left .meta{font-size:8px;color:#666;margin-top:1px;}
-    .header-right{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
-    .badge{font-size:7.5px;padding:2px 7px;border-radius:10px;font-weight:700;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#111;background:#fff;}
+    .header{border-bottom:3px solid #F4A800;padding-bottom:8px;margin-bottom:12px;}
+    .header h1{font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;}
+    .header .day-title{font-size:20px;font-weight:900;color:#F4A800;margin:2px 0;}
+    .header .meta{font-size:9px;color:#666;margin-top:3px;}
+    .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+    .badge{font-size:9px;padding:2px 9px;border-radius:10px;font-weight:700;}
     .badge-gray{background:#eee;color:#333;}
     .badge-gold{background:#F4A800;color:#000;}
     .badge-red{background:#c0392b;color:#fff;}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-    .day-block{break-inside:avoid;page-break-inside:avoid;}
-    .day-header{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;color:#111;
-      background:#f7f7f7;padding:4px 7px;margin-bottom:0;}
-    .day-sub{font-weight:400;font-size:8px;color:#888;text-transform:none;letter-spacing:0;}
-    table{width:100%;border-collapse:collapse;border:1px solid #e0e0e0;}
+    table{width:100%;border-collapse:collapse;border:1px solid #ddd;}
+    thead tr{background:#f0f0f0;}
+    th{padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#666;}
     tr{border-bottom:1px solid #ebebeb;}
     tr:last-child{border-bottom:none;}
-    .tc{padding:2.5px 5px;white-space:nowrap;width:62px;color:#555;font-size:7.8px;}
-    .ac{padding:2.5px 5px;font-size:8px;}
-    .nc{padding:2.5px 5px;font-size:7.5px;color:#888;width:110px;}
-    .footer{text-align:center;margin-top:7px;font-size:7px;color:#bbb;border-top:1px solid #eee;padding-top:5px;}
+    tbody tr:nth-child(even){filter:brightness(0.985);}
+    .tc{padding:5px 10px;white-space:nowrap;width:80px;color:#555;font-size:10px;}
+    .ac{padding:5px 10px;font-size:10.5px;}
+    .nc{padding:5px 10px;font-size:9.5px;color:#888;width:140px;}
+    .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="header-left">
-      <h1>🏀 Hilhi Youth Basketball Camp — 2026 Schedule</h1>
-      <div class="meta">June 22–25, 2026 · Hillsboro, OR · 8:30 AM – 3:00 PM Daily</div>
-    </div>
-    <div class="header-right">
+    <h1>🏀 Hilhi Youth Basketball Camp 2026</h1>
+    <div class="day-title">${current.label} — ${current.theme}</div>
+    <div class="meta">${current.date}, 2026 · Hillsboro, OR · 8:30 AM – 3:00 PM</div>
+    <div class="badges">
       <span class="badge badge-gray">Grades 1st–8th</span>
-      <span class="badge badge-gold">NBA · 1st–4th</span>
-      <span class="badge badge-red">College · 5th–8th</span>
+      <span class="badge badge-gold">NBA Division · 1st–4th Grade</span>
+      <span class="badge badge-red">College Division · 5th–8th Grade</span>
     </div>
   </div>
-  <div class="grid">
-    ${schedule.map(dayHTML).join("")}
-  </div>
+  <table>
+    <thead><tr>
+      <th>Time</th><th>Activity</th><th>Notes</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
   <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
   <script>window.onload=()=>{window.print();}</script>
 </body>

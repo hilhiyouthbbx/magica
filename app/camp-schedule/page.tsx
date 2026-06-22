@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────
 type RowType = "section" | "normal" | "break" | "game" | "highlight";
@@ -127,6 +127,8 @@ export default function CampHubPage() {
   const [unlockedThrough, setUnlockedThrough] = useState(0);
   // loaded = API response received (prevents flash of wrong state)
   const [loaded, setLoaded] = useState(false);
+  // Only auto-select day tab on the very first API response; user picks after that
+  const autoSelected = useRef(false);
 
   const fetchStatus = useCallback(() => {
     fetch("/api/camp-schedule", { cache: "no-store" })
@@ -139,9 +141,10 @@ export default function CampHubPage() {
         const through = typeof d.currentDay === "number" ? d.currentDay : 0;
         setIsActive(active);
         setUnlockedThrough(through);
-        // Auto-select the latest unlocked day tab
-        if (active && through > 0) {
+        // Auto-select the latest unlocked day tab — first load only
+        if (!autoSelected.current && active && through > 0) {
           setActiveDay(Math.min(through - 1, 3));
+          autoSelected.current = true;
         }
       })
       .catch(() => {

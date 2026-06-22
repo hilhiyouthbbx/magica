@@ -478,6 +478,64 @@ export default function CampHubPage() {
         )}
 
         {/* ── SCHEDULE VIEW ── */}
+        {activeView === "schedule" && (
+          <div className="space-y-4">
+            <div className="mb-4">
+              <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-0.5">{current.date}, 2026</div>
+              <div className="text-xs text-white/20">{current.theme}</div>
+            </div>
+            <div className="space-y-1.5">
+              {current.rows.map((row) => (
+                <div key={row.id} className={`flex gap-3 px-4 py-2.5 rounded-xl ${
+                  row.type === "section"   ? "bg-[#F4A800]/8 border border-[#F4A800]/25" :
+                  row.type === "highlight" ? "bg-white/8 border border-white/15" :
+                  row.type === "break"     ? "bg-white/3" :
+                  row.type === "game"      ? "bg-blue-900/20 border border-blue-500/20" :
+                  "bg-white/2"
+                }`}>
+                  <div className="w-[72px] text-[11px] font-black text-white/40 pt-0.5 shrink-0 tabular-nums">{row.time}</div>
+                  <div className="flex-1">
+                    <div className={`text-sm font-bold ${
+                      row.type === "section"   ? "text-[#F4A800]" :
+                      row.type === "highlight" ? "text-white" :
+                      row.type === "break"     ? "text-white/30" :
+                      row.type === "game"      ? "text-blue-300" :
+                      "text-white/75"
+                    }`}>{row.activity}</div>
+                    {row.note && <div className="text-[11px] text-white/30 mt-0.5">{row.note}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 4-Day Camp Overview */}
+            <div className="rounded-xl border border-white/10 overflow-hidden mt-6">
+              <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/28 bg-white/3 border-b border-white/10">
+                4-Day Camp Overview
+              </div>
+              {schedule.map((d, i) => (
+                <button key={i} onClick={() => { setActiveDay(i); setActiveView("schedule"); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors text-left">
+                  <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0"
+                    style={{ background: i === 3 ? "#E03A3A" : "#1B2A5E" }}>
+                    <span className="text-[9px] opacity-60 leading-none">Jun</span>
+                    <span className="text-base font-black leading-tight">{22 + i}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-white/75">{d.label}{i === 3 ? " — Championship" : ""}</div>
+                    <div className="text-xs text-white/28">{d.date}, 2026 · {d.theme}</div>
+                  </div>
+                  {isDayUnlocked(i)
+                    ? <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-700 text-white">OPEN</span>
+                    : <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-white/30">SOON</span>}
+                  <span className="text-white/20">›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── BRACKETS VIEW ── */}
         {activeView === "brackets" && (() => {
           const teamName = (id: string) => teams.find(t => t.id === id)?.name || "";
 
@@ -706,33 +764,6 @@ export default function CampHubPage() {
             </div>
           );
           })()}
-
-
-                {/* 4-Day Overview */}
-        <div className="rounded-xl border border-white/10 overflow-hidden">
-          <div className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-white/28 bg-white/3 border-b border-white/10">
-            4-Day Camp Overview
-          </div>
-          {schedule.map((d, i) => (
-            <button key={i} onClick={() => { setActiveDay(i); setActiveView("schedule"); }}
-              className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors text-left">
-              <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0"
-                style={{ background: i === 3 ? "#E03A3A" : "#1B2A5E" }}>
-                <span className="text-[9px] opacity-60 leading-none">Jun</span>
-                <span className="text-base font-black leading-tight">{22 + i}</span>
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-bold text-white/75">{d.label}{i === 3 ? " — Championship" : ""}</div>
-                <div className="text-xs text-white/28">{d.date}, 2026 · {d.theme}</div>
-              </div>
-              {isDayUnlocked(i)
-                ? <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-700 text-white">OPEN</span>
-                : <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-white/30">SOON</span>}
-              <span className="text-white/20">›</span>
-            </button>
-          ))}
-        </div>
-      </>)}
       </div>
 
       <footer className="bg-[#0D1520] border-t border-white/10 py-6 text-center">

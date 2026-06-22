@@ -197,13 +197,24 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
     setIsLive(live);
     setLiveDay(day);
     try {
-      await fetch(`/api/camp-schedule?key=${adminKey}`, {
+      const res = await fetch(`/api/camp-schedule?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isLive: live, liveDay: day }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        notify(`❌ Save failed (${res.status}) — ${err.error ?? "check admin key"}`);
+        // Revert UI state on failure
+        setIsLive(!live);
+        setLiveDay(day);
+        return;
+      }
       notify(live ? `🔴 LIVE — ${day >= 0 ? "Day " + (day + 1) : "On Air"}` : "⚫ Off Air — schedule is public");
-    } catch {}
+    } catch (e) {
+      notify("❌ Network error — live status NOT saved");
+      setIsLive(!live);
+    }
   }
 
   function notify(msg: string) {
@@ -388,7 +399,7 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {flash && <span className="text-sm text-blue-300 font-medium animate-pulse">{flash}</span>}
+          {flash && <span className={`text-sm font-medium animate-pulse ${flash.startsWith("❌") ? "text-red-400" : "text-blue-300"}`}>{flash}</span>}
           <button onClick={addRow}
             className="px-3 py-2 bg-white/8 hover:bg-white/12 border border-white/15 rounded-lg text-sm text-gray-300 hover:text-white transition-all">
             + Add Row

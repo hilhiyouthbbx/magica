@@ -163,11 +163,11 @@ export default function CampHubPage() {
       <div className="relative bg-gradient-to-b from-[#0D1520] to-[#080C14] px-4 pt-10 pb-8 text-center overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% -20%, rgba(244,168,0,.1) 0%, transparent 60%)" }} />
         <div className="relative z-10 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-bold mb-5 tracking-wider">
-            <span className={`w-2 h-2 rounded-full ${isLive ? "bg-orange-400 animate-pulse" : "bg-white/30"}`} />
-            {isLive ? "LIVE CAMP HUB" : "CAMP SCHEDULE HUB"}
-          </div>
-          <h1 className="text-4xl md:text-6xl font-black uppercase leading-tight mb-2">Hilhi Summer Youth Hoop Camp</h1>
+
+          <h1 className="text-4xl md:text-6xl font-black uppercase leading-tight mb-2">
+            {isLive && <span className="inline-block w-3 h-3 rounded-full bg-orange-400 animate-pulse mr-3 align-middle" />}
+            Hilhi Summer Youth Hoop Camp
+          </h1>
           <div className="text-5xl md:text-7xl font-black mb-3" style={{ color: "#F4A800" }}>2026</div>
           <p className="text-white/45 mb-5">June 22–25, 2026 · Follow the action in real time</p>
           <div className="flex flex-wrap justify-center gap-2 mb-5">

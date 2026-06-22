@@ -631,7 +631,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [data,        setData]        = useState<CampScheduleData | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [saved,       setSaved]       = useState(false);
-  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"games"|"bracket"|"events"|"settings">("teams");
+  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"games"|"bracket"|"events"|"settings"|"schedule">("teams");
   const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
   const [rawContacts, setRawContacts] = useState<Record<string, string>[]>([]);
   const [rosterLoad,  setRosterLoad]  = useState(false);
@@ -1081,6 +1081,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           ["bracket",   "🏆 Bracket"],
           ["events",    "🎯 Individual Events"],
           ["settings",  "⚙️ Settings"],
+        ["schedule",  "📅 Schedule"],
         ] as const).map(([s, label]) => (
           <button key={s} onClick={() => setSection(s)}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${section === s ? "bg-blue-600 text-white" : "glass border border-white/15 text-gray-400 hover:text-white"}`}>
@@ -1961,6 +1962,9 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           </button>
         </div>
       )}
+
+      {/* ── SCHEDULE EDITOR ── */}
+      {section === "schedule" && <ScheduleTab adminKey={adminKey} />}
 
       {/* ── Inline Camper Edit Modal ── */}
       {editingCamper && (

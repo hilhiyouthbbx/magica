@@ -11,10 +11,12 @@ import type {
 import type { DayKey, CheckInMap } from "@/lib/camp-checkin";
 
 const EVENT_NAMES = [
+  "Knockout",
   "Free Throw Contest",
   "3-Point Contest",
   "1-on-1 Challenge",
   "3-on-3 Tournament",
+  "Layup Contest",
 ];
 
 // ─── Types ───────────────────────────────────────────────────────────────────

@@ -1255,8 +1255,12 @@ export function CampTab({ adminKey }: { adminKey: string }) {
               gradeMap.get(cam.gradeNum)!.campers.push(cam);
             });
             const grades = [...gradeMap.entries()].sort((a,b) => a[0]-b[0]);
-            const totalPresent = confirmedRoster.filter(cam => checkIns[cam.id]?.[checkInDay]).length;
-            const totalAbsent  = confirmedRoster.length - totalPresent;
+            // Only count campers that are actually visible in the list (valid grade).
+            // Confirmed campers with unknown grade (gradeNum 99) are skipped in the
+            // display, so they must not inflate the absent counter.
+            const visibleRoster = confirmedRoster.filter(cam => cam.gradeNum !== 99);
+            const totalPresent = visibleRoster.filter(cam => checkIns[cam.id]?.[checkInDay]).length;
+            const totalAbsent  = visibleRoster.length - totalPresent;
             return (
               <div className="space-y-4">
                 {/* Summary bar */}
@@ -1270,7 +1274,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                     <div className="text-xs text-gray-500">Absent</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-black text-white">{confirmedRoster.length}</div>
+                    <div className="text-2xl font-black text-white">{visibleRoster.length}</div>
                     <div className="text-xs text-gray-500">Total</div>
                   </div>
                   <div className="flex-1" />

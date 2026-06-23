@@ -65,11 +65,44 @@ async function sendAbsentEmails(day: DayKey, dayLabel: string, campName: string)
 
   const [contacts, checkIns] = await Promise.all([getContacts(), getCheckIns()]);
 
-  // Find campers registered for camp (have camperName)
-  const campers = contacts.filter(c => c.camperName?.trim());
+  // Match the same roster rules used by the admin Check-In screen:
+  // 1) must have a camper name
+  // 2) must be confirmed/paid/free/approved, or blank payment status
+  // 3) must have a real grade number so hidden/unknown roster rows are not emailed
+  // 4) de-dupe by camper name + parent email so duplicate contact rows do not get random absent emails
+  const isConfirmed = (paymentStatus?: string) => {
+    const s = (paymentStatus ?? "").trim();
+    return s === "" || /paid|free|manual payment approved|approved/i.test(s);
+  };
 
-  // Who did NOT check in today
-  const absent = campers.filter(c => !checkIns[c.id]?.[day]);
+  const gradeNum = (grade?: string) => {
+    const m = (grade ?? "").match(/\d+/);
+    return m ? Number(m[0]) : 99;
+  };
+
+  const norm = (s?: string) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const camperKey = (c: { camperName?: string; email?: string }) => `${norm(c.camperName)}|${norm(c.email)}`;
+
+  const seen = new Set<string>();
+  const campers = contacts
+    .filter(c => c.camperName?.trim())
+    .filter(c => isConfirmed(c.paymentStatus))
+    .filter(c => gradeNum(c.grade) !== 99)
+    .filter(c => {
+      const key = camperKey(c);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  // Treat duplicate rows for the same camper/email as present if ANY matching row was checked in.
+  // This prevents checked-in campers from being emailed when duplicate contact records exist.
+  const checkedKeys = new Set<string>();
+  for (const c of contacts) {
+    if (checkIns[c.id]?.[day]) checkedKeys.add(camperKey(c));
+  }
+
+  const absent = campers.filter(c => !checkIns[c.id]?.[day] && !checkedKeys.has(camperKey(c)));
 
   if (absent.length === 0) {
     return { ok: true, sent: 0, skipped: 0, message: "All registered campers are checked in!" };

@@ -306,6 +306,87 @@ export default function CampHubPage() {
 
   const current = schedule[activeDay] ?? DEFAULT_SCHEDULE[0];
 
+
+  // ── PDF Print ──────────────────────────────────────────────────────────────
+  const handleDownloadPDF = () => {
+    const typeLabel = (type: RowType) => {
+      if (type === "section")   return "background:#fff8e8;color:#7a5000;font-weight:700;";
+      if (type === "highlight") return "background:#f0f0f0;color:#000;font-weight:700;";
+      if (type === "game")      return "color:#1a4080;font-weight:600;";
+      if (type === "break")     return "color:#999;font-style:italic;";
+      return "color:#333;";
+    };
+
+    const rows = current.rows.map(row => `
+      <tr style="${typeLabel(row.type)}">
+        <td class="tc">${row.time}</td>
+        <td class="ac">${row.activity}</td>
+        <td class="nc">${row.note ?? ""}</td>
+      </tr>`).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Hilhi Youth Basketball Camp 2026 — ${current.label}</title>
+  <style>
+    @page{size:letter portrait;margin:12mm 14mm;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#111;background:#fff;}
+    .header{border-bottom:3px solid #F4A800;padding-bottom:8px;margin-bottom:12px;}
+    .header h1{font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;}
+    .header .day-title{font-size:20px;font-weight:900;color:#F4A800;margin:2px 0;}
+    .header .meta{font-size:9px;color:#666;margin-top:3px;}
+    .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+    .badge{font-size:9px;padding:2px 9px;border-radius:10px;font-weight:700;}
+    .badge-gray{background:#eee;color:#333;}
+    .badge-gold{background:#F4A800;color:#000;}
+    .badge-red{background:#c0392b;color:#fff;}
+    table{width:100%;border-collapse:collapse;border:1px solid #ddd;}
+    thead tr{background:#f0f0f0;}
+    th{padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#666;}
+    tr{border-bottom:1px solid #ebebeb;}
+    tr:last-child{border-bottom:none;}
+    tbody tr:nth-child(even){filter:brightness(0.985);}
+    .tc{padding:5px 10px;white-space:nowrap;width:80px;color:#555;font-size:10px;}
+    .ac{padding:5px 10px;font-size:10.5px;}
+    .nc{padding:5px 10px;font-size:9.5px;color:#888;width:140px;}
+    .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+      <img src="data:image/jpeg;base64,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" alt="Hilhi Youth Basketball Camp" style="height:48px;width:auto;object-fit:contain;flex-shrink:0;border-radius:4px;" />
+      <div>
+        <h1>Hilhi Youth Basketball Camp 2026</h1>
+        <div class="day-title">${current.label} — ${current.theme ?? ""}</div>
+        <div class="meta">${current.date ?? ""}, 2026 · Hillsboro, OR · 7:30 AM – 3:00 PM</div>
+      </div>
+    </div>
+    <div class="badges">
+      <span class="badge badge-gray">Grades 1st–8th</span>
+      <span class="badge badge-gold">NBA Division · 1st–4th Grade</span>
+      <span class="badge badge-red">College Division · 5th–8th Grade</span>
+    </div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Time</th><th>Activity</th><th>Notes</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow pop-ups to print the schedule."); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
   // ── Spinner while waiting for first API response ──
   if (!loaded) {
     return (
@@ -346,6 +427,16 @@ export default function CampHubPage() {
             <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">7:30 AM – 3:00 PM</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold" style={{ background: "#F4A800", color: "#0B0F1A" }}>NBA: 1st–4th Grade</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#E03A3A]">College: 5th–8th Grade</span>
+          </div>
+          {/* Print Schedule PDF */}
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#F4A800]/60 hover:text-[#F4A800] transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Print Schedule PDF
+            </button>
           </div>
         </div>
       </div>

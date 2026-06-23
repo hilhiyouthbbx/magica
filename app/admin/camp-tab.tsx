@@ -562,7 +562,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [data,        setData]        = useState<CampScheduleData | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [saved,       setSaved]       = useState(false);
-  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"bracket"|"events"|"schedule"|"settings">("teams");
+  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"poolplay"|"standings"|"bracket"|"events"|"schedule"|"settings">("teams");
   const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
   const [rawContacts, setRawContacts] = useState<Record<string, string>[]>([]);
   const [rosterLoad,  setRosterLoad]  = useState(false);
@@ -960,6 +960,39 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     return s1 !== null && s2 !== null && (game.status === "final" || s1 > 0 || s2 > 0);
   }
 
+  function addPoolGame(division: Division) {
+    if (!data) return;
+    const games = getPoolGames();
+    const g = {
+      id: Date.now().toString(),
+      round: 1,
+      division,
+      team1Id: "",
+      team2Id: "",
+      score1: null as number | null,
+      score2: null as number | null,
+      court: "A",
+      status: "scheduled",
+    };
+    save({ seedingGames: [...games, g] } as Partial<CampScheduleData>);
+  }
+
+  function setPoolGameField(id: string, field: string, value: unknown) {
+    if (!data) return;
+    const games = getPoolGames().map(g => g.id === id ? { ...g, [field]: value } : g);
+    setData({ ...data, seedingGames: games } as CampScheduleData);
+  }
+
+  function savePoolGames() {
+    if (!data) return;
+    save({ seedingGames: getPoolGames() } as Partial<CampScheduleData>);
+  }
+
+  function removePoolGame(id: string) {
+    if (!data || !confirm("Remove this pool play game?")) return;
+    save({ seedingGames: getPoolGames().filter(g => g.id !== id) } as Partial<CampScheduleData>);
+  }
+
   function calcPoolStandings(div: Division): PoolStandingRow[] {
     const rows = new Map<string, PoolStandingRow>();
     divTeams(div).forEach(team => rows.set(team.id, {
@@ -1044,6 +1077,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           ["roster",    "📋 Camper Roster"],
           ["checkin",   "✅ Check-In"],
           ["teams",     "👥 Teams & Rosters"],
+          ["poolplay",  "🏀 Pool Play Scores"],
           ["standings", "📊 Standings"],
           ["bracket",   "🏆 Bracket"],
           ["events",    "🎯 Individual Events"],
@@ -1474,6 +1508,123 @@ export function CampTab({ adminKey }: { adminKey: string }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── POOL PLAY SCORES ── */}
+      {section === "poolplay" && (
+        <div className="space-y-6">
+          {(["NBA", "College"] as Division[]).map(div => {
+            const games = getPoolGames().filter(game => game.division === div).sort((a, b) => a.round - b.round);
+            const opts = teamOpts(div);
+            return (
+              <div key={div} className="glass rounded-2xl border border-white/10 p-5">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-white font-black text-base">{div} Division — Pool Play Scores</h3>
+                    <p className="text-gray-500 text-xs mt-0.5">
+                      Enter pool play scores here. The Standings tab and public website standings use these scores.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => addPoolGame(div)}
+                      className="px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 text-xs font-bold rounded-xl transition-all">
+                      + Add Pool Game
+                    </button>
+                    <button onClick={savePoolGames}
+                      className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
+                      <Save className="w-3 h-3" /> Save Scores
+                    </button>
+                  </div>
+                </div>
+
+                {games.length === 0 ? (
+                  <p className="text-gray-600 text-sm">No pool play games yet. Click &quot;Add Pool Game&quot; to create one.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {games.map(game => (
+                      <div key={game.id} className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500 text-xs">Round</span>
+                            <input
+                              type="number" min={1} max={3}
+                              value={game.round}
+                              onChange={e => setPoolGameField(game.id, "round", parseInt(e.target.value) || 1)}
+                              className="w-14 text-center px-2 py-1 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500"
+                            />
+                            <span className="text-gray-500 text-xs">Court</span>
+                            <input
+                              value={game.court ?? ""}
+                              onChange={e => setPoolGameField(game.id, "court", e.target.value)}
+                              className="w-14 text-center px-2 py-1 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={game.status ?? "scheduled"}
+                              onChange={e => setPoolGameField(game.id, "status", e.target.value)}
+                              className="px-2 py-1 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500">
+                              <option value="scheduled">Scheduled</option>
+                              <option value="live">🔴 Live</option>
+                              <option value="final">Final</option>
+                            </select>
+                            <button onClick={() => removePoolGame(game.id)}
+                              className="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-red-400 transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-[1fr_80px_1fr] gap-3 items-end">
+                          <div>
+                            <label className="block text-xs text-gray-500 font-semibold mb-1.5">Team 1</label>
+                            <select
+                              value={game.team1Id}
+                              onChange={e => setPoolGameField(game.id, "team1Id", e.target.value)}
+                              className="w-full px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500">
+                              <option value="">Select Team 1…</option>
+                              {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1">
+                            <div>
+                              <label className="block text-[10px] text-gray-600 text-center mb-1">Score</label>
+                              <input
+                                type="number" min={0} placeholder="0"
+                                value={game.score1 ?? ""}
+                                onChange={e => setPoolGameField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
+                                className="w-full text-center px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-gray-600 text-center mb-1">Score</label>
+                              <input
+                                type="number" min={0} placeholder="0"
+                                value={game.score2 ?? ""}
+                                onChange={e => setPoolGameField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
+                                className="w-full text-center px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 font-semibold mb-1.5 text-right">Team 2</label>
+                            <select
+                              value={game.team2Id}
+                              onChange={e => setPoolGameField(game.id, "team2Id", e.target.value)}
+                              className="w-full px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500">
+                              <option value="">Select Team 2…</option>
+                              {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

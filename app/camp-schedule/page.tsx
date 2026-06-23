@@ -468,6 +468,85 @@ export default function CampHubPage() {
           </div>
         )}
 
+        {/* ── STANDINGS VIEW ── */}
+        {activeView === "standings" && (
+          <div className="space-y-8">
+            {(["NBA", "College"] as const).map((div) => {
+              const rows = calcPoolStandings(div);
+              const playedGames = seedingGames.filter(g => g.division === div && isPlayedPoolGame(g));
+              return (
+                <div key={div} className="rounded-2xl border border-white/10 overflow-hidden bg-white/2">
+                  <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between" style={{ background: div === "NBA" ? "#1B2A5E" : "#7B1212" }}>
+                    <div>
+                      <div className="text-white font-black text-sm uppercase tracking-widest">{div} Division Standings</div>
+                      <div className="text-white/45 text-xs mt-0.5">Calculated from pool play scores</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white font-black text-lg">{playedGames.length}</div>
+                      <div className="text-white/45 text-[10px] uppercase tracking-widest">Final Games</div>
+                    </div>
+                  </div>
+
+                  {rows.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-white/35 text-sm">
+                      No teams posted yet.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-white/5 text-white/35 text-[10px] uppercase tracking-widest">
+                            <th className="px-3 py-2 text-left">Rank</th>
+                            <th className="px-3 py-2 text-left">Team</th>
+                            <th className="px-3 py-2 text-center">W</th>
+                            <th className="px-3 py-2 text-center">L</th>
+                            <th className="px-3 py-2 text-center">GP</th>
+                            <th className="px-3 py-2 text-center">PF</th>
+                            <th className="px-3 py-2 text-center">PA</th>
+                            <th className="px-3 py-2 text-center">Diff</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {rows.map((row, idx) => (
+                            <tr key={row.team.id} className={idx === 0 ? "bg-[#F4A800]/8" : ""}>
+                              <td className="px-3 py-3 font-black text-[#F4A800]">#{idx + 1}</td>
+                              <td className="px-3 py-3 font-bold text-white">{row.team.name || "TBD"}</td>
+                              <td className="px-3 py-3 text-center text-green-400 font-black">{row.wins}</td>
+                              <td className="px-3 py-3 text-center text-red-400 font-black">{row.losses}</td>
+                              <td className="px-3 py-3 text-center text-white/55">{row.gamesPlayed}</td>
+                              <td className="px-3 py-3 text-center text-white/55">{row.pointsFor}</td>
+                              <td className="px-3 py-3 text-center text-white/55">{row.pointsAgainst}</td>
+                              <td className={`px-3 py-3 text-center font-black ${row.diff >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                {row.diff > 0 ? "+" : ""}{row.diff}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="px-4 py-3 border-t border-white/10 bg-black/20">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-white/28 mb-2">Pool Play Scores Used</div>
+                    {playedGames.length === 0 ? (
+                      <div className="text-xs text-white/30 italic">No final pool play scores entered yet.</div>
+                    ) : (
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        {playedGames.map(game => (
+                          <div key={game.id} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs flex items-center justify-between gap-2">
+                            <span className="text-white/70 truncate">R{game.round}: {teamName(game.team1Id)} vs {teamName(game.team2Id)}</span>
+                            <span className="font-black text-white flex-shrink-0">{game.score1 ?? 0} - {game.score2 ?? 0}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* ── SCHEDULE VIEW ── */}
         {activeView === "schedule" && (<>
 

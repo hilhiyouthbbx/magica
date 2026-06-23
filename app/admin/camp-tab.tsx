@@ -993,6 +993,64 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     save({ seedingGames: getPoolGames().filter(g => g.id !== id) } as Partial<CampScheduleData>);
   }
 
+
+  function generateSixGamePoolSchedule(division: Division) {
+    if (!data) return;
+    const teams = divTeams(division);
+    if (teams.length !== 4) {
+      alert("The 6-game pool schedule is set up for 4 teams per division. This division currently has " + teams.length + " teams.");
+      return;
+    }
+
+    const allGames = getPoolGames();
+    const otherDivisionGames = allGames.filter(g => g.division !== division);
+    const divisionGames = allGames.filter(g => g.division === division);
+    const existingByPair = new Map<string, typeof divisionGames>();
+
+    function pairKey(a: string, b: string) {
+      return [a, b].sort().join("__");
+    }
+
+    divisionGames.forEach(g => {
+      if (!g.team1Id || !g.team2Id) return;
+      const key = pairKey(g.team1Id, g.team2Id);
+      existingByPair.set(key, [...(existingByPair.get(key) ?? []), g]);
+    });
+
+    const nextGames = [...divisionGames];
+    let round = Math.max(0, ...divisionGames.map(g => Number(g.round) || 0)) + 1;
+    let courtIndex = 0;
+    const courts = ["A", "B"];
+
+    // 4 teams + everyone plays 6 games = double round robin.
+    // Each pair plays twice: 6 pairings x 2 games = 12 total games per division.
+    for (let i = 0; i < teams.length; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        const t1 = teams[i];
+        const t2 = teams[j];
+        const key = pairKey(t1.id, t2.id);
+        const currentCount = existingByPair.get(key)?.length ?? 0;
+        for (let n = currentCount; n < 2; n++) {
+          nextGames.push({
+            id: `pool-${division}-${t1.id}-${t2.id}-${Date.now()}-${i}-${j}-${n}`,
+            round,
+            division,
+            team1Id: n % 2 === 0 ? t1.id : t2.id,
+            team2Id: n % 2 === 0 ? t2.id : t1.id,
+            score1: null,
+            score2: null,
+            court: courts[courtIndex % courts.length],
+            status: "scheduled",
+          });
+          courtIndex++;
+          if (courtIndex % 2 === 0) round++;
+        }
+      }
+    }
+
+    save({ seedingGames: [...otherDivisionGames, ...nextGames] } as Partial<CampScheduleData>);
+  }
+
   function calcPoolStandings(div: Division): PoolStandingRow[] {
     const rows = new Map<string, PoolStandingRow>();
     divTeams(div).forEach(team => rows.set(team.id, {
@@ -1531,6 +1589,10 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       className="px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 text-xs font-bold rounded-xl transition-all">
                       + Add Pool Game
                     </button>
+                    <button onClick={() => generateSixGamePoolSchedule(div)}
+                      className="px-3 py-1.5 glass border border-yellow-500/30 hover:border-yellow-400/60 text-yellow-500 hover:text-yellow-300 text-xs font-bold rounded-xl transition-all">
+                      Generate 6-Game Pool
+                    </button>
                     <button onClick={savePoolGames}
                       className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
                       <Save className="w-3 h-3" /> Save Scores
@@ -1576,7 +1638,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-[1fr_80px_1fr] gap-3 items-end">
+                        <div className="grid grid-cols-[1fr_150px_1fr] gap-4 items-end">
                           <div>
                             <label className="block text-xs text-gray-500 font-semibold mb-1.5">Team 1</label>
                             <select
@@ -1594,7 +1656,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                                 type="number" min={0} placeholder="0"
                                 value={game.score1 ?? ""}
                                 onChange={e => setPoolGameField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
-                                className="w-full text-center px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500"
+                                className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
                               />
                             </div>
                             <div>
@@ -1603,7 +1665,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                                 type="number" min={0} placeholder="0"
                                 value={game.score2 ?? ""}
                                 onChange={e => setPoolGameField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
-                                className="w-full text-center px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500"
+                                className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
                               />
                             </div>
                           </div>
@@ -1786,7 +1848,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                                   type="number" min={0} placeholder="Score"
                                   value={game[scoreKey] ?? ""}
                                   onChange={e => setBracketField(game.id, scoreKey, e.target.value === "" ? null : parseInt(e.target.value))}
-                                  className="w-full text-center px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500"
+                                  className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
                                 />
                               </div>
                             );

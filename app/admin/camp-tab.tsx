@@ -998,7 +998,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     if (!data) return;
     const teams = divTeams(division);
     if (teams.length !== 4) {
-      alert("The 6-game pool schedule is set up for 4 teams per division. This division currently has " + teams.length + " teams.");
+      alert("The 12-games-per-team pool schedule is set up for 4 teams per division. This division currently has " + teams.length + " teams.");
       return;
     }
 
@@ -1016,9 +1016,12 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     }
 
     function autoScheduleRows(gamesToPlace: typeof divisionGames): DayData[] {
-      const baseDays: DayData[] = Array.isArray(data.dailySchedule) && data.dailySchedule.length > 0
-        ? JSON.parse(JSON.stringify(data.dailySchedule))
-        : JSON.parse(JSON.stringify(DEFAULT));
+      const baseDays: DayData[] =
+        data?.dailySchedule &&
+        Array.isArray(data.dailySchedule) &&
+        data.dailySchedule.length > 0
+          ? JSON.parse(JSON.stringify(data.dailySchedule))
+          : JSON.parse(JSON.stringify(DEFAULT));
 
       // Remove previous auto-added rows for this division only, so regenerating does not duplicate rows.
       const autoPrefix = `pool-schedule-auto-${division}-`;
@@ -1028,9 +1031,10 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       }));
 
       const sorted = [...gamesToPlace].sort((a, b) => (Number(a.round) || 0) - (Number(b.round) || 0));
-      const half = Math.ceil(sorted.length / 2);
-      const day2Games = sorted.slice(0, half);
-      const day3Games = sorted.slice(half);
+      const third = Math.ceil(sorted.length / 3);
+      const day1Games = sorted.slice(0, third);
+      const day2Games = sorted.slice(third, third * 2);
+      const day3Games = sorted.slice(third * 2);
 
       function makeRows(dayGames: typeof divisionGames, startTime: string): ScheduleRow[] {
         const start = toMins(startTime);
@@ -1043,6 +1047,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
         }));
       }
 
+      if (cleanDays[0]) cleanDays[0].rows = [...cleanDays[0].rows, ...makeRows(day1Games, "11:00 AM")];
       if (cleanDays[1]) cleanDays[1].rows = [...cleanDays[1].rows, ...makeRows(day2Games, "10:00 AM")];
       if (cleanDays[2]) cleanDays[2].rows = [...cleanDays[2].rows, ...makeRows(day3Games, "9:30 AM")];
       return cleanDays;
@@ -1060,15 +1065,15 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     let courtIndex = 0;
     const courts = ["Main Court", "Aux Court"];
 
-    // 4 teams + everyone plays 6 games = double round robin.
-    // Each pair plays twice: 6 pairings x 2 games = 12 total games per division.
+    // 4 teams + everyone plays 12 games = four full round robins.
+    // Each pair plays 4 times: 6 pairings x 4 games = 24 total games per division.
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
         const t1 = teams[i];
         const t2 = teams[j];
         const key = pairKey(t1.id, t2.id);
         const currentCount = existingByPair.get(key)?.length ?? 0;
-        for (let n = currentCount; n < 2; n++) {
+        for (let n = currentCount; n < 4; n++) {
           const newGame = {
             id: `pool-${division}-${t1.id}-${t2.id}-${Date.now()}-${i}-${j}-${n}`,
             round,
@@ -1088,7 +1093,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       }
     }
 
-    const dailySchedule = addedGames.length > 0 ? autoScheduleRows(addedGames) : (data.dailySchedule ?? DEFAULT);
+    const dailySchedule = addedGames.length > 0 ? autoScheduleRows(addedGames) : (data?.dailySchedule ?? DEFAULT);
     save({ seedingGames: [...otherDivisionGames, ...nextGames], dailySchedule } as Partial<CampScheduleData>);
   }
 
@@ -1632,7 +1637,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                     </button>
                     <button onClick={() => generateSixGamePoolSchedule(div)}
                       className="px-3 py-1.5 glass border border-yellow-500/30 hover:border-yellow-400/60 text-yellow-500 hover:text-yellow-300 text-xs font-bold rounded-xl transition-all">
-                      Generate 6-Game Pool
+                      Generate 12 Games/Team
                     </button>
                     <button onClick={savePoolGames}
                       className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
@@ -1651,7 +1656,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           <div className="flex items-center gap-2">
                             <span className="text-gray-500 text-xs">Round</span>
                             <input
-                              type="number" min={1} max={3}
+                              type="number" min={1} max={12}
                               value={game.round}
                               onChange={e => setPoolGameField(game.id, "round", parseInt(e.target.value) || 1)}
                               className="w-14 text-center px-2 py-1 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500"

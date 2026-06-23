@@ -108,6 +108,7 @@ export function Navbar() {
     ...(navConfig.showTryouts ? [{ label: lbl(navConfig, "labelTryout"), href: "/tryout" }] : []),
     { label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" },
     { label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" },
+    { label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" },
     { label: lbl(navConfig, "labelMerch"),        href: "/merch" },
     { label: lbl(navConfig, "labelFilmRoom"),     href: "/film-room" },
     { label: lbl(navConfig, "labelContact"),      href: "/#contact" },
@@ -155,7 +156,13 @@ export function Navbar() {
               );
             }
             return (
-              <a key={l.label} href={l.href} className="px-2.5 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap">
+              <a
+                key={l.label}
+                href={l.href}
+                target={l.href.startsWith("http") ? "_blank" : undefined}
+                rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                className="px-2.5 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
+              >
                 {l.label}
               </a>
             );
@@ -192,7 +199,14 @@ export function Navbar() {
             if (l.href === "/film-room") {
               return <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all">🎬 {l.label}</a>;
             }
-            return <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">{l.label}</a>;
+            return <a
+              key={l.label}
+              href={l.href}
+              target={l.href.startsWith("http") ? "_blank" : undefined}
+              rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
+              onClick={() => setOpen(false)}
+              className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+            >{l.label}</a>;
           })}
           <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
             Register Now

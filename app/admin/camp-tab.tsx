@@ -919,7 +919,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     }
   }
 
-  const divTeams = (div: Division) => data.teams.filter(t => t.division === div);
+  const divTeams = (div: Division) => (data?.teams ?? []).filter(t => t.division === div);
   const teamOpts = (div: Division) => divTeams(div).map(t => ({ id: t.id, name: t.name || "(unnamed)" }));
 
   type PoolStandingRow = {
@@ -933,7 +933,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   };
 
   function getPoolGames() {
-    return (((data as unknown as { seedingGames?: Array<{
+    return ((((data ?? {}) as unknown as { seedingGames?: Array<{
       id: string;
       round: number;
       division: Division;
@@ -1002,7 +1002,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   }
 
   function teamName(id: string) {
-    return data.teams.find(t => t.id === id)?.name || id || "TBD";
+    return data?.teams?.find(t => t.id === id)?.name || id || "TBD";
   }
 
   // Grade label helper (used in roster section)

@@ -907,6 +907,13 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     setSendingEmail(true);
     setEmailResult("");
     try {
+      // Collect the contactIds the admin has checked on-screen right now.
+      // Sending this to the server ensures it uses the exact same data the UI shows,
+      // not a stale or empty Redis snapshot (which caused the "emailed everyone" bug).
+      const presentIds = Object.entries(checkIns)
+        .filter(([, ci]) => ci[checkInDay])
+        .map(([id]) => id);
+
       const res  = await fetch(`/api/camp-checkin?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -914,6 +921,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           action: "send-absent", day: checkInDay,
           dayLabel: { day1:"Day 1",day2:"Day 2",day3:"Day 3",day4:"Day 4" }[checkInDay],
           campName: data?.campName || "Hilhi Youth Basketball Camp",
+          presentIds, // ← authoritative list of who is present on this screen
         }),
       });
       const json = await res.json() as { ok?: boolean; sent?: number; failed?: number; total?: number; message?: string; error?: string };
@@ -1234,8 +1242,8 @@ export function CampTab({ adminKey }: { adminKey: string }) {
               gradeMap.get(cam.gradeNum)!.campers.push(cam);
             });
             const grades = [...gradeMap.entries()].sort((a,b) => a[0]-b[0]);
-            const totalPresent = roster.filter(cam => checkIns[cam.id]?.[checkInDay]).length;
-            const totalAbsent  = roster.length - totalPresent;
+            const totalPresent = confirmedRoster.filter(cam => checkIns[cam.id]?.[checkInDay]).length;
+            const totalAbsent  = confirmedRoster.length - totalPresent;
             return (
               <div className="space-y-4">
                 {/* Summary bar */}

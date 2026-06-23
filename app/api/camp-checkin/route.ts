@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     checked?: boolean;
     dayLabel?: string;
     campName?: string;
+    presentIds?: string[];  // contactIds the admin sees as checked-in on screen
   };
 
   if (body.action === "toggle" && body.contactId && body.day) {
@@ -38,7 +39,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "send-absent" && body.day) {
-    const result = await sendAbsentEmails(body.day, body.dayLabel ?? body.day, body.campName ?? "Hilhi Youth Basketball Camp");
+    const result = await sendAbsentEmails(
+      body.day,
+      body.dayLabel ?? body.day,
+      body.campName ?? "Hilhi Youth Basketball Camp",
+      body.presentIds,
+    );
     return NextResponse.json(result);
   }
 
@@ -54,7 +60,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 // ── Send absent notifications ────────────────────────────────────────────────
-async function sendAbsentEmails(day: DayKey, dayLabel: string, campName: string) {
+async function sendAbsentEmails(day: DayKey, dayLabel: string, campName: string, presentIds?: string[]) {
   const smtpHost = process.env.SMTP_HOST;
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
@@ -65,11 +71,7 @@ async function sendAbsentEmails(day: DayKey, dayLabel: string, campName: string)
 
   const [contacts, checkIns] = await Promise.all([getContacts(), getCheckIns()]);
 
-  // Match the same roster rules used by the admin Check-In screen:
-  // 1) must have a camper name
-  // 2) must be confirmed/paid/free/approved, or blank payment status
-  // 3) must have a real grade number so hidden/unknown roster rows are not emailed
-  // 4) de-dupe by camper name + parent email so duplicate contact rows do not get random absent emails
+  // ── Roster filtering (matches the admin Check-In screen exactly) ────────
   const isConfirmed = (paymentStatus?: string) => {
     const s = (paymentStatus ?? "").trim();
     return s === "" || /paid|free|manual payment approved|approved/i.test(s);
@@ -95,14 +97,44 @@ async function sendAbsentEmails(day: DayKey, dayLabel: string, campName: string)
       return true;
     });
 
-  // Treat duplicate rows for the same camper/email as present if ANY matching row was checked in.
-  // This prevents checked-in campers from being emailed when duplicate contact records exist.
-  const checkedKeys = new Set<string>();
-  for (const c of contacts) {
-    if (checkIns[c.id]?.[day]) checkedKeys.add(camperKey(c));
+  // ── Build the authoritative "present" set ────────────────────────────────
+  // If the admin UI sent presentIds, use that list — it reflects what the admin
+  // verified on screen and prevents a stale/empty Redis snapshot from causing
+  // every camper to appear absent (the "emailed everyone" bug).
+  // Fall back to Redis only if no list was sent, with a safety gate.
+  let presentSet: Set<string>;
+
+  if (presentIds !== undefined) {
+    // Client-provided list is authoritative.
+    presentSet = new Set(presentIds);
+  } else {
+    // Legacy path: no client list sent.  Apply safety gate — if Redis shows
+    // 0 present but we have >3 confirmed campers, something is wrong; refuse.
+    const redisPresentCount = contacts.filter(c => checkIns[c.id]?.[day]).length;
+    if (redisPresentCount === 0 && campers.length > 3) {
+      return {
+        ok: false,
+        error: `Safety check: 0 of ${campers.length} registered campers show as checked in. ` +
+               "Check-in data may not have saved. Refresh the page and verify check-ins before sending emails.",
+        sent: 0,
+        skipped: 0,
+      };
+    }
+    presentSet = new Set(
+      Object.entries(checkIns)
+        .filter(([, ci]) => ci[day])
+        .map(([id]) => id)
+    );
   }
 
-  const absent = campers.filter(c => !checkIns[c.id]?.[day] && !checkedKeys.has(camperKey(c)));
+  // Handle duplicate contact rows: if ANY row for the same camper+email is
+  // present, treat that camper as present (prevents double-sending).
+  const presentKeys = new Set<string>();
+  for (const c of contacts) {
+    if (presentSet.has(c.id)) presentKeys.add(camperKey(c));
+  }
+
+  const absent = campers.filter(c => !presentSet.has(c.id) && !presentKeys.has(camperKey(c)));
 
   if (absent.length === 0) {
     return { ok: true, sent: 0, skipped: 0, message: "All registered campers are checked in!" };

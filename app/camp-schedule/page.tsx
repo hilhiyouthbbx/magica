@@ -123,16 +123,6 @@ interface SeedingGame {
   status: "scheduled" | "live" | "final";
 }
 
-interface StandingRow {
-  team: CampTeam;
-  wins: number;
-  losses: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  diff: number;
-  gamesPlayed: number;
-}
-
 interface BracketGame {
   id: string;
   round: "semi" | "final" | "3rd";
@@ -175,11 +165,100 @@ function actColor(type: RowType) {
 }
 
 
-function camperShortName(name: string): string {
-  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0];
-  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+type StandingRow = {
+  teamId: string;
+  teamName: string;
+  division: "NBA" | "College";
+  wins: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  diff: number;
+  gamesPlayed: number;
+};
+
+function calculateCampStandings(
+  division: "NBA" | "College",
+  teams: CampTeam[],
+  seedingGames: SeedingGame[]
+): StandingRow[] {
+  const divTeams = teams.filter((team) => team.division === division);
+  const rows = new Map<string, StandingRow>();
+
+  divTeams.forEach((team) => {
+    rows.set(team.id, {
+      teamId: team.id,
+      teamName: team.name || "TBD",
+      division: team.division,
+      wins: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      diff: 0,
+      gamesPlayed: 0,
+    });
+  });
+
+  const scoredPoolGames = seedingGames.filter((game) => {
+    if (game.division !== division) return false;
+    if (!game.team1Id || !game.team2Id) return false;
+    if (game.score1 === null || game.score2 === null) return false;
+    // Ignore empty scheduled placeholders that are still 0-0.
+    if (game.score1 === 0 && game.score2 === 0) return false;
+    return rows.has(game.team1Id) && rows.has(game.team2Id);
+  });
+
+  scoredPoolGames.forEach((game) => {
+    const team1 = rows.get(game.team1Id);
+    const team2 = rows.get(game.team2Id);
+    if (!team1 || !team2 || game.score1 === null || game.score2 === null) return;
+
+    team1.pointsFor += game.score1;
+    team1.pointsAgainst += game.score2;
+    team1.gamesPlayed += 1;
+
+    team2.pointsFor += game.score2;
+    team2.pointsAgainst += game.score1;
+    team2.gamesPlayed += 1;
+
+    if (game.score1 > game.score2) {
+      team1.wins += 1;
+      team2.losses += 1;
+    } else if (game.score2 > game.score1) {
+      team2.wins += 1;
+      team1.losses += 1;
+    }
+  });
+
+  // If no pool scores are saved yet, fall back to the manual team standings fields.
+  const hasPoolScores = scoredPoolGames.length > 0;
+  if (!hasPoolScores) {
+    divTeams.forEach((team) => {
+      const row = rows.get(team.id);
+      if (!row) return;
+      row.wins = team.wins || 0;
+      row.losses = team.losses || 0;
+      row.pointsFor = team.pointsFor || 0;
+      row.pointsAgainst = team.pointsAgainst || 0;
+      row.gamesPlayed = row.wins + row.losses;
+    });
+  }
+
+  return Array.from(rows.values())
+    .map((row) => ({ ...row, diff: row.pointsFor - row.pointsAgainst }))
+    .sort((a, b) =>
+      b.wins - a.wins ||
+      a.losses - b.losses ||
+      b.diff - a.diff ||
+      b.pointsFor - a.pointsFor ||
+      a.teamName.localeCompare(b.teamName)
+    );
+}
+
+function formatPoolScore(game: SeedingGame, teams: CampTeam[]) {
+  const t1 = teams.find((team) => team.id === game.team1Id)?.name || game.team1Id || "TBD";
+  const t2 = teams.find((team) => team.id === game.team2Id)?.name || game.team2Id || "TBD";
+  return `${t1} ${game.score1 ?? "-"} — ${game.score2 ?? "-"} ${t2}`;
 }
 
 // ─── Public Page (read-only) ──────────────────────────────────────────
@@ -201,7 +280,7 @@ export default function CampHubPage() {
   const [seedingGames, setSeedingGames] = useState<SeedingGame[]>([]);
   const [individualEvents, setIndividualEvents] = useState<IndividualEvent[]>([]);
   // Top-level view toggle
-  const [activeView, setActiveView] = useState<"schedule" | "standings" | "rosters">("schedule");
+  const [activeView, setActiveView] = useState<"schedule" | "rosters" | "standings">("schedule");
 
   const fetchStatus = useCallback(() => {
     fetch("/api/camp-schedule", { cache: "no-store" })
@@ -244,67 +323,11 @@ export default function CampHubPage() {
   // Helper: is this day tab unlocked?
   const isDayUnlocked = (i: number) => (i + 1) <= unlockedThrough;
 
-  function isPlayedPoolGame(game: SeedingGame) {
-    const s1 = typeof game.score1 === "number" ? game.score1 : null;
-    const s2 = typeof game.score2 === "number" ? game.score2 : null;
-    return s1 !== null && s2 !== null && (game.status === "final" || s1 > 0 || s2 > 0);
-  }
-
-  function teamName(id: string) {
-    return teams.find(t => t.id === id)?.name || id || "TBD";
-  }
-
-  function calcPoolStandings(division: "NBA" | "College"): StandingRow[] {
-    const divTeams = teams.filter(t => t.division === division);
-    const rows = new Map<string, StandingRow>();
-    divTeams.forEach(team => rows.set(team.id, {
-      team,
-      wins: 0,
-      losses: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      diff: 0,
-      gamesPlayed: 0,
-    }));
-
-    seedingGames
-      .filter(game => game.division === division && isPlayedPoolGame(game))
-      .forEach(game => {
-        const s1 = game.score1 ?? 0;
-        const s2 = game.score2 ?? 0;
-        const t1 = rows.get(game.team1Id);
-        const t2 = rows.get(game.team2Id);
-        if (!t1 || !t2) return;
-
-        t1.pointsFor += s1;
-        t1.pointsAgainst += s2;
-        t1.diff = t1.pointsFor - t1.pointsAgainst;
-        t1.gamesPlayed += 1;
-
-        t2.pointsFor += s2;
-        t2.pointsAgainst += s1;
-        t2.diff = t2.pointsFor - t2.pointsAgainst;
-        t2.gamesPlayed += 1;
-
-        if (s1 > s2) {
-          t1.wins += 1;
-          t2.losses += 1;
-        } else if (s2 > s1) {
-          t2.wins += 1;
-          t1.losses += 1;
-        }
-      });
-
-    return Array.from(rows.values()).sort((a, b) =>
-      b.wins - a.wins ||
-      b.diff - a.diff ||
-      b.pointsFor - a.pointsFor ||
-      a.pointsAgainst - b.pointsAgainst ||
-      a.team.name.localeCompare(b.team.name)
-    );
-  }
-
   const current = schedule[activeDay] ?? DEFAULT_SCHEDULE[0];
+  const standingsByDivision = {
+    NBA: calculateCampStandings("NBA", teams, seedingGames),
+    College: calculateCampStandings("College", teams, seedingGames),
+  };
 
   // ── Spinner while waiting for first API response ──
   if (!loaded) {
@@ -362,16 +385,16 @@ export default function CampHubPage() {
               📅 Schedule
             </button>
             <button
-              onClick={() => setActiveView("standings")}
-              className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "standings" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
-            >
-              📊 Standings
-            </button>
-            <button
               onClick={() => setActiveView("rosters")}
               className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "rosters" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
             >
               👥 Teams
+            </button>
+            <button
+              onClick={() => setActiveView("standings")}
+              className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "standings" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
+            >
+              📊 Standings
             </button>
           </div>
           {schedule.map((d, i) => (
@@ -443,19 +466,23 @@ export default function CampHubPage() {
                                   players.map((p, i) => (
                                     <div key={i} className="px-4 py-2.5 flex items-center gap-3">
                                       <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[11px] font-bold text-white/40 flex-shrink-0">{i + 1}</div>
-                                      <div className="text-sm text-white/75">{camperShortName(p)}</div>
+                                      <div className="text-sm text-white/75">{p}</div>
                                     </div>
                                   ))
                                 )}
                               </div>
                               {/* Record (show once games are played) */}
-                              {(team.wins > 0 || team.losses > 0) && (
-                                <div className="px-4 py-2 bg-white/5 flex gap-4 text-xs">
-                                  <span className="text-green-400 font-bold">{team.wins}W</span>
-                                  <span className="text-red-400 font-bold">{team.losses}L</span>
-                                  <span className="text-white/28">{team.pointsFor} PF / {team.pointsAgainst} PA</span>
-                                </div>
-                              )}
+                              {(() => {
+                                const standing = standingsByDivision[team.division].find((row) => row.teamId === team.id);
+                                if (!standing || standing.gamesPlayed === 0) return null;
+                                return (
+                                  <div className="px-4 py-2 bg-white/5 flex gap-4 text-xs">
+                                    <span className="text-green-400 font-bold">{standing.wins}W</span>
+                                    <span className="text-red-400 font-bold">{standing.losses}L</span>
+                                    <span className="text-white/28">{standing.pointsFor} PF / {standing.pointsAgainst} PA</span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}
@@ -465,6 +492,81 @@ export default function CampHubPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── STANDINGS VIEW ── */}
+        {activeView === "standings" && (
+          <div className="space-y-6">
+            {(["NBA", "College"] as const).map((div) => {
+              const rows = standingsByDivision[div];
+              const scoredGames = seedingGames
+                .filter((game) => game.division === div)
+                .filter((game) => game.score1 !== null && game.score2 !== null)
+                .filter((game) => !(game.score1 === 0 && game.score2 === 0));
+
+              return (
+                <div key={div} className="rounded-2xl border border-white/10 overflow-hidden bg-white/2">
+                  <div className="px-4 py-3 flex items-center justify-between" style={{ background: div === "NBA" ? "#1B2A5E" : "#E03A3A" }}>
+                    <div>
+                      <h2 className="text-white font-black text-sm uppercase">{div} Division Standings</h2>
+                      <p className="text-white/50 text-[11px] mt-0.5">Calculated from pool play scores</p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase px-2 py-1 rounded bg-white/15 text-white/70">
+                      {scoredGames.length} scored games
+                    </span>
+                  </div>
+
+                  {rows.length === 0 ? (
+                    <div className="px-4 py-6 text-sm text-white/35 text-center">Teams not posted yet.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-white/10 bg-white/5 text-[10px] uppercase tracking-widest text-white/35">
+                            <th className="px-3 py-2 text-left">#</th>
+                            <th className="px-3 py-2 text-left">Team</th>
+                            <th className="px-3 py-2 text-center">W</th>
+                            <th className="px-3 py-2 text-center">L</th>
+                            <th className="px-3 py-2 text-center">PF</th>
+                            <th className="px-3 py-2 text-center">PA</th>
+                            <th className="px-3 py-2 text-center">Diff</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row, index) => (
+                            <tr key={row.teamId} className="border-b border-white/5 last:border-0">
+                              <td className="px-3 py-2 text-white/35 font-bold">{index + 1}</td>
+                              <td className="px-3 py-2 text-white font-bold whitespace-nowrap">{row.teamName}</td>
+                              <td className="px-3 py-2 text-center text-green-400 font-black">{row.wins}</td>
+                              <td className="px-3 py-2 text-center text-red-400 font-black">{row.losses}</td>
+                              <td className="px-3 py-2 text-center text-white/70">{row.pointsFor}</td>
+                              <td className="px-3 py-2 text-center text-white/70">{row.pointsAgainst}</td>
+                              <td className={`px-3 py-2 text-center font-black ${row.diff >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                {row.diff > 0 ? "+" : ""}{row.diff}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {scoredGames.length > 0 && (
+                    <div className="px-4 py-3 border-t border-white/10 bg-black/10">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-white/25 mb-2">Pool scores used</div>
+                      <div className="grid sm:grid-cols-2 gap-1.5">
+                        {scoredGames.map((game) => (
+                          <div key={game.id} className="text-[11px] text-white/45 bg-white/5 rounded-lg px-2 py-1.5">
+                            Round {game.round} · {formatPoolScore(game, teams)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -742,7 +844,7 @@ export default function CampHubPage() {
                                             <div className="text-[10px] font-bold uppercase text-white/25 mb-0.5">{e.division}</div>
                                             <div className="flex flex-wrap gap-1">
                                               {nominated.map((p, pi) => (
-                                                <span key={pi} className="text-[11px] px-2 py-0.5 rounded bg-white/8 text-white/50">{camperShortName(p)}</span>
+                                                <span key={pi} className="text-[11px] px-2 py-0.5 rounded bg-white/8 text-white/50">{p}</span>
                                               ))}
                                             </div>
                                           </div>

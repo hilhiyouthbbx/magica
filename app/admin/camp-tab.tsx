@@ -573,6 +573,9 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
   const [addPlayerOpen, setAddPlayerOpen] = useState<string | null>(null);
   const [playerSearch, setPlayerSearch]   = useState<string>("");
+  const [eventDragOver, setEventDragOver] = useState<{eventId: string; teamId: string} | null>(null);
+  const [addNomineeOpen, setAddNomineeOpen] = useState<{eventId: string; teamId: string} | null>(null);
+  const [nomineeSearch, setNomineeSearch] = useState<string>("");
   const [rosterError,  setRosterError]  = useState<string>("");
   const [checkIns,     setCheckIns]     = useState<CheckInMap>({});
   const [checkInDay,   setCheckInDay]   = useState<DayKey>("day1");
@@ -803,6 +806,54 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   function removeEvent(id: string) {
     if (!data || !confirm("Remove this event?")) return;
     save({ individualEvents: (data.individualEvents ?? []).filter(e => e.id !== id) });
+  }
+
+  function addNominee(eventId: string, teamId: string, playerFullName: string) {
+    if (!data) return;
+    const events = (data.individualEvents ?? []).map(e => {
+      if (e.id !== eventId) return e;
+      const slots = e.name === "3-on-3 Tournament" ? 3 : 2;
+      const nomIdx = e.nominees.findIndex(n => n.teamId === teamId);
+      const nominees = [...e.nominees];
+      const curPlayers = nomIdx >= 0 ? nominees[nomIdx].players.filter(p => p.trim()) : [];
+      if (curPlayers.includes(playerFullName) || curPlayers.length >= slots) return e;
+      const newPlayers = [...curPlayers, playerFullName];
+      if (nomIdx >= 0) nominees[nomIdx] = { teamId, players: newPlayers };
+      else nominees.push({ teamId, players: newPlayers });
+      return { ...e, nominees };
+    });
+    setData({ ...data, individualEvents: events });
+    setAddNomineeOpen(null);
+    setNomineeSearch("");
+  }
+
+  function removeNominee(eventId: string, teamId: string, playerFullName: string) {
+    if (!data) return;
+    const events = (data.individualEvents ?? []).map(e => {
+      if (e.id !== eventId) return e;
+      const nomIdx = e.nominees.findIndex(n => n.teamId === teamId);
+      if (nomIdx === -1) return e;
+      const nominees = [...e.nominees];
+      nominees[nomIdx] = { ...nominees[nomIdx], players: nominees[nomIdx].players.filter(p => p !== playerFullName) };
+      return { ...e, nominees };
+    });
+    setData({ ...data, individualEvents: events });
+  }
+
+  function handleEventDragOver(e: React.DragEvent<HTMLDivElement>, eventId: string, teamId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setEventDragOver({ eventId, teamId });
+  }
+
+  function handleEventDrop(e: React.DragEvent<HTMLDivElement>, eventId: string, teamId: string) {
+    e.preventDefault();
+    setEventDragOver(null);
+    if (!data) return;
+    const raw = e.dataTransfer.getData("camper");
+    if (!raw) return;
+    const cam: CamperRosterEntry = JSON.parse(raw) as CamperRosterEntry;
+    addNominee(eventId, teamId, cam.fullName);
   }
 
   // ── Drag-and-drop helpers ─────────────────────────────────────────────────
@@ -2096,19 +2147,119 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {teams.map(team => {
                             const nom = evt.nominees.find(n => n.teamId === team.id);
+                            const nominees = (nom?.players ?? []).filter(p => p.trim());
+                            const isFull = nominees.length >= slots;
+                            const isDropTarget = eventDragOver?.eventId === evt.id && eventDragOver?.teamId === team.id;
+                            const isNomineeOpen = addNomineeOpen?.eventId === evt.id && addNomineeOpen?.teamId === team.id;
                             return (
-                              <div key={team.id}>
-                                <label className="block text-xs font-semibold text-gray-400 mb-1.5">{team.name || "(unnamed)"}</label>
-                                <div className="space-y-1.5">
-                                  {Array.from({ length: slots }, (_, i) => (
-                                    <input key={i}
-                                      value={(nom?.players ?? [])[i] ?? ""}
-                                      onChange={e => setNominee(evt.id, team.id, i, e.target.value)}
-                                      placeholder={`Nominee ${i + 1}`}
-                                      className="w-full px-2.5 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700"
-                                    />
-                                  ))}
+                              <div key={team.id}
+                                onDragOver={e => !isFull && handleEventDragOver(e, evt.id, team.id)}
+                                onDragLeave={() => setEventDragOver(null)}
+                                onDrop={e => handleEventDrop(e, evt.id, team.id)}
+                                className={`rounded-xl border p-2.5 transition-all ${
+                                  isDropTarget ? "border-purple-400 bg-purple-500/15 scale-[1.01]"
+                                  : isFull     ? "border-white/10 bg-white/[0.02]"
+                                  :              "border-white/15 bg-white/[0.03] hover:border-white/25"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="text-xs font-semibold text-gray-400">{team.name || "(unnamed)"}</label>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`text-[10px] font-bold ${isFull ? "text-yellow-500" : "text-gray-600"}`}>
+                                      {nominees.length}/{slots}{isFull ? " full" : ""}
+                                    </span>
+                                    {!isFull && (
+                                      <button
+                                        onClick={() => {
+                                          setAddNomineeOpen(isNomineeOpen ? null : { eventId: evt.id, teamId: team.id });
+                                          setNomineeSearch("");
+                                        }}
+                                        className="flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-400 text-[10px] font-bold rounded-md transition-all"
+                                      >
+                                        <Plus className="w-2.5 h-2.5" /> Add
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
+
+                                {/* Add nominee dropdown */}
+                                {isNomineeOpen && (() => {
+                                  const teamPlayers = (data.teams.find(t => t.id === team.id)?.players ?? []).filter(p => p.trim());
+                                  const divisionForEvt = evt.division ?? div;
+                                  const gradeRange = divisionForEvt === "NBA" ? [1,4] : [5,8];
+                                  const divRoster = roster.filter(cam => cam.gradeNum >= gradeRange[0] && cam.gradeNum <= gradeRange[1]);
+                                  const searchLower = nomineeSearch.toLowerCase();
+                                  // Show team players first, then rest of division
+                                  const teamRoster = divRoster.filter(cam => teamPlayers.includes(cam.fullName));
+                                  const otherRoster = divRoster.filter(cam => !teamPlayers.includes(cam.fullName));
+                                  const allOptions = [...teamRoster, ...otherRoster].filter(cam => !nominees.includes(cam.fullName));
+                                  const filtered = nomineeSearch ? allOptions.filter(cam =>
+                                    cam.fullName.toLowerCase().includes(searchLower) || cam.displayName.toLowerCase().includes(searchLower)
+                                  ) : allOptions;
+                                  return (
+                                    <div className="mb-2 rounded-lg border border-purple-500/30 bg-[#0a0f1e] overflow-hidden">
+                                      <div className="p-1.5 border-b border-white/10">
+                                        <input
+                                          autoFocus
+                                          value={nomineeSearch}
+                                          onChange={e => setNomineeSearch(e.target.value)}
+                                          placeholder="Search player…"
+                                          className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/10 text-white text-[11px] focus:outline-none focus:border-purple-500 placeholder-gray-600"
+                                        />
+                                      </div>
+                                      {filtered.length === 0 ? (
+                                        <p className="text-[11px] text-gray-600 text-center py-2">
+                                          {nomineeSearch ? "No matches" : "No players available"}
+                                        </p>
+                                      ) : (
+                                        <div className="max-h-36 overflow-y-auto divide-y divide-white/5">
+                                          {filtered.map(cam => (
+                                            <button
+                                              key={cam.id}
+                                              onClick={() => addNominee(evt.id, team.id, cam.fullName)}
+                                              className="w-full text-left px-2.5 py-1.5 hover:bg-purple-500/15 transition-colors flex items-center justify-between gap-2"
+                                            >
+                                              <span className="text-white text-[11px] font-medium">{cam.fullName}</span>
+                                              <span className={`text-[10px] font-bold shrink-0 ${teamPlayers.includes(cam.fullName) ? "text-blue-400/70" : "text-gray-600"}`}>
+                                                {teamPlayers.includes(cam.fullName) ? "on team" : `Gr. ${cam.gradeNum}`}
+                                              </span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                      <div className="px-2 py-1 border-t border-white/10">
+                                        <button onClick={() => { setAddNomineeOpen(null); setNomineeSearch(""); }} className="text-[10px] text-gray-600 hover:text-gray-400">Cancel</button>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+
+                                {/* Nominee chips */}
+                                {nominees.length === 0 ? (
+                                  <p className={`text-[11px] text-center py-2 rounded-lg border border-dashed ${
+                                    isDropTarget ? "text-purple-400 border-purple-400/50" : "text-gray-700 border-white/10"
+                                  }`}>
+                                    {isDropTarget ? "Drop to nominate" : "Drop player here or click Add"}
+                                  </p>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1">
+                                    {nominees.map((p, idx) => (
+                                      <span key={idx} className="flex items-center gap-1 bg-purple-500/15 border border-purple-500/25 rounded-md px-2 py-0.5 text-[11px] text-purple-200">
+                                        {p}
+                                        <button onClick={() => removeNominee(evt.id, team.id, p)} className="text-purple-400/50 hover:text-red-400 transition-colors">
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      </span>
+                                    ))}
+                                    {!isFull && (
+                                      <span className={`text-[11px] border border-dashed rounded-md px-2 py-0.5 ${
+                                        isDropTarget ? "text-purple-400 border-purple-400/50" : "text-gray-700 border-white/10"
+                                      }`}>
+                                        + drop here
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}

@@ -886,21 +886,34 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
   // ── Check-in helpers ──────────────────────────────────────────────────────
   async function toggleCheckIn(contactId: string, day: DayKey, checked: boolean) {
-    const updated = {
-      ...checkIns,
+    // Optimistic update — MUST use functional form (prev =>) so rapid clicks
+    // always build on the latest state, not a stale closure snapshot.
+    setCheckIns(prev => ({
+      ...prev,
       [contactId]: {
-        ...(checkIns[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+        ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
         [day]: checked,
       },
-    };
-    setCheckIns(updated); // optimistic
-    const res = await fetch(`/api/camp-checkin?key=${adminKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "toggle", contactId, day, checked }),
-    });
-    const json = await res.json() as { checkIns?: CheckInMap };
-    if (json.checkIns) setCheckIns(json.checkIns);
+    }));
+    try {
+      await fetch(`/api/camp-checkin?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle", contactId, day, checked }),
+      });
+      // Do NOT call setCheckIns from the server response — that overwrites any
+      // optimistic updates that happened while this request was in-flight,
+      // which is exactly what causes a check to vanish when you click another.
+    } catch {
+      // On network error revert this one toggle
+      setCheckIns(prev => ({
+        ...prev,
+        [contactId]: {
+          ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+          [day]: !checked,
+        },
+      }));
+    }
   }
 
   async function sendAbsentEmails() {

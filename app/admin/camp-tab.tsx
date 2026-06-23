@@ -153,6 +153,14 @@ function actColor(type: RowType) {
   return "text-gray-300";
 }
 
+
+function camperShortName(name: string): string {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export function ScheduleTab({ adminKey }: { adminKey: string }) {
   const [days, setDays]             = useState<DayData[]>(DEFAULT);
@@ -1353,7 +1361,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                               <div className="flex flex-wrap gap-1.5">
                                 {filledPlayers.map((p, idx) => (
                                   <span key={idx} className="flex items-center gap-1 bg-white/10 rounded-lg px-2 py-1 text-xs text-white">
-                                    {p}
+                                    {camperShortName(p)}
                                     <button onClick={() => removeFromTeam(team.id, p)} className="text-gray-500 hover:text-red-400 ml-0.5 flex-shrink-0">
                                       <X className="w-3 h-3" />
                                     </button>

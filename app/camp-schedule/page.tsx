@@ -174,6 +174,14 @@ function actColor(type: RowType) {
   return "text-white/75";
 }
 
+
+function camperShortName(name: string): string {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+}
+
 // ─── Public Page (read-only) ──────────────────────────────────────────
 export default function CampHubPage() {
   const [schedule, setSchedule] = useState<DayData[]>(DEFAULT_SCHEDULE);
@@ -435,7 +443,7 @@ export default function CampHubPage() {
                                   players.map((p, i) => (
                                     <div key={i} className="px-4 py-2.5 flex items-center gap-3">
                                       <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[11px] font-bold text-white/40 flex-shrink-0">{i + 1}</div>
-                                      <div className="text-sm text-white/75">{p}</div>
+                                      <div className="text-sm text-white/75">{camperShortName(p)}</div>
                                     </div>
                                   ))
                                 )}
@@ -734,7 +742,7 @@ export default function CampHubPage() {
                                             <div className="text-[10px] font-bold uppercase text-white/25 mb-0.5">{e.division}</div>
                                             <div className="flex flex-wrap gap-1">
                                               {nominated.map((p, pi) => (
-                                                <span key={pi} className="text-[11px] px-2 py-0.5 rounded bg-white/8 text-white/50">{p}</span>
+                                                <span key={pi} className="text-[11px] px-2 py-0.5 rounded bg-white/8 text-white/50">{camperShortName(p)}</span>
                                               ))}
                                             </div>
                                           </div>

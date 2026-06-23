@@ -31,7 +31,7 @@ export interface CampTeam {
 
 export interface SeedingGame {
   id:       string;
-  round:    1 | 2 | 3;
+  round:    number;
   division: Division;
   team1Id:  string;
   team2Id:  string;
@@ -68,12 +68,27 @@ export interface IndividualEvent {
   status:    "upcoming" | "live" | "complete";
 }
 
+export interface ScheduleRow {
+  id:       string;
+  time:     string;
+  activity: string;
+  note:     string;
+  type:     string;
+}
+
+export interface DayData {
+  label: string;
+  date:  string;
+  rows:  ScheduleRow[];
+}
+
 export interface CampScheduleData {
   campName:      string;
   campYear:      number;
   currentDay:    number;  // 1-4 (0 = not started)
   active:        boolean; // false = hidden from public
   announcement:  string;
+  dailySchedule?: DayData[];
   teams:         CampTeam[];
   seedingGames:  SeedingGame[];
   bracketGames:    BracketGame[];
@@ -87,6 +102,7 @@ const DEFAULTS: CampScheduleData = {
   currentDay:   0,
   active:       false,
   announcement: "",
+  dailySchedule: [],
   teams: [],
   seedingGames: [],
   bracketGames:     [],

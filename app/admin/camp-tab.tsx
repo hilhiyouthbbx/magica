@@ -571,6 +571,8 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [editCamperSaving,  setEditCamperSaving]  = useState(false);
   const [dragOver,    setDragOver]    = useState<string | null>(null);
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
+  const [addPlayerOpen, setAddPlayerOpen] = useState<string | null>(null);
+  const [playerSearch, setPlayerSearch]   = useState<string>("");
   const [rosterError,  setRosterError]  = useState<string>("");
   const [checkIns,     setCheckIns]     = useState<CheckInMap>({});
   const [checkInDay,   setCheckInDay]   = useState<DayKey>("day1");
@@ -701,9 +703,25 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     if (!data) return;
     const team = data.teams.find(t => t.id === teamId);
     if (!team) return;
-    const arr = Array.from({ length: 6 }, (_, i) => team.players[i] ?? "");
+    const arr = [...team.players];
     arr[idx] = value;
     setData({ ...data, teams: data.teams.map(t => t.id === teamId ? { ...t, players: arr } : t) });
+  }
+
+  function addPlayerToTeam(teamId: string, playerFullName: string) {
+    if (!data) return;
+    const team = data.teams.find(t => t.id === teamId);
+    if (!team) return;
+    if (team.players.includes(playerFullName)) return; // already on team
+    const updatedTeams = data.teams.map(t =>
+      t.id !== teamId ? t : { ...t, players: [...t.players.filter(p => p.trim()), playerFullName] }
+    );
+    setData({ ...data, teams: updatedTeams });
+    // mark as assigned
+    const cam = roster.find(r => r.fullName === playerFullName || r.displayName === playerFullName);
+    if (cam) setAssignedIds(prev => new Set([...prev, cam.id]));
+    setAddPlayerOpen(null);
+    setPlayerSearch("");
   }
 
   function saveTeams() {
@@ -810,18 +828,16 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     // Use fullName to avoid silent drop when two campers share the same "First L." display name
     const playerName = cam.fullName;
     if (team.players.includes(playerName)) return;
-    const arr = Array.from({ length: 6 }, (_, i) => team.players[i] ?? "");
-    const emptyIdx = arr.findIndex(p => !p.trim());
-    if (emptyIdx === -1) return;
-    arr[emptyIdx] = playerName;
-    const updatedTeams = data.teams.map(t => t.id === teamId ? { ...t, players: arr } : t);
+    const updatedTeams = data.teams.map(t =>
+      t.id !== teamId ? t : { ...t, players: [...t.players.filter(p => p.trim()), playerName] }
+    );
     setData({ ...data, teams: updatedTeams });
     setAssignedIds(prev => new Set([...prev, cam.id]));
   }
   function removeFromTeam(teamId: string, playerName: string) {
     if (!data) return;
     const updatedTeams = data.teams.map(t =>
-      t.id !== teamId ? t : { ...t, players: t.players.map(p => p === playerName ? "" : p) }
+      t.id !== teamId ? t : { ...t, players: t.players.filter(p => p !== playerName) }
     );
     setData({ ...data, teams: updatedTeams });
     const stillAssigned = updatedTeams.some(t => t.players.some(p => p === playerName));
@@ -1496,7 +1512,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       {data.teams.filter(t => t.division === div).map(team => {
                         const isDragTarget  = dragOver === team.id;
                         const filledPlayers = team.players.filter(p => p.trim());
-                        const isFull        = filledPlayers.length >= 6;
+                        const isFull        = false; // no hard cap on team size
                         return (
                           <div
                             key={team.id}
@@ -1511,8 +1527,8 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           >
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-white font-black text-sm">{team.name || "(unnamed)"}</span>
-                              <span className={`text-xs font-bold ${isFull ? "text-yellow-500" : "text-gray-600"}`}>
-                                {filledPlayers.length}/6{isFull ? " full" : ""}
+                              <span className="text-xs font-bold text-gray-600">
+                                {filledPlayers.length} player{filledPlayers.length !== 1 ? "s" : ""}
                               </span>
                             </div>
                             {filledPlayers.length === 0 ? (
@@ -1613,22 +1629,102 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       </button>
                     </div>
 
-                    {/* 6 player slots */}
+                    {/* Players — dynamic list + add from roster */}
                     <div>
-                      <label className="block text-xs text-gray-400 font-semibold mb-2">Players (up to 6)</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <div key={i}>
-                            <label className="block text-[11px] text-gray-600 mb-1">Player {i + 1}</label>
-                            <input
-                              value={team.players[i] ?? ""}
-                              onChange={e => setPlayerName(team.id, i, e.target.value)}
-                              placeholder={`Player ${i + 1}`}
-                              className="w-full px-3 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700"
-                            />
-                          </div>
-                        ))}
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs text-gray-400 font-semibold">
+                          Players{team.players.filter(p=>p.trim()).length > 0 ? ` (${team.players.filter(p=>p.trim()).length})` : ""}
+                        </label>
+                        <button
+                          onClick={() => {
+                            setAddPlayerOpen(addPlayerOpen === team.id ? null : team.id);
+                            setPlayerSearch("");
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 hover:border-blue-500/60 text-blue-400 text-xs font-bold rounded-lg transition-all"
+                        >
+                          <Plus className="w-3 h-3" /> Add Player
+                        </button>
                       </div>
+
+                      {/* Add player dropdown */}
+                      {addPlayerOpen === team.id && (() => {
+                        const divisionForTeam = team.division;
+                        const gradeRange = divisionForTeam === "NBA" ? [1,4] : [5,8];
+                        const divRoster = roster
+                          .filter(cam => cam.gradeNum >= gradeRange[0] && cam.gradeNum <= gradeRange[1])
+                          .filter(cam => !team.players.includes(cam.fullName));
+                        const searchLower = playerSearch.toLowerCase();
+                        const filtered = playerSearch
+                          ? divRoster.filter(cam =>
+                              cam.fullName.toLowerCase().includes(searchLower) ||
+                              cam.displayName.toLowerCase().includes(searchLower)
+                            )
+                          : divRoster;
+                        // Sort: unassigned first, then by name
+                        const sorted = [...filtered].sort((a,b) => {
+                          const aAssigned = assignedIds.has(a.id);
+                          const bAssigned = assignedIds.has(b.id);
+                          if (aAssigned !== bAssigned) return aAssigned ? 1 : -1;
+                          return a.fullName.localeCompare(b.fullName);
+                        });
+                        return (
+                          <div className="mb-3 rounded-xl border border-blue-500/30 bg-[#0a1020] overflow-hidden">
+                            <div className="p-2 border-b border-white/10">
+                              <input
+                                autoFocus
+                                value={playerSearch}
+                                onChange={e => setPlayerSearch(e.target.value)}
+                                placeholder="Search by name…"
+                                className="w-full px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-blue-500 placeholder-gray-600"
+                              />
+                            </div>
+                            {sorted.length === 0 ? (
+                              <p className="text-xs text-gray-600 text-center py-3">
+                                {playerSearch ? "No matches" : `No more ${divisionForTeam} players available`}
+                              </p>
+                            ) : (
+                              <div className="max-h-48 overflow-y-auto divide-y divide-white/5">
+                                {sorted.map(cam => (
+                                  <button
+                                    key={cam.id}
+                                    onClick={() => addPlayerToTeam(team.id, cam.fullName)}
+                                    className="w-full text-left px-3 py-2 hover:bg-blue-500/15 transition-colors flex items-center justify-between gap-2"
+                                  >
+                                    <span className="text-white text-xs font-medium">{cam.fullName}</span>
+                                    <span className={`text-[10px] font-bold shrink-0 ${assignedIds.has(cam.id) ? "text-yellow-500/70" : "text-green-500/70"}`}>
+                                      {assignedIds.has(cam.id) ? "on a team" : `Gr. ${cam.gradeNum}`}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <div className="px-3 py-1.5 border-t border-white/10">
+                              <button onClick={() => { setAddPlayerOpen(null); setPlayerSearch(""); }} className="text-xs text-gray-600 hover:text-gray-400">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Player chips */}
+                      {team.players.filter(p => p.trim()).length === 0 ? (
+                        <p className="text-xs text-gray-700 italic py-2">No players yet — click Add Player or drag from the roster</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {team.players.filter(p => p.trim()).map((p, idx) => (
+                            <span key={idx} className="flex items-center gap-1 bg-white/8 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white">
+                              {p}
+                              <button
+                                onClick={() => removeFromTeam(team.id, p)}
+                                className="text-gray-600 hover:text-red-400 ml-0.5 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                   </div>

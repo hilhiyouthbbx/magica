@@ -15,7 +15,7 @@ async function getRedis() {
 
 export type Division = "NBA" | "College";
 export type GameStatus = "scheduled" | "live" | "final";
-export type BracketRound = "semi" | "final" | "3rd";
+export type BracketRound = "quarter" | "semi" | "final" | "3rd";
 
 export interface CampTeam {
   id:        string;

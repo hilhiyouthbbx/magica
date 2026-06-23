@@ -135,7 +135,7 @@ interface StandingRow {
 
 interface BracketGame {
   id: string;
-  round: "semi" | "final" | "3rd";
+  round: "quarter" | "semi" | "final" | "3rd";
   division: "NBA" | "College";
   team1Id: string;
   team2Id: string;
@@ -762,11 +762,13 @@ export default function CampHubPage() {
             <>
               {/* ── Semifinals ── */}
               {(["NBA", "College"] as const).map(div => {
-                const semis = bracketGames.filter(g => g.division === div && g.round === "semi");
+                const quarters = bracketGames.filter(g => g.division === div && g.round === "quarter").sort((a,b) => a.id.localeCompare(b.id));
+                const semis = bracketGames.filter(g => g.division === div && g.round === "semi").sort((a,b) => a.id.localeCompare(b.id));
                 const finals = bracketGames.filter(g => g.division === div && g.round === "final");
+                const thirds = bracketGames.filter(g => g.division === div && g.round === "3rd");
                 const divColor = div === "NBA" ? "#1B2A5E" : "#7B1212";
                 const accent   = div === "NBA" ? "#F4A800" : "#fff";
-                const hasGames = semis.length > 0 || finals.length > 0;
+                const hasGames = quarters.length > 0 || semis.length > 0 || finals.length > 0;
 
                 return (
                   <div key={div} className="mb-6">
@@ -808,9 +810,15 @@ export default function CampHubPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
+                        {quarters.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest">Quarterfinals — 11:00 AM</p>
+                            {quarters.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
+                          </>
+                        )}
                         {semis.length > 0 && (
                           <>
-                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest">Semifinals — 12:45 PM</p>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest mt-4">Semifinals — 12:45 PM</p>
                             {semis.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
                           </>
                         )}
@@ -818,6 +826,12 @@ export default function CampHubPage() {
                           <>
                             <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest mt-4">🏆 Championship Game — 2:05 PM</p>
                             {finals.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
+                          </>
+                        )}
+                        {thirds.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest mt-4">🥉 3rd Place — 2:05 PM</p>
+                            {thirds.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
                           </>
                         )}
                       </div>

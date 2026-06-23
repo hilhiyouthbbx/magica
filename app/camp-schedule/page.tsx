@@ -377,7 +377,7 @@ export default function CampHubPage() {
           {schedule.map((d, i) => (
             <button
               key={i}
-              onClick={() => { setActiveView("schedule"); setActiveDay(i); }}
+              onClick={() => { setActiveDay(i); setActiveView("schedule"); }}
               className={[
                 "relative flex-shrink-0 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap",
                 activeDay === i
@@ -422,17 +422,19 @@ export default function CampHubPage() {
                       <div className="grid sm:grid-cols-2 gap-4">
                         {divTeams.map(team => {
                           const players = team.players.filter(p => p.trim());
+                          const record = new Map(calcPoolStandings(div).map(r => [r.team.id, r])).get(team.id);
                           return (
                             <div key={team.id} className="rounded-2xl border border-white/10 overflow-hidden">
                               {/* Team header */}
-                              <div className="px-4 py-3 flex items-center justify-between" style={{ background: div === "NBA" ? "#1B2A5E" : "#E03A3A" }}>
-                                <div>
-                                  <div className="text-base font-black text-white">{team.name || "TBD"}</div>
+                              <div className="px-4 py-3 flex items-center justify-between gap-3" style={{ background: div === "NBA" ? "#1B2A5E" : "#E03A3A" }}>
+                                <div className="min-w-0">
+                                  <div className="text-base font-black text-white truncate">{team.name || "TBD"}</div>
                                   {team.coach && <div className="text-xs opacity-60 text-white mt-0.5">Coach: {team.coach}</div>}
                                 </div>
-                                <div className="text-right">
-                                  <div className="text-2xl font-black text-white/20">{players.length}</div>
-                                  <div className="text-[10px] text-white/40 uppercase tracking-wider">players</div>
+                                <div className="text-right flex-shrink-0">
+                                  <div className="text-xl font-black text-white">{record?.wins ?? 0}-{record?.losses ?? 0}</div>
+                                  <div className="text-[10px] text-white/60 uppercase tracking-wider">record</div>
+                                  <div className="text-[10px] text-white/40">{players.length} players</div>
                                 </div>
                               </div>
                               {/* Player list */}
@@ -448,14 +450,7 @@ export default function CampHubPage() {
                                   ))
                                 )}
                               </div>
-                              {/* Record (show once games are played) */}
-                              {(team.wins > 0 || team.losses > 0) && (
-                                <div className="px-4 py-2 bg-white/5 flex gap-4 text-xs">
-                                  <span className="text-green-400 font-bold">{team.wins}W</span>
-                                  <span className="text-red-400 font-bold">{team.losses}L</span>
-                                  <span className="text-white/28">{team.pointsFor} PF / {team.pointsAgainst} PA</span>
-                                </div>
-                              )}
+
                             </div>
                           );
                         })}
@@ -470,55 +465,48 @@ export default function CampHubPage() {
 
         {/* ── STANDINGS VIEW ── */}
         {activeView === "standings" && (
-          <div className="space-y-8">
-            {(["NBA", "College"] as const).map((div) => {
+          <div className="space-y-6">
+            {(["NBA", "College"] as const).map(div => {
               const rows = calcPoolStandings(div);
-              const playedGames = seedingGames.filter(g => g.division === div && isPlayedPoolGame(g));
+              const games = seedingGames.filter(g => g.division === div && isPlayedPoolGame(g));
               return (
                 <div key={div} className="rounded-2xl border border-white/10 overflow-hidden bg-white/2">
-                  <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between" style={{ background: div === "NBA" ? "#1B2A5E" : "#7B1212" }}>
+                  <div className="px-4 py-3 flex items-center justify-between" style={{ background: div === "NBA" ? "#1B2A5E" : "#E03A3A" }}>
                     <div>
-                      <div className="text-white font-black text-sm uppercase tracking-widest">{div} Division Standings</div>
-                      <div className="text-white/45 text-xs mt-0.5">Calculated from pool play scores</div>
+                      <div className="text-white font-black uppercase">{div} Division Standings</div>
+                      <div className="text-xs text-white/50">Calculated from final pool-play scores</div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-white font-black text-lg">{playedGames.length}</div>
-                      <div className="text-white/45 text-[10px] uppercase tracking-widest">Final Games</div>
-                    </div>
+                    <div className="text-xs text-white/60 font-bold">{games.length} games played</div>
                   </div>
 
                   {rows.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-white/35 text-sm">
-                      No teams posted yet.
-                    </div>
+                    <div className="px-4 py-8 text-center text-white/35 text-sm">Standings will show after teams are posted.</div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-white/5 text-white/35 text-[10px] uppercase tracking-widest">
-                            <th className="px-3 py-2 text-left">Rank</th>
-                            <th className="px-3 py-2 text-left">Team</th>
-                            <th className="px-3 py-2 text-center">W</th>
-                            <th className="px-3 py-2 text-center">L</th>
-                            <th className="px-3 py-2 text-center">GP</th>
-                            <th className="px-3 py-2 text-center">PF</th>
-                            <th className="px-3 py-2 text-center">PA</th>
-                            <th className="px-3 py-2 text-center">Diff</th>
+                        <thead className="bg-white/5 text-white/35 text-[11px] uppercase tracking-widest">
+                          <tr>
+                            <th className="text-left px-3 py-2">#</th>
+                            <th className="text-left px-3 py-2">Team</th>
+                            <th className="text-center px-3 py-2">W</th>
+                            <th className="text-center px-3 py-2">L</th>
+                            <th className="text-center px-3 py-2">GP</th>
+                            <th className="text-center px-3 py-2">PF</th>
+                            <th className="text-center px-3 py-2">PA</th>
+                            <th className="text-center px-3 py-2">Diff</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                           {rows.map((row, idx) => (
-                            <tr key={row.team.id} className={idx === 0 ? "bg-[#F4A800]/8" : ""}>
-                              <td className="px-3 py-3 font-black text-[#F4A800]">#{idx + 1}</td>
-                              <td className="px-3 py-3 font-bold text-white">{row.team.name || "TBD"}</td>
-                              <td className="px-3 py-3 text-center text-green-400 font-black">{row.wins}</td>
-                              <td className="px-3 py-3 text-center text-red-400 font-black">{row.losses}</td>
-                              <td className="px-3 py-3 text-center text-white/55">{row.gamesPlayed}</td>
-                              <td className="px-3 py-3 text-center text-white/55">{row.pointsFor}</td>
-                              <td className="px-3 py-3 text-center text-white/55">{row.pointsAgainst}</td>
-                              <td className={`px-3 py-3 text-center font-black ${row.diff >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                {row.diff > 0 ? "+" : ""}{row.diff}
-                              </td>
+                            <tr key={row.team.id} className="text-white/75">
+                              <td className="px-3 py-2 font-black text-white/35">{idx + 1}</td>
+                              <td className="px-3 py-2 font-bold text-white">{row.team.name || "TBD"}</td>
+                              <td className="px-3 py-2 text-center text-green-400 font-black">{row.wins}</td>
+                              <td className="px-3 py-2 text-center text-red-400 font-black">{row.losses}</td>
+                              <td className="px-3 py-2 text-center text-white/55">{row.gamesPlayed}</td>
+                              <td className="px-3 py-2 text-center text-white/55">{row.pointsFor}</td>
+                              <td className="px-3 py-2 text-center text-white/55">{row.pointsAgainst}</td>
+                              <td className={`px-3 py-2 text-center font-black ${row.diff >= 0 ? "text-green-400" : "text-red-400"}`}>{row.diff > 0 ? "+" : ""}{row.diff}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -526,21 +514,19 @@ export default function CampHubPage() {
                     </div>
                   )}
 
-                  <div className="px-4 py-3 border-t border-white/10 bg-black/20">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-white/28 mb-2">Pool Play Scores Used</div>
-                    {playedGames.length === 0 ? (
-                      <div className="text-xs text-white/30 italic">No final pool play scores entered yet.</div>
-                    ) : (
+                  {games.length > 0 && (
+                    <div className="px-4 py-3 border-t border-white/10 bg-black/10">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-white/28 mb-2">Pool Scores Used</div>
                       <div className="grid sm:grid-cols-2 gap-2">
-                        {playedGames.map(game => (
-                          <div key={game.id} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs flex items-center justify-between gap-2">
-                            <span className="text-white/70 truncate">R{game.round}: {teamName(game.team1Id)} vs {teamName(game.team2Id)}</span>
-                            <span className="font-black text-white flex-shrink-0">{game.score1 ?? 0} - {game.score2 ?? 0}</span>
+                        {games.map(g => (
+                          <div key={g.id} className="rounded-lg bg-white/5 px-3 py-2 text-xs flex items-center justify-between gap-2">
+                            <span className="text-white/60 truncate">{teamName(g.team1Id)} vs {teamName(g.team2Id)}</span>
+                            <span className="font-black text-white flex-shrink-0">{g.score1} - {g.score2}</span>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -849,7 +835,7 @@ export default function CampHubPage() {
             4-Day Camp Overview
           </div>
           {schedule.map((d, i) => (
-            <button key={i} onClick={() => { setActiveView("schedule"); setActiveDay(i); }}
+            <button key={i} onClick={() => setActiveDay(i)}
               className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors text-left">
               <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0"
                 style={{ background: i === 3 ? "#E03A3A" : "#1B2A5E" }}>

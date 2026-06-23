@@ -377,7 +377,7 @@ export default function CampHubPage() {
           {schedule.map((d, i) => (
             <button
               key={i}
-              onClick={() => setActiveDay(i)}
+              onClick={() => { setActiveView("schedule"); setActiveDay(i); }}
               className={[
                 "relative flex-shrink-0 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap",
                 activeDay === i
@@ -770,7 +770,7 @@ export default function CampHubPage() {
             4-Day Camp Overview
           </div>
           {schedule.map((d, i) => (
-            <button key={i} onClick={() => setActiveDay(i)}
+            <button key={i} onClick={() => { setActiveView("schedule"); setActiveDay(i); }}
               className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors text-left">
               <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0"
                 style={{ background: i === 3 ? "#E03A3A" : "#1B2A5E" }}>

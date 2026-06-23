@@ -922,6 +922,89 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const divTeams = (div: Division) => data.teams.filter(t => t.division === div);
   const teamOpts = (div: Division) => divTeams(div).map(t => ({ id: t.id, name: t.name || "(unnamed)" }));
 
+  type PoolStandingRow = {
+    team: CampTeam;
+    wins: number;
+    losses: number;
+    pointsFor: number;
+    pointsAgainst: number;
+    diff: number;
+    gamesPlayed: number;
+  };
+
+  function getPoolGames() {
+    return (((data as unknown as { seedingGames?: Array<{
+      id: string;
+      round: number;
+      division: Division;
+      team1Id: string;
+      team2Id: string;
+      score1: number | null;
+      score2: number | null;
+      court?: string;
+      status?: string;
+    }> }).seedingGames) ?? []);
+  }
+
+  function isPlayedPoolGame(game: ReturnType<typeof getPoolGames>[number]) {
+    const s1 = typeof game.score1 === "number" ? game.score1 : null;
+    const s2 = typeof game.score2 === "number" ? game.score2 : null;
+    return s1 !== null && s2 !== null && (game.status === "final" || s1 > 0 || s2 > 0);
+  }
+
+  function calcPoolStandings(div: Division): PoolStandingRow[] {
+    const rows = new Map<string, PoolStandingRow>();
+    divTeams(div).forEach(team => rows.set(team.id, {
+      team,
+      wins: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      diff: 0,
+      gamesPlayed: 0,
+    }));
+
+    getPoolGames()
+      .filter(game => game.division === div && isPlayedPoolGame(game))
+      .forEach(game => {
+        const s1 = game.score1 ?? 0;
+        const s2 = game.score2 ?? 0;
+        const t1 = rows.get(game.team1Id);
+        const t2 = rows.get(game.team2Id);
+        if (!t1 || !t2) return;
+
+        t1.pointsFor += s1;
+        t1.pointsAgainst += s2;
+        t1.diff = t1.pointsFor - t1.pointsAgainst;
+        t1.gamesPlayed += 1;
+
+        t2.pointsFor += s2;
+        t2.pointsAgainst += s1;
+        t2.diff = t2.pointsFor - t2.pointsAgainst;
+        t2.gamesPlayed += 1;
+
+        if (s1 > s2) {
+          t1.wins += 1;
+          t2.losses += 1;
+        } else if (s2 > s1) {
+          t2.wins += 1;
+          t1.losses += 1;
+        }
+      });
+
+    return Array.from(rows.values()).sort((a, b) =>
+      b.wins - a.wins ||
+      b.diff - a.diff ||
+      b.pointsFor - a.pointsFor ||
+      a.pointsAgainst - b.pointsAgainst ||
+      a.team.name.localeCompare(b.team.name)
+    );
+  }
+
+  function teamName(id: string) {
+    return data.teams.find(t => t.id === id)?.name || id || "TBD";
+  }
+
   // Grade label helper (used in roster section)
   function gradeLabel(g: string) {
     if (!g || g === "Unknown Grade") return g || "Unknown Grade";
@@ -1389,52 +1472,85 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       {/* ── STANDINGS ── */}
       {section === "standings" && (
         <div className="space-y-6">
-          {(["NBA", "College"] as Division[]).map(div => (
-            <div key={div} className="glass rounded-2xl border border-white/10 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white font-black text-base">{div} Division Standings</h3>
-                <button onClick={saveTeams}
-                  className="flex items-center gap-1.5 px-3 py-2 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
-                  <Save className="w-3.5 h-3.5" /> Save
-                </button>
-              </div>
+          {(["NBA", "College"] as Division[]).map(div => {
+            const rows = calcPoolStandings(div);
+            const games = getPoolGames()
+              .filter(game => game.division === div && isPlayedPoolGame(game))
+              .sort((a, b) => a.round - b.round);
 
-              {divTeams(div).length === 0 ? (
-                <p className="text-gray-600 text-sm">Add teams first in the Teams &amp; Rosters section.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-white/10">
-                        <th className="pb-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider pr-4">Team</th>
-                        <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">W</th>
-                        <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">L</th>
-                        <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">PF</th>
-                        <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">PA</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {divTeams(div).map(team => (
-                        <tr key={team.id} className="border-b border-white/5">
-                          <td className="py-3 pr-4 text-white font-semibold text-sm">{team.name || "(unnamed)"}</td>
-                          {(["wins","losses","pointsFor","pointsAgainst"] as const).map(field => (
-                            <td key={field} className="py-3 px-3">
-                              <input
-                                type="number" min={0}
-                                value={team[field]}
-                                onChange={e => setTeamField(team.id, field, parseInt(e.target.value) || 0)}
-                                className="w-16 text-center px-2 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                              />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            return (
+              <div key={div} className="glass rounded-2xl border border-white/10 p-5">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-white font-black text-base">{div} Division Standings</h3>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Auto-calculated from Pool Play scores. Scheduled 0–0 games are ignored until a score is entered.
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold">
+                    {games.length} scored games
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {divTeams(div).length === 0 ? (
+                  <p className="text-gray-600 text-sm">Add teams first in the Teams &amp; Rosters section.</p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px]">
+                        <thead>
+                          <tr className="border-b border-white/10">
+                            <th className="pb-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider pr-4">Rank</th>
+                            <th className="pb-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider pr-4">Team</th>
+                            <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">W</th>
+                            <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">L</th>
+                            <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">PF</th>
+                            <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">PA</th>
+                            <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Diff</th>
+                            <th className="pb-3 px-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">GP</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row, idx) => (
+                            <tr key={row.team.id} className="border-b border-white/5">
+                              <td className="py-3 pr-4 text-gray-500 font-black text-sm">#{idx + 1}</td>
+                              <td className="py-3 pr-4 text-white font-semibold text-sm">{row.team.name || "(unnamed)"}</td>
+                              <td className="py-3 px-3 text-center text-green-400 font-black text-sm">{row.wins}</td>
+                              <td className="py-3 px-3 text-center text-red-400 font-black text-sm">{row.losses}</td>
+                              <td className="py-3 px-3 text-center text-gray-300 text-sm">{row.pointsFor}</td>
+                              <td className="py-3 px-3 text-center text-gray-300 text-sm">{row.pointsAgainst}</td>
+                              <td className={`py-3 px-3 text-center font-black text-sm ${row.diff > 0 ? "text-green-400" : row.diff < 0 ? "text-red-400" : "text-gray-500"}`}>
+                                {row.diff > 0 ? "+" : ""}{row.diff}
+                              </td>
+                              <td className="py-3 px-3 text-center text-gray-500 text-sm">{row.gamesPlayed}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {games.length > 0 && (
+                      <div className="mt-5 pt-4 border-t border-white/10">
+                        <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-3">Pool Play Scores Used</div>
+                        <div className="grid md:grid-cols-2 gap-2">
+                          {games.map(game => (
+                            <div key={game.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-2 text-xs">
+                              <span className="text-gray-500 font-bold">R{game.round}</span>
+                              <span className="text-white font-semibold flex-1 truncate">{teamName(game.team1Id)}</span>
+                              <span className="text-white font-black">{game.score1}</span>
+                              <span className="text-gray-600">–</span>
+                              <span className="text-white font-black">{game.score2}</span>
+                              <span className="text-white font-semibold flex-1 truncate text-right">{teamName(game.team2Id)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

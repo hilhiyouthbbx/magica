@@ -123,6 +123,16 @@ interface SeedingGame {
   status: "scheduled" | "live" | "final";
 }
 
+interface StandingRow {
+  team: CampTeam;
+  wins: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  diff: number;
+  gamesPlayed: number;
+}
+
 interface BracketGame {
   id: string;
   round: "semi" | "final" | "3rd";
@@ -183,7 +193,7 @@ export default function CampHubPage() {
   const [seedingGames, setSeedingGames] = useState<SeedingGame[]>([]);
   const [individualEvents, setIndividualEvents] = useState<IndividualEvent[]>([]);
   // Top-level view toggle
-  const [activeView, setActiveView] = useState<"schedule" | "rosters">("schedule");
+  const [activeView, setActiveView] = useState<"schedule" | "standings" | "rosters">("schedule");
 
   const fetchStatus = useCallback(() => {
     fetch("/api/camp-schedule", { cache: "no-store" })
@@ -225,6 +235,66 @@ export default function CampHubPage() {
 
   // Helper: is this day tab unlocked?
   const isDayUnlocked = (i: number) => (i + 1) <= unlockedThrough;
+
+  function isPlayedPoolGame(game: SeedingGame) {
+    const s1 = typeof game.score1 === "number" ? game.score1 : null;
+    const s2 = typeof game.score2 === "number" ? game.score2 : null;
+    return s1 !== null && s2 !== null && (game.status === "final" || s1 > 0 || s2 > 0);
+  }
+
+  function teamName(id: string) {
+    return teams.find(t => t.id === id)?.name || id || "TBD";
+  }
+
+  function calcPoolStandings(division: "NBA" | "College"): StandingRow[] {
+    const divTeams = teams.filter(t => t.division === division);
+    const rows = new Map<string, StandingRow>();
+    divTeams.forEach(team => rows.set(team.id, {
+      team,
+      wins: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      diff: 0,
+      gamesPlayed: 0,
+    }));
+
+    seedingGames
+      .filter(game => game.division === division && isPlayedPoolGame(game))
+      .forEach(game => {
+        const s1 = game.score1 ?? 0;
+        const s2 = game.score2 ?? 0;
+        const t1 = rows.get(game.team1Id);
+        const t2 = rows.get(game.team2Id);
+        if (!t1 || !t2) return;
+
+        t1.pointsFor += s1;
+        t1.pointsAgainst += s2;
+        t1.diff = t1.pointsFor - t1.pointsAgainst;
+        t1.gamesPlayed += 1;
+
+        t2.pointsFor += s2;
+        t2.pointsAgainst += s1;
+        t2.diff = t2.pointsFor - t2.pointsAgainst;
+        t2.gamesPlayed += 1;
+
+        if (s1 > s2) {
+          t1.wins += 1;
+          t2.losses += 1;
+        } else if (s2 > s1) {
+          t2.wins += 1;
+          t1.losses += 1;
+        }
+      });
+
+    return Array.from(rows.values()).sort((a, b) =>
+      b.wins - a.wins ||
+      b.diff - a.diff ||
+      b.pointsFor - a.pointsFor ||
+      a.pointsAgainst - b.pointsAgainst ||
+      a.team.name.localeCompare(b.team.name)
+    );
+  }
 
   const current = schedule[activeDay] ?? DEFAULT_SCHEDULE[0];
 
@@ -282,6 +352,12 @@ export default function CampHubPage() {
               className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "schedule" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
             >
               📅 Schedule
+            </button>
+            <button
+              onClick={() => setActiveView("standings")}
+              className={`px-4 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${activeView === "standings" ? "border-[#F4A800] text-[#F4A800]" : "border-transparent text-white/40 hover:text-white/60"}`}
+            >
+              📊 Standings
             </button>
             <button
               onClick={() => setActiveView("rosters")}

@@ -164,7 +164,7 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center gap-3">
           <a href="/join" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 whitespace-nowrap">
-            Join
+            Register Now
           </a>
         </div>
 
@@ -195,7 +195,7 @@ export function Navbar() {
             return <a key={l.label} href={l.href} onClick={() => setOpen(false)} className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">{l.label}</a>;
           })}
           <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
-            Join
+            Register Now
           </a>
         </div>
       )}

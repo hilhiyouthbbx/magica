@@ -65,13 +65,8 @@ async function sendAbsentEmails(day: DayKey, dayLabel: string, campName: string)
 
   const [contacts, checkIns] = await Promise.all([getContacts(), getCheckIns()]);
 
-  // Find confirmed campers — same criteria as the check-in UI:
-  // must have a camperName AND a confirmed payment status (paid/free/approved/empty)
-  const campers = contacts.filter(c => {
-    if (!c.camperName?.trim()) return false;
-    const pay = (c.paymentStatus ?? "").trim();
-    return /paid|free|manual payment approved|approved/i.test(pay) || pay === "";
-  });
+  // Find campers registered for camp (have camperName)
+  const campers = contacts.filter(c => c.camperName?.trim());
 
   // Who did NOT check in today
   const absent = campers.filter(c => !checkIns[c.id]?.[day]);

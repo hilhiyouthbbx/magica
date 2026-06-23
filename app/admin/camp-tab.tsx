@@ -2,10 +2,10 @@
 import { useState, useEffect } from "react";
 import {
   Plus, Save, Trash2, X, Loader2, CheckCircle,
-  Users, GripVertical, RefreshCw, Mail, Edit, ChevronUp, ChevronDown
+  Users, GripVertical, RefreshCw, Mail, Edit
 } from "lucide-react";
 import type {
-  CampScheduleData, CampTeam, BracketGame, SeedingGame, IndividualEvent, Division,
+  CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
   CamperRosterEntry
 } from "@/lib/camp-schedule";
 import type { DayKey, CheckInMap } from "@/lib/camp-checkin";
@@ -31,7 +31,6 @@ interface ScheduleRow {
 interface DayData {
   label: string;
   date: string;
-  theme: string;
   rows: ScheduleRow[];
 }
 
@@ -59,77 +58,77 @@ function fromMins(total: number): string {
 // ─── Default Schedule ─────────────────────────────────────────────────────────
 const DEFAULT: DayData[] = [
   {
-    label: "Day 1", date: "Monday, June 22", theme: "Fundamentals",
+    label: "Day 1", date: "Monday, June 22",
     rows: [
-      { id:"1-1",  time:"8:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
-      { id:"1-2",  time:"9:00 AM",  activity:"Welcome, Camp Overview & Introductions",        note:"All campers",                      type:"highlight" },
-      { id:"1-3",  time:"9:15 AM",  activity:"Warm-Up & Dynamic Stretching",                  note:"",                                 type:"normal"    },
-      { id:"1-4",  time:"9:25 AM",  activity:"SKILL STATION — Ballhandling Fundamentals",     note:"Both courts",                      type:"section"   },
-      { id:"1-5",  time:"10:00 AM", activity:"SKILL STATION — Footwork & Pivoting",           note:"Both courts",                      type:"section"   },
-      { id:"1-6",  time:"10:35 AM", activity:"SKILL STATION — Passing & Catching",            note:"Both courts",                      type:"section"   },
-      { id:"1-7",  time:"11:10 AM", activity:"SKILL STATION — Shooting Form & Arc",           note:"Both courts",                      type:"section"   },
-      { id:"1-8",  time:"11:45 AM", activity:"Water Break",                                   note:"5 min",                            type:"break"     },
-      { id:"1-9",  time:"12:00 PM", activity:"Lunch Break",                                   note:"45 min",                           type:"break"     },
-      { id:"1-10", time:"12:45 PM", activity:"Seeding Round 1 — NBA Division",                note:"2x12-min clock | 1st-4th Grade",   type:"game"      },
-      { id:"1-11", time:"1:15 PM",  activity:"Seeding Round 1 — College Division",            note:"2x12-min clock | 5th-8th Grade",   type:"game"      },
-      { id:"1-12", time:"1:45 PM",  activity:"SKILL STATION — Defensive Positioning",         note:"Both courts",                      type:"section"   },
-      { id:"1-13", time:"2:30 PM",  activity:"Cool Down & Camp Debrief",                      note:"",                                 type:"normal"    },
-      { id:"1-14", time:"3:00 PM",  activity:"End of Day",                                    note:"",                                 type:"highlight" },
+      { id:"1-1",  time:"7:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
+      { id:"1-2",  time:"8:00 AM",  activity:"Welcome, Camp Overview & Introductions",        note:"All campers",                      type:"highlight" },
+      { id:"1-3",  time:"8:15 AM",  activity:"Warm-Up & Dynamic Stretching",                  note:"",                                 type:"normal"    },
+      { id:"1-4",  time:"8:30 AM",  activity:"SKILL STATION — Ballhandling Fundamentals",     note:"Both courts",                      type:"section"   },
+      { id:"1-5",  time:"9:15 AM",  activity:"SKILL STATION — Footwork & Pivoting",           note:"Both courts",                      type:"section"   },
+      { id:"1-6",  time:"10:00 AM", activity:"SKILL STATION — Passing & Catching",            note:"Both courts",                      type:"section"   },
+      { id:"1-7",  time:"10:45 AM", activity:"Water Break",                                   note:"5 min",                            type:"break"     },
+      { id:"1-8",  time:"11:00 AM", activity:"Seeding Round 1 — NBA Division",                note:"2x12-min clock | 1st-4th Grade",   type:"game"      },
+      { id:"1-9",  time:"11:30 AM", activity:"Seeding Round 1 — College Division",            note:"2x12-min clock | 5th-8th Grade",   type:"game"      },
+      { id:"1-10", time:"12:00 PM", activity:"Lunch Break",                                   note:"45 min",                           type:"break"     },
+      { id:"1-11", time:"12:45 PM", activity:"SKILL STATION — Shooting Form & Arc",           note:"Both courts",                      type:"section"   },
+      { id:"1-12", time:"1:30 PM",  activity:"SKILL STATION — Defensive Positioning",         note:"Both courts",                      type:"section"   },
+      { id:"1-13", time:"2:15 PM",  activity:"Cool Down & Camp Debrief",                      note:"",                                 type:"normal"    },
+      { id:"1-14", time:"2:45 PM",  activity:"End of Day",                                    note:"",                                 type:"highlight" },
     ],
   },
   {
-    label: "Day 2", date: "Tuesday, June 23", theme: "Teamwork & Competition",
+    label: "Day 2", date: "Tuesday, June 23",
     rows: [
-      { id:"2-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
-      { id:"2-2",  time:"9:00 AM",  activity:"TEAM FORMATION & NAMING",                          note:"NBA: 1st-4th | College: 5th-8th",         type:"highlight" },
-      { id:"2-3",  time:"9:15 AM",  activity:"SKILL STATION — Post Moves & Low-Post Finishing",  note:"Both courts",                             type:"section"   },
-      { id:"2-4",  time:"9:50 AM",  activity:"SKILL STATION — Shooting Off Screens",             note:"Both courts",                             type:"section"   },
-      { id:"2-5",  time:"10:25 AM", activity:"SKILL STATION — Transition Offense / Fast Break",  note:"Both courts",                             type:"section"   },
-      { id:"2-6",  time:"11:00 AM", activity:"SKILL STATION — 3-Point & Free Throw Practice",   note:"Both courts",                             type:"section"   },
-      { id:"2-7",  time:"11:35 AM", activity:"Water Break",                                      note:"5 min",                                   type:"break"     },
+      { id:"2-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
+      { id:"2-2",  time:"8:00 AM",  activity:"TEAM FORMATION & NAMING",                          note:"NBA: 1st-4th | College: 5th-8th",         type:"highlight" },
+      { id:"2-3",  time:"8:15 AM",  activity:"SKILL STATION — Post Moves & Low-Post Finishing",  note:"Both courts",                             type:"section"   },
+      { id:"2-4",  time:"9:00 AM",  activity:"SKILL STATION — Shooting Off Screens",             note:"Both courts",                             type:"section"   },
+      { id:"2-5",  time:"9:45 AM",  activity:"Water Break",                                      note:"5 min",                                   type:"break"     },
+      { id:"2-6",  time:"10:00 AM", activity:"Seeding Round 2 — NBA Division",                   note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
+      { id:"2-7",  time:"11:00 AM", activity:"Seeding Round 2 — College Division",               note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
       { id:"2-8",  time:"12:00 PM", activity:"Lunch Break",                                      note:"45 min",                                  type:"break"     },
-      { id:"2-9",  time:"12:45 PM", activity:"Seeding Round 2 — NBA Division",                   note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
-      { id:"2-10", time:"1:30 PM",  activity:"Seeding Round 2 — College Division",               note:"T1 vs T3 | T2 vs T4 | 2x12-min clock",   type:"game"      },
+      { id:"2-9",  time:"12:45 PM", activity:"SKILL STATION — Transition Offense / Fast Break",  note:"Both courts",                             type:"section"   },
+      { id:"2-10", time:"1:30 PM",  activity:"SKILL STATION — 3-Point & Free Throw Practice",   note:"Both courts",                             type:"section"   },
       { id:"2-11", time:"2:15 PM",  activity:"Championship Contest Preview & Practice",          note:"All campers",                             type:"normal"    },
-      { id:"2-12", time:"2:50 PM",  activity:"Cool Down & Team Debrief",                         note:"",                                        type:"normal"    },
-      { id:"2-13", time:"3:00 PM",  activity:"End of Day",                                       note:"",                                        type:"highlight" },
+      { id:"2-12", time:"2:45 PM",  activity:"End of Day",                                       note:"",                                        type:"highlight" },
     ],
   },
   {
-    label: "Day 3", date: "Wednesday, June 24", theme: "Championship Prep",
+    label: "Day 3", date: "Wednesday, June 24",
     rows: [
-      { id:"3-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                         note:"",                                        type:"normal"    },
-      { id:"3-2",  time:"9:00 AM",  activity:"SKILL STATION — Pick & Roll Offense",        note:"Both courts",                             type:"section"   },
-      { id:"3-3",  time:"9:40 AM",  activity:"SKILL STATION — Fast Break & Transition D",  note:"Both courts",                             type:"section"   },
-      { id:"3-4",  time:"10:20 AM", activity:"Championship Day Preview / Lineup Cards",    note:"Teams nominate players for each contest", type:"highlight" },
-      { id:"3-5",  time:"10:45 AM", activity:"Individual Contest Practice / Shootaround",  note:"All courts",                              type:"normal"    },
-      { id:"3-6",  time:"11:30 AM", activity:"Water Break",                                note:"5 min",                                   type:"break"     },
-      { id:"3-7",  time:"12:00 PM", activity:"Lunch Break",                                note:"45 min",                                  type:"break"     },
-      { id:"3-8",  time:"12:45 PM", activity:"Seeding Round 3 — NBA Division",             note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
-      { id:"3-9",  time:"1:45 PM",  activity:"Seeding Round 3 — College Division",         note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
-      { id:"3-10", time:"2:45 PM",  activity:"Final Standings Announced",                  note:"All teams",                               type:"highlight" },
-      { id:"3-11", time:"2:50 PM",  activity:"Cool Down & Championship Day Prep",          note:"",                                        type:"normal"    },
-      { id:"3-12", time:"3:00 PM",  activity:"End of Day",                                 note:"",                                        type:"highlight" },
+      { id:"3-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                         note:"",                                        type:"normal"    },
+      { id:"3-2",  time:"8:00 AM",  activity:"SKILL STATION — Pick & Roll Offense",        note:"Both courts",                             type:"section"   },
+      { id:"3-3",  time:"8:45 AM",  activity:"SKILL STATION — Fast Break & Transition D",  note:"Both courts",                             type:"section"   },
+      { id:"3-4",  time:"9:30 AM",  activity:"Seeding Round 3 — NBA Division",             note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
+      { id:"3-5",  time:"10:30 AM", activity:"Water Break",                                note:"5 min",                                   type:"break"     },
+      { id:"3-6",  time:"10:45 AM", activity:"Seeding Round 3 — College Division",         note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",   type:"game"      },
+      { id:"3-7",  time:"11:45 AM", activity:"Championship Day Preview / Lineup Cards",    note:"Teams nominate players for each contest", type:"highlight" },
+      { id:"3-8",  time:"12:15 PM", activity:"Lunch Break",                                note:"45 min",                                  type:"break"     },
+      { id:"3-9",  time:"1:00 PM",  activity:"Individual Contest Practice / Shootaround",  note:"All courts",                              type:"normal"    },
+      { id:"3-10", time:"2:00 PM",  activity:"Final Standings Announced",                  note:"All teams",                               type:"highlight" },
+      { id:"3-11", time:"2:15 PM",  activity:"Cool Down & Championship Day Prep",          note:"",                                        type:"normal"    },
+      { id:"3-12", time:"2:45 PM",  activity:"End of Day",                                 note:"",                                        type:"highlight" },
     ],
   },
   {
-    label: "Championship", date: "Thursday, June 25", theme: "Championship Day",
+    label: "Championship", date: "Thursday, June 25",
     rows: [
-      { id:"4-1",  time:"8:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                                type:"normal"    },
-      { id:"4-2",  time:"9:00 AM",  activity:"Opening Ceremony",                      note:"All campers",                                     type:"highlight" },
-      { id:"4-3",  time:"9:15 AM",  activity:"KNOCKOUT CONTEST — All Camp",           note:"Last one standing wins!",                         type:"game"      },
-      { id:"4-4",  time:"10:00 AM", activity:"FREE THROW CONTEST",                    note:"Best of 10, 2 at a time | Tie = Sudden Death",    type:"game"      },
-      { id:"4-5",  time:"10:25 AM", activity:"3-POINT CONTEST",                       note:"3 balls at 5 spots | 1 min per shooter",          type:"game"      },
-      { id:"4-6",  time:"10:50 AM", activity:"1-ON-1 CONTEST",                        note:"First to 15 points (2s and 3s count)",            type:"game"      },
-      { id:"4-7",  time:"11:15 AM", activity:"3-ON-3 CONTEST",                        note:"First to 21 points (2s and 3s count)",            type:"game"      },
-      { id:"4-8",  time:"11:40 AM", activity:"LAYUP CONTEST (Team Event)",            note:"Right 1 min + Left 1 min | Team total wins",      type:"game"      },
-      { id:"4-9",  time:"12:00 PM", activity:"Lunch / Bracket Reveal",                note:"45 min",                                          type:"break"     },
-      { id:"4-10", time:"12:45 PM", activity:"SEMIFINAL GAMES — NBA & College",       note:"Both courts simultaneously | 2x10-min clock",     type:"game"      },
-      { id:"4-11", time:"1:15 PM",  activity:"CHAMPIONSHIP GAMES — NBA & College",    note:"Both courts simultaneously | 2x15-min clock",     type:"highlight" },
-      { id:"4-12", time:"2:00 PM",  activity:"3rd Place Games — NBA & College",       note:"Both courts simultaneously | 2x10-min clock",     type:"game"      },
-      { id:"4-13", time:"2:30 PM",  activity:"AWARDS CEREMONY",                       note:"Trophies, medals & camp awards",                  type:"highlight" },
-      { id:"4-14", time:"2:50 PM",  activity:"Photos & Closing Remarks",              note:"",                                                type:"normal"    },
-      { id:"4-15", time:"3:00 PM",  activity:"Dismissal",                             note:"",                                                type:"highlight" },
+      { id:"4-1",  time:"7:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                              type:"normal"    },
+      { id:"4-2",  time:"8:00 AM",  activity:"Opening Ceremony",                      note:"All campers",                                   type:"highlight" },
+      { id:"4-3",  time:"8:15 AM",  activity:"KNOCKOUT CONTEST — All Camp",           note:"Last one standing wins!",                       type:"game"      },
+      { id:"4-4",  time:"9:00 AM",  activity:"FREE THROW CONTEST",                    note:"Best of 10, 2 at a time | Tie = Sudden Death",  type:"game"      },
+      { id:"4-5",  time:"9:30 AM",  activity:"3-POINT CONTEST",                       note:"3 balls at 5 spots | 1 min per shooter",        type:"game"      },
+      { id:"4-6",  time:"10:00 AM", activity:"1-ON-1 CONTEST",                        note:"First to 15 points (2s and 3s count)",          type:"game"      },
+      { id:"4-7",  time:"10:30 AM", activity:"3-ON-3 CONTEST",                        note:"First to 21 points (2s and 3s count)",          type:"game"      },
+      { id:"4-8",  time:"11:15 AM", activity:"LAYUP CONTEST (Team Event)",            note:"Right 1 min + Left 1 min | Team total wins",    type:"game"      },
+      { id:"4-9",  time:"12:00 PM", activity:"Lunch / Bracket Reveal",                note:"45 min",                                        type:"break"     },
+      { id:"4-10", time:"12:45 PM", activity:"SEMIFINAL GAMES — NBA Division",        note:"#1 vs #4 | #2 vs #3 | 2x12-min clock",         type:"game"      },
+      { id:"4-11", time:"1:25 PM",  activity:"SEMIFINAL GAMES — College Division",    note:"#1 vs #4 | #2 vs #3 | 2x12-min clock",         type:"game"      },
+      { id:"4-12", time:"1:40 PM",  activity:"CHAMPIONSHIP GAME — NBA Division",      note:"Semifinal winners | 2x20-min clock",            type:"highlight" },
+      { id:"4-13", time:"2:20 PM",  activity:"CHAMPIONSHIP GAME — College Division",  note:"Semifinal winners | 2x20-min clock",            type:"highlight" },
+      { id:"4-14", time:"3:00 PM",  activity:"AWARDS CEREMONY",                       note:"Trophies, medals & camp awards",                type:"highlight" },
+      { id:"4-15", time:"3:20 PM",  activity:"Photos & Closing Remarks",              note:"",                                              type:"normal"    },
+      { id:"4-16", time:"3:30 PM",  activity:"Dismissal",                             note:"",                                              type:"highlight" },
     ],
   },
 ];
@@ -159,8 +158,6 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
   const [days, setDays]             = useState<DayData[]>(DEFAULT);
   const [activeDay, setActiveDay]   = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dragRowId,  setDragRowId]  = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [editBuf, setEditBuf]       = useState<ScheduleRow | null>(null);
   const [autoShift, setAutoShift]   = useState(true);
   const [flash, setFlash]           = useState("");
@@ -301,38 +298,6 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
     persist(nextDays);
     setSelectedId(null);
     setEditBuf(null);
-  }
-
-
-  // ── Move row up / down ──
-  function moveRow(dir: "up" | "down", rowId?: string) {
-    const id = rowId ?? selectedId;
-    if (!id) return;
-    const rows = current.rows;
-    const idx  = rows.findIndex(r => r.id === id);
-    if (idx < 0) return;
-    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= rows.length) return;
-    const newRows = [...rows];
-    [newRows[idx], newRows[swapIdx]] = [newRows[swapIdx], newRows[idx]];
-    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
-    persist(nextDays);
-  }
-
-  // ── Drag-to-reorder ──
-  function onDropRow(targetId: string) {
-    if (!dragRowId || dragRowId === targetId) { setDragRowId(null); setDragOverId(null); return; }
-    const rows = current.rows;
-    const fromIdx = rows.findIndex(r => r.id === dragRowId);
-    const toIdx   = rows.findIndex(r => r.id === targetId);
-    if (fromIdx < 0 || toIdx < 0) return;
-    const newRows = [...rows];
-    const [moved] = newRows.splice(fromIdx, 1);
-    newRows.splice(toIdx, 0, moved);
-    const nextDays = days.map((d, di) => di !== activeDay ? d : { ...d, rows: newRows });
-    persist(nextDays);
-    setDragRowId(null);
-    setDragOverId(null);
   }
 
   // ── Add row ──
@@ -500,46 +465,17 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
             <span className="text-xs text-gray-600">{current.rows.length} events · click any row to edit</span>
           </div>
 
-          {current.rows.map((row, rowIdx) => {
-            const isSel   = selectedId === row.id;
-            const isDragging = dragRowId === row.id;
-            const isDragOver = dragOverId === row.id && dragRowId !== row.id;
+          {current.rows.map((row) => {
+            const isSel = selectedId === row.id;
             return (
-              <div key={row.id}
-                draggable
-                onDragStart={e => { e.dataTransfer.effectAllowed = "move"; setDragRowId(row.id); }}
-                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverId(row.id); }}
-                onDrop={e => { e.preventDefault(); onDropRow(row.id); }}
-                onDragEnd={() => { setDragRowId(null); setDragOverId(null); }}
-                onClick={() => selectRow(row)}
-                className={`grid grid-cols-[28px_90px_1fr_56px] items-center px-2 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-all select-none
-                  ${isDragOver ? "border-t-2 border-t-blue-400 bg-blue-900/20" : ""}
-                  ${isDragging ? "opacity-40" : ""}
-                  ${rowBg(row.type, isSel)}`}>
-                {/* Drag grip */}
-                <div className="flex items-center justify-center text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing">
-                  <GripVertical className="w-4 h-4" />
-                </div>
-                <div className={`text-xs font-mono ${isSel ? "text-blue-300" : timeColor(row.type)}`}>{row.time}</div>
+              <div key={row.id} onClick={() => selectRow(row)}
+                className={`grid grid-cols-[90px_1fr_auto] items-start px-4 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-all ${rowBg(row.type, isSel)}`}>
+                <div className={`text-xs font-mono pt-0.5 ${isSel ? "text-blue-300" : timeColor(row.type)}`}>{row.time}</div>
                 <div>
                   <div className={`text-sm leading-snug ${isSel ? "text-white font-medium" : actColor(row.type)}`}>{row.activity}</div>
                   {row.note && <div className={`text-xs mt-0.5 ${isSel ? "text-blue-300/70" : "text-gray-600"}`}>{row.note}</div>}
                 </div>
-                {/* Up / Down arrows — always visible */}
-                <div className="flex flex-col items-center gap-0.5 pl-1">
-                  <button onClick={e => { e.stopPropagation(); selectRow(row); moveRow("up", row.id); }}
-                    disabled={rowIdx === 0}
-                    className={`transition-colors leading-none rounded p-0.5 disabled:opacity-20 disabled:cursor-not-allowed
-                      ${isSel ? "text-blue-300 hover:text-blue-100" : "text-gray-500 hover:text-gray-300"}`}>
-                    <ChevronUp className="w-4 h-4" />
-                  </button>
-                  <button onClick={e => { e.stopPropagation(); selectRow(row); moveRow("down", row.id); }}
-                    disabled={rowIdx === current.rows.length - 1}
-                    className={`transition-colors leading-none rounded p-0.5 disabled:opacity-20 disabled:cursor-not-allowed
-                      ${isSel ? "text-blue-300 hover:text-blue-100" : "text-gray-500 hover:text-gray-300"}`}>
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </div>
+                <div className={`text-sm pl-2 ${isSel ? "opacity-100 text-blue-400" : "opacity-0"}`}>✏️</div>
               </div>
             );
           })}
@@ -569,20 +505,6 @@ export function ScheduleTab({ adminKey }: { adminKey: string }) {
               <button onClick={deleteSelected}
                 className="flex-1 py-2.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 hover:text-red-300 text-sm font-bold rounded-lg transition-all">
                 🗑 Delete{autoShift && <span className="text-xs font-normal ml-1">+ shift</span>}
-              </button>
-            </div>
-
-            {/* ── Move up / down ── */}
-            <div className="flex gap-2">
-              <button onClick={() => moveRow("up")}
-                disabled={current.rows.findIndex(r => r.id === editBuf.id) === 0}
-                className="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-sm rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
-                <ChevronUp className="w-4 h-4" /> Move Up
-              </button>
-              <button onClick={() => moveRow("down")}
-                disabled={current.rows.findIndex(r => r.id === editBuf.id) === current.rows.length - 1}
-                className="flex-1 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-sm rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
-                Move Down <ChevronDown className="w-4 h-4" />
               </button>
             </div>
 
@@ -632,7 +554,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [data,        setData]        = useState<CampScheduleData | null>(null);
   const [saving,      setSaving]      = useState(false);
   const [saved,       setSaved]       = useState(false);
-  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"games"|"bracket"|"events"|"settings"|"schedule">("teams");
+  const [section,     setSection]     = useState<"roster"|"checkin"|"teams"|"standings"|"bracket"|"events"|"schedule"|"settings">("teams");
   const [roster,      setRoster]      = useState<CamperRosterEntry[]>([]);
   const [rawContacts, setRawContacts] = useState<Record<string, string>[]>([]);
   const [rosterLoad,  setRosterLoad]  = useState(false);
@@ -787,52 +709,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   function removeTeam(id: string) {
     if (!data || !confirm("Remove this team?")) return;
     save({ teams: data.teams.filter(t => t.id !== id) });
-  }
-
-  // ── Seeding Game helpers ─────────────────────────────────────────────────
-
-  function addSeedingGame(division: Division, round: 1|2|3) {
-    if (!data) return;
-    const opts = data.teams.filter(t => t.division === division);
-    const g: SeedingGame = {
-      id: `sg-${Date.now()}`,
-      round, division,
-      team1Id: opts[0]?.id || "",
-      team2Id: opts[1]?.id || "",
-      score1: null, score2: null,
-      court: "Court A", status: "scheduled",
-    };
-    save({ seedingGames: [...data.seedingGames, g] });
-  }
-
-  function setSeedingField(id: string, field: keyof SeedingGame, val: unknown) {
-    if (!data) return;
-    const updated = data.seedingGames.map(g => g.id === id ? { ...g, [field]: val } : g);
-    setData({ ...data, seedingGames: updated });
-  }
-
-  async function saveSeedingGames() {
-    if (!data) return;
-    const games = data.seedingGames;
-    const teams = data.teams.map(t => ({
-      ...t, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0
-    }));
-    for (const g of games) {
-      if (g.status !== "final" || g.score1 === null || g.score2 === null) continue;
-      const t1 = teams.find(t => t.id === g.team1Id);
-      const t2 = teams.find(t => t.id === g.team2Id);
-      if (!t1 || !t2) continue;
-      t1.pointsFor += g.score1; t1.pointsAgainst += g.score2;
-      t2.pointsFor += g.score2; t2.pointsAgainst += g.score1;
-      if (g.score1 > g.score2) { t1.wins++; t2.losses++; }
-      else if (g.score2 > g.score1) { t2.wins++; t1.losses++; }
-    }
-    save({ seedingGames: games, teams });
-  }
-
-  function removeSeedingGame(id: string) {
-    if (!data || !confirm("Remove this game?")) return;
-    save({ seedingGames: data.seedingGames.filter(g => g.id !== id) });
   }
 
   // ── Bracket helpers ───────────────────────────────────────────────────────
@@ -1002,33 +878,21 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
   // ── Check-in helpers ──────────────────────────────────────────────────────
   async function toggleCheckIn(contactId: string, day: DayKey, checked: boolean) {
-    // Optimistic update — functional form avoids stale-closure race conditions
-    setCheckIns(prev => ({
-      ...prev,
+    const updated = {
+      ...checkIns,
       [contactId]: {
-        ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+        ...(checkIns[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
         [day]: checked,
       },
-    }));
-    try {
-      await fetch(`/api/camp-checkin?key=${adminKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "toggle", contactId, day, checked }),
-      });
-      // Do NOT setCheckIns from the server response — doing so overwrites any
-      // optimistic updates that happened while this request was in-flight,
-      // causing previously-checked names to visually reset.
-    } catch {
-      // On network error, revert this toggle
-      setCheckIns(prev => ({
-        ...prev,
-        [contactId]: {
-          ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
-          [day]: !checked,
-        },
-      }));
-    }
+    };
+    setCheckIns(updated); // optimistic
+    const res = await fetch(`/api/camp-checkin?key=${adminKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "toggle", contactId, day, checked }),
+    });
+    const json = await res.json() as { checkIns?: CheckInMap };
+    if (json.checkIns) setCheckIns(json.checkIns);
   }
 
   async function sendAbsentEmails() {
@@ -1090,11 +954,10 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           ["checkin",   "✅ Check-In"],
           ["teams",     "👥 Teams & Rosters"],
           ["standings", "📊 Standings"],
-          ["games",     "🏀 Pool Play"],
           ["bracket",   "🏆 Bracket"],
           ["events",    "🎯 Individual Events"],
+          ["schedule",  "📅 Schedule"],
           ["settings",  "⚙️ Settings"],
-        ["schedule",  "📅 Schedule"],
         ] as const).map(([s, label]) => (
           <button key={s} onClick={() => setSection(s)}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${section === s ? "bg-blue-600 text-white" : "glass border border-white/15 text-gray-400 hover:text-white"}`}>
@@ -1575,112 +1438,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
         </div>
       )}
 
-      {/* ── POOL PLAY ── */}
-      {section === "games" && (
-        <div className="space-y-6">
-          {(["NBA", "College"] as Division[]).map(div => (
-            <div key={div} className="glass rounded-2xl border border-white/10 p-5">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <h3 className="text-white font-black text-base">{div} Division — Pool Play</h3>
-                <div className="flex flex-wrap gap-2">
-                  {([1, 2, 3] as const).map(r => (
-                    <button key={r} onClick={() => addSeedingGame(div, r)}
-                      className="px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 text-xs font-bold rounded-xl transition-all">
-                      + Round {r}
-                    </button>
-                  ))}
-                  <button onClick={saveSeedingGames}
-                    className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
-                    <Save className="w-3 h-3" /> Save &amp; Calc W/L
-                  </button>
-                </div>
-              </div>
-
-              {[1, 2, 3].map(round => {
-                const games = (data?.seedingGames ?? []).filter(g => g.division === div && g.round === round);
-                if (games.length === 0) return null;
-                return (
-                  <div key={round} className="mb-5">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 pb-2 border-b border-white/8">Round {round}</div>
-                    <div className="space-y-2">
-                      {games.map(game => (
-                        <div key={game.id} className="rounded-xl bg-white/3 border border-white/10 overflow-hidden">
-                          {/* Row 1 — Teams + Scores */}
-                          <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2 px-3 pt-3 pb-2">
-                            {/* Team 1 */}
-                            <select
-                              value={game.team1Id}
-                              onChange={e => setSeedingField(game.id, "team1Id", e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
-                              <option value="">— Select Team —</option>
-                              {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
-                            </select>
-                            {/* Score 1 */}
-                            <input type="number" min={0} placeholder="0"
-                              value={game.score1 ?? ""}
-                              onChange={e => setSeedingField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
-                              className="w-16 text-center px-2 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500" />
-                            <span className="text-white/25 text-sm font-black px-1">VS</span>
-                            {/* Score 2 */}
-                            <input type="number" min={0} placeholder="0"
-                              value={game.score2 ?? ""}
-                              onChange={e => setSeedingField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
-                              className="w-16 text-center px-2 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500" />
-                            {/* Team 2 */}
-                            <select
-                              value={game.team2Id}
-                              onChange={e => setSeedingField(game.id, "team2Id", e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
-                              <option value="">— Select Team —</option>
-                              {divTeams(div).map(t => <option key={t.id} value={t.id}>{t.name || "(unnamed)"}</option>)}
-                            </select>
-                          </div>
-                          {/* Row 2 — Court + Status + Delete */}
-                          <div className="flex items-center gap-2 px-3 pb-3 border-t border-white/6 pt-2">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest shrink-0">Court</span>
-                            <select
-                              value={game.court}
-                              onChange={e => setSeedingField(game.id, "court", e.target.value)}
-                              className="px-3 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
-                              <option value="Court A">Court A</option>
-                              <option value="Court B">Court B</option>
-                              <option value="Court 1">Court 1</option>
-                              <option value="Court 2">Court 2</option>
-                              <option value="Main Court">Main Court</option>
-                              <option value="Gym A">Gym A</option>
-                              <option value="Gym B">Gym B</option>
-                              <option value="Both Courts">Both Courts</option>
-                            </select>
-                            <div className="flex-1" />
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest shrink-0">Status</span>
-                            <select
-                              value={game.status}
-                              onChange={e => setSeedingField(game.id, "status", e.target.value)}
-                              className="px-3 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-sm font-bold focus:outline-none focus:border-blue-500 cursor-pointer">
-                              <option value="scheduled">📅 Scheduled</option>
-                              <option value="live">🔴 Live</option>
-                              <option value="final">✅ Final</option>
-                            </select>
-                            <button onClick={() => removeSeedingGame(game.id)}
-                              className="p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10 ml-1">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {(data?.seedingGames ?? []).filter(g => g.division === div).length === 0 && (
-                <p className="text-gray-600 text-sm">No games yet — use the Round buttons above to add pool play games. Each division needs 6 games total (3 rounds × 2 games).</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── BRACKET ── */}
       {section === "bracket" && (
         <div className="space-y-6">
@@ -1832,45 +1589,22 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       <div>
                         <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                           Nominees — {evt.name === "3-on-3 Tournament" ? "3 players per team" : "up to 2 per team"}
-                          <span className="ml-2 text-gray-700 normal-case font-normal">drag a player chip into a slot</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {teams.map(team => {
                             const nom = evt.nominees.find(n => n.teamId === team.id);
-                            const roster = team.players.filter(p => p.trim());
                             return (
-                              <div key={team.id} className="bg-white/3 rounded-xl p-3 space-y-2 border border-white/8">
-                                <div className="text-xs font-black text-gray-300">{team.name || "(unnamed)"}</div>
-                                {roster.length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5 pb-2 border-b border-white/10">
-                                    {roster.map((player, pi) => (
-                                      <span key={pi} draggable
-                                        onDragStart={e => { e.dataTransfer.setData("text/plain", player); }}
-                                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-900/40 border border-blue-500/30 text-blue-300 cursor-grab active:cursor-grabbing hover:bg-blue-800/50 transition-colors select-none">
-                                        {player}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
+                              <div key={team.id}>
+                                <label className="block text-xs font-semibold text-gray-400 mb-1.5">{team.name || "(unnamed)"}</label>
                                 <div className="space-y-1.5">
-                                  {Array.from({ length: slots }, (_, i) => {
-                                    const val = (nom?.players ?? [])[i] ?? "";
-                                    return (
-                                      <div key={i} className="relative group/slot"
-                                        onDragOver={e => e.preventDefault()}
-                                        onDrop={e => { e.preventDefault(); const p = e.dataTransfer.getData("text/plain"); if (p) setNominee(evt.id, team.id, i, p); }}>
-                                        <input value={val}
-                                          onChange={e => setNominee(evt.id, team.id, i, e.target.value)}
-                                          placeholder="Drop player or type name…"
-                                          className="w-full px-2.5 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700 group-hover/slot:border-blue-500/40"
-                                        />
-                                        {val && (
-                                          <button onClick={() => setNominee(evt.id, team.id, i, "")}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-red-400 transition-colors text-xs leading-none">×</button>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
+                                  {Array.from({ length: slots }, (_, i) => (
+                                    <input key={i}
+                                      value={(nom?.players ?? [])[i] ?? ""}
+                                      onChange={e => setNominee(evt.id, team.id, i, e.target.value)}
+                                      placeholder={`Nominee ${i + 1}`}
+                                      className="w-full px-2.5 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700"
+                                    />
+                                  ))}
                                 </div>
                               </div>
                             );
@@ -1910,6 +1644,8 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       )}
 
       {/* ── SCHEDULE ── */}
+      {section === "schedule" && <ScheduleTab adminKey={adminKey} />}
+
       {/* ── SETTINGS ── */}
       {section === "settings" && (
         <div className="glass rounded-2xl border border-white/10 p-5 space-y-5">
@@ -1990,9 +1726,6 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           </button>
         </div>
       )}
-
-      {/* ── SCHEDULE EDITOR ── */}
-      {section === "schedule" && <ScheduleTab adminKey={adminKey} />}
 
       {/* ── Inline Camper Edit Modal ── */}
       {editingCamper && (

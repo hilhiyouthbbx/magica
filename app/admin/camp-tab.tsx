@@ -1011,6 +1011,43 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       return [a, b].sort().join("__");
     }
 
+    function teamNameForSchedule(id: string) {
+      return teams.find(t => t.id === id)?.name || "TBD";
+    }
+
+    function autoScheduleRows(gamesToPlace: typeof divisionGames): DayData[] {
+      const baseDays: DayData[] = Array.isArray(data.dailySchedule) && data.dailySchedule.length > 0
+        ? JSON.parse(JSON.stringify(data.dailySchedule))
+        : JSON.parse(JSON.stringify(DEFAULT));
+
+      // Remove previous auto-added rows for this division only, so regenerating does not duplicate rows.
+      const autoPrefix = `pool-schedule-auto-${division}-`;
+      const cleanDays = baseDays.map(day => ({
+        ...day,
+        rows: day.rows.filter(row => !String(row.id).startsWith(autoPrefix)),
+      }));
+
+      const sorted = [...gamesToPlace].sort((a, b) => (Number(a.round) || 0) - (Number(b.round) || 0));
+      const half = Math.ceil(sorted.length / 2);
+      const day2Games = sorted.slice(0, half);
+      const day3Games = sorted.slice(half);
+
+      function makeRows(dayGames: typeof divisionGames, startTime: string): ScheduleRow[] {
+        const start = toMins(startTime);
+        return dayGames.map((game, idx) => ({
+          id: `${autoPrefix}${game.id}`,
+          time: fromMins(start + idx * 35),
+          activity: `POOL PLAY — ${division}: ${teamNameForSchedule(game.team1Id)} vs ${teamNameForSchedule(game.team2Id)}`,
+          note: `Round ${game.round} | Court ${game.court || "TBD"} | Enter score in Admin → Pool Play Scores`,
+          type: "game" as RowType,
+        }));
+      }
+
+      if (cleanDays[1]) cleanDays[1].rows = [...cleanDays[1].rows, ...makeRows(day2Games, "10:00 AM")];
+      if (cleanDays[2]) cleanDays[2].rows = [...cleanDays[2].rows, ...makeRows(day3Games, "9:30 AM")];
+      return cleanDays;
+    }
+
     divisionGames.forEach(g => {
       if (!g.team1Id || !g.team2Id) return;
       const key = pairKey(g.team1Id, g.team2Id);
@@ -1018,9 +1055,10 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     });
 
     const nextGames = [...divisionGames];
+    const addedGames: typeof divisionGames = [];
     let round = Math.max(0, ...divisionGames.map(g => Number(g.round) || 0)) + 1;
     let courtIndex = 0;
-    const courts = ["A", "B"];
+    const courts = ["Main Court", "Aux Court"];
 
     // 4 teams + everyone plays 6 games = double round robin.
     // Each pair plays twice: 6 pairings x 2 games = 12 total games per division.
@@ -1031,7 +1069,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
         const key = pairKey(t1.id, t2.id);
         const currentCount = existingByPair.get(key)?.length ?? 0;
         for (let n = currentCount; n < 2; n++) {
-          nextGames.push({
+          const newGame = {
             id: `pool-${division}-${t1.id}-${t2.id}-${Date.now()}-${i}-${j}-${n}`,
             round,
             division,
@@ -1041,14 +1079,17 @@ export function CampTab({ adminKey }: { adminKey: string }) {
             score2: null,
             court: courts[courtIndex % courts.length],
             status: "scheduled",
-          });
+          };
+          nextGames.push(newGame);
+          addedGames.push(newGame);
           courtIndex++;
           if (courtIndex % 2 === 0) round++;
         }
       }
     }
 
-    save({ seedingGames: [...otherDivisionGames, ...nextGames] } as Partial<CampScheduleData>);
+    const dailySchedule = addedGames.length > 0 ? autoScheduleRows(addedGames) : (data.dailySchedule ?? DEFAULT);
+    save({ seedingGames: [...otherDivisionGames, ...nextGames], dailySchedule } as Partial<CampScheduleData>);
   }
 
   function calcPoolStandings(div: Division): PoolStandingRow[] {
@@ -1619,7 +1660,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                             <input
                               value={game.court ?? ""}
                               onChange={e => setPoolGameField(game.id, "court", e.target.value)}
-                              className="w-14 text-center px-2 py-1 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500"
+                              className="w-40 text-center px-3 py-1.5 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500"
                             />
                           </div>
                           <div className="flex items-center gap-2">

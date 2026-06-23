@@ -1016,11 +1016,10 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     }
 
     function autoScheduleRows(gamesToPlace: typeof divisionGames): DayData[] {
+      const scheduleDays = (data as CampScheduleData & { dailySchedule?: DayData[] })?.dailySchedule;
       const baseDays: DayData[] =
-        data?.dailySchedule &&
-        Array.isArray(data.dailySchedule) &&
-        data.dailySchedule.length > 0
-          ? JSON.parse(JSON.stringify(data.dailySchedule))
+        Array.isArray(scheduleDays) && scheduleDays.length > 0
+          ? JSON.parse(JSON.stringify(scheduleDays))
           : JSON.parse(JSON.stringify(DEFAULT));
 
       // Remove previous auto-added rows for this division only, so regenerating does not duplicate rows.

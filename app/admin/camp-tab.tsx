@@ -2350,44 +2350,74 @@ export function CampTab({ adminKey }: { adminKey: string }) {
             </p>
           </div>
 
-          {/* ── Draggable Roster Panel ── */}
-          {roster.length > 0 && (() => {
-            const confirmed = roster.filter(cam => cam.confirmed && cam.gradeNum !== 99);
-            const nba     = confirmed.filter(cam => cam.gradeNum <= 4);
-            const college = confirmed.filter(cam => cam.gradeNum >= 5);
+          {/* ── Draggable Teams Panel ── */}
+          {data && data.teams.length > 0 && (() => {
+            // Build a name→CamperRosterEntry lookup so we can pass full roster data on drag
+            const rosterByName = new Map<string, CamperRosterEntry>();
+            roster.forEach(cam => {
+              rosterByName.set(cam.fullName.toLowerCase(), cam);
+            });
+
+            function dragTeamPlayer(e: React.DragEvent<HTMLDivElement>, playerFullName: string) {
+              // Try to find the matching roster entry for full metadata; fall back to name-only
+              const cam = rosterByName.get(playerFullName.toLowerCase()) ?? {
+                id: playerFullName, fullName: playerFullName,
+                displayName: playerFullName, grade: "", gradeNum: 99,
+                paymentStatus: "", confirmed: true,
+              };
+              e.dataTransfer.setData("camper", JSON.stringify(cam));
+              e.dataTransfer.effectAllowed = "copy";
+            }
+
             return (
               <div className="glass rounded-2xl border border-white/10 p-4">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-4">
                   <GripVertical className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-black text-white">Roster — Drag to Nominate</span>
-                  <span className="text-xs text-gray-600 ml-1">grab a player and drop into any event slot</span>
+                  <span className="text-sm font-black text-white">Teams — Drag Players to Nominate</span>
+                  <span className="text-xs text-gray-600 ml-1">grab any player and drop into an event slot below</span>
                 </div>
-                <div className="space-y-3">
-                  {[{ label: "NBA · 1st–4th Grade", campers: nba, accent: "text-orange-400" },
-                    { label: "College · 5th–8th Grade", campers: college, accent: "text-blue-400" }].map(({ label, campers: gc, accent }) => (
-                    <div key={label}>
-                      <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${accent}`}>{label}</div>
-                      {gc.length === 0 ? (
-                        <p className="text-xs text-gray-700 italic">No campers in this division</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {gc.map(cam => (
-                            <div
-                              key={cam.id}
-                              draggable
-                              onDragStart={e => handleDragStart(e, cam)}
-                              title={`${cam.fullName}${cam.grade ? " · " + cam.grade : ""} — drag to an event`}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold select-none cursor-grab active:cursor-grabbing transition-all bg-white/8 border border-white/15 text-white/70 hover:bg-white/15 hover:text-white hover:border-white/30"
-                            >
-                              <GripVertical className="w-2.5 h-2.5 opacity-40 flex-shrink-0" />
-                              {cam.displayName}
+                {(["NBA", "College"] as Division[]).map(div => {
+                  const divTeamsList = data.teams.filter(t => t.division === div);
+                  if (divTeamsList.length === 0) return null;
+                  return (
+                    <div key={div} className="mb-4 last:mb-0">
+                      <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${div === "NBA" ? "text-orange-400" : "text-blue-400"}`}>
+                        {div} Division · {div === "NBA" ? "1st–4th Grade" : "5th–8th Grade"}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {divTeamsList.map(team => {
+                          const players = team.players.filter(p => p.trim());
+                          return (
+                            <div key={team.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                              <div className="text-xs font-black text-white mb-2">
+                                {team.name || "(unnamed)"}
+                                <span className="text-gray-600 font-normal ml-1.5">· {players.length} player{players.length !== 1 ? "s" : ""}</span>
+                              </div>
+                              {players.length === 0 ? (
+                                <p className="text-[11px] text-gray-700 italic">No players on this team yet</p>
+                              ) : (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {players.map((p, i) => (
+                                    <div
+                                      key={i}
+                                      draggable
+                                      onDragStart={e => dragTeamPlayer(e, p)}
+                                      title={`${p} — drag to an event slot`}
+                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium select-none cursor-grab active:cursor-grabbing transition-all bg-white/8 border border-white/12 text-white/65 hover:bg-white/15 hover:text-white hover:border-white/30"
+                                    >
+                                      <GripVertical className="w-2.5 h-2.5 opacity-35 flex-shrink-0" />
+                                      {p}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          );
+                        })}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             );
           })()}

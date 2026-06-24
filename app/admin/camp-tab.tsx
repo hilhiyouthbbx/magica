@@ -584,15 +584,47 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailResult,  setEmailResult]  = useState<string>("");
 
+  const CHECKIN_LS_KEY = `hilhi_checkins_${adminKey}`;
+
+  // Save checkIns map to localStorage so it survives sign-out / refresh
+  function persistLocally(map: CheckInMap) {
+    try { localStorage.setItem(CHECKIN_LS_KEY, JSON.stringify(map)); } catch {}
+  }
+
   useEffect(() => {
+    // 1. Show localStorage data immediately (instant — no loading flash)
+    try {
+      const cached = localStorage.getItem(CHECKIN_LS_KEY);
+      if (cached) setCheckIns(JSON.parse(cached) as CheckInMap);
+    } catch {}
+
     fetch("/api/camp-schedule")
       .then(r => r.json())
       .then(setData)
       .catch(() => {});
+
+    // 2. Load from Redis (authoritative source)
     fetch(`/api/camp-checkin?key=${adminKey}`)
       .then(r => r.json())
-      .then(d => { if (d.checkIns) setCheckIns(d.checkIns as CheckInMap); })
-      .catch(() => {});
+      .then(d => {
+        if (!d.checkIns) return;
+        const serverData = d.checkIns as CheckInMap;
+        // Check if Redis actually has any check-ins stored
+        const serverHasData = Object.values(serverData).some(ci =>
+          Object.values(ci).some(Boolean)
+        );
+        if (serverHasData) {
+          // Redis has data — use it as truth and refresh localStorage
+          setCheckIns(serverData);
+          persistLocally(serverData);
+        }
+        // If Redis is empty but localStorage had data, keep the localStorage
+        // version already set above (Redis may just not be configured yet).
+      })
+      .catch(() => {
+        // Network error — keep whatever localStorage provided above
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminKey]);
 
   // Recompute assignedIds whenever teams or roster changes
@@ -1045,13 +1077,18 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   async function toggleCheckIn(contactId: string, day: DayKey, checked: boolean) {
     // Optimistic update — MUST use functional form (prev =>) so rapid clicks
     // always build on the latest state, not a stale closure snapshot.
-    setCheckIns(prev => ({
-      ...prev,
-      [contactId]: {
-        ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
-        [day]: checked,
-      },
-    }));
+    setCheckIns(prev => {
+      const next = {
+        ...prev,
+        [contactId]: {
+          ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+          [day]: checked,
+        },
+      };
+      // Persist immediately to localStorage so sign-out / refresh can restore it
+      persistLocally(next);
+      return next;
+    });
     try {
       await fetch(`/api/camp-checkin?key=${adminKey}`, {
         method: "POST",
@@ -1062,14 +1099,18 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       // optimistic updates that happened while this request was in-flight,
       // which is exactly what causes a check to vanish when you click another.
     } catch {
-      // On network error revert this one toggle
-      setCheckIns(prev => ({
-        ...prev,
-        [contactId]: {
-          ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
-          [day]: !checked,
-        },
-      }));
+      // On network error revert this one toggle (and update localStorage too)
+      setCheckIns(prev => {
+        const next = {
+          ...prev,
+          [contactId]: {
+            ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+            [day]: !checked,
+          },
+        };
+        persistLocally(next);
+        return next;
+      });
     }
   }
 

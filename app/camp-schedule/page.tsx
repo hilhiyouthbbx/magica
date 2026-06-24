@@ -349,8 +349,8 @@ export default function CampHubPage() {
     tr:last-child{border-bottom:none;}
     tbody tr:nth-child(even){filter:brightness(0.985);}
     col.c-time{width:82px;}
-    col.c-act{width:55%;}
-    col.c-note{width:auto;}
+    col.c-act{width:auto;}
+    col.c-note{width:45%;}
     .tc{padding:6px 10px;white-space:nowrap;color:#555;font-size:10px;vertical-align:top;}
     .ac{padding:6px 10px;font-size:10.5px;vertical-align:top;word-break:break-word;}
     .nc{padding:6px 10px;font-size:9.5px;color:#555;vertical-align:top;word-break:break-word;line-height:1.45;}

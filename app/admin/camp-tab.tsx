@@ -2346,9 +2346,51 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           <div className="glass rounded-2xl border border-white/10 p-4">
             <p className="text-gray-400 text-sm">
               Track which players each team is nominating for individual skill events on Championship Day.
-              Add one section per event per division, enter nominees, then record the winner when done.
+              Add one section per event per division, then <strong className="text-white/70">drag players from the roster below</strong> into each event slot — or use the + Add button.
             </p>
           </div>
+
+          {/* ── Draggable Roster Panel ── */}
+          {roster.length > 0 && (() => {
+            const confirmed = roster.filter(cam => cam.confirmed && cam.gradeNum !== 99);
+            const nba     = confirmed.filter(cam => cam.gradeNum <= 4);
+            const college = confirmed.filter(cam => cam.gradeNum >= 5);
+            return (
+              <div className="glass rounded-2xl border border-white/10 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <GripVertical className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-black text-white">Roster — Drag to Nominate</span>
+                  <span className="text-xs text-gray-600 ml-1">grab a player and drop into any event slot</span>
+                </div>
+                <div className="space-y-3">
+                  {[{ label: "NBA · 1st–4th Grade", campers: nba, accent: "text-orange-400" },
+                    { label: "College · 5th–8th Grade", campers: college, accent: "text-blue-400" }].map(({ label, campers: gc, accent }) => (
+                    <div key={label}>
+                      <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${accent}`}>{label}</div>
+                      {gc.length === 0 ? (
+                        <p className="text-xs text-gray-700 italic">No campers in this division</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {gc.map(cam => (
+                            <div
+                              key={cam.id}
+                              draggable
+                              onDragStart={e => handleDragStart(e, cam)}
+                              title={`${cam.fullName}${cam.grade ? " · " + cam.grade : ""} — drag to an event`}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold select-none cursor-grab active:cursor-grabbing transition-all bg-white/8 border border-white/15 text-white/70 hover:bg-white/15 hover:text-white hover:border-white/30"
+                            >
+                              <GripVertical className="w-2.5 h-2.5 opacity-40 flex-shrink-0" />
+                              {cam.displayName}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {(["NBA", "College"] as Division[]).map(div => (
             <div key={div} className="glass rounded-2xl border border-white/10 p-5">

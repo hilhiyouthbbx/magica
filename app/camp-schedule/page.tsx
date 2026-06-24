@@ -852,84 +852,110 @@ export default function CampHubPage() {
               <div className="mb-6">
                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-3">Individual Contests</h3>
                 {(() => {
-                  const CONTEST_META: Record<string, { abbr: string; rule: string; color: string; time: string }> = {
-                    "Knockout":          { abbr:"KO",  rule:"Last one standing wins!",                              color:"#B91C1C", time:"8:15 AM"  },
-                    "Free Throw Contest":{ abbr:"FT",  rule:"Best of 10 shots. Tie = sudden death.",               color:"#1B4FC4", time:"9:00 AM"  },
-                    "3-Point Contest":   { abbr:"3PT", rule:"3 balls at 5 spots. 1 minute per shooter.",           color:"#C41B1B", time:"9:30 AM"  },
-                    "1-on-1 Challenge":  { abbr:"1v1", rule:"First to 15 points. 2s and 3s count.",               color:"#1B7A3C", time:"10:00 AM" },
-                    "3-on-3 Tournament": { abbr:"3v3", rule:"First to 21 points. 2s and 3s count.",               color:"#7B3F00", time:"10:30 AM" },
-                    "Layup Contest":     { abbr:"LAY", rule:"Right hand 1 min + Left hand 1 min. Team total wins.",color:"#5B21B6", time:"11:15 AM" },
+                  const CONTEST_META: Record<string, { abbr: string; rule: string; color: string; bg: string; time: string }> = {
+                    "Knockout":          { abbr:"KO",  rule:"Last one standing wins!",                               color:"#fff",   bg:"#B91C1C", time:"8:15 AM"  },
+                    "Free Throw Contest":{ abbr:"FT",  rule:"Best of 10 shots. Tie = sudden death.",                color:"#fff",   bg:"#1B4FC4", time:"9:00 AM"  },
+                    "3-Point Contest":   { abbr:"3PT", rule:"3 balls at 5 spots. 1 minute per shooter.",            color:"#fff",   bg:"#C41B1B", time:"9:30 AM"  },
+                    "1-on-1 Challenge":  { abbr:"1v1", rule:"First to 15 points. 2s and 3s count.",                color:"#fff",   bg:"#1B7A3C", time:"10:00 AM" },
+                    "3-on-3 Tournament": { abbr:"3v3", rule:"First to 21 points. 2s and 3s count.",                color:"#fff",   bg:"#7B3F00", time:"10:30 AM" },
+                    "Layup Contest":     { abbr:"LAY", rule:"Right hand 1 min + Left hand 1 min. Team total wins.", color:"#fff",   bg:"#5B21B6", time:"11:15 AM" },
                   };
-                  // Group events by name (both divisions together)
-                  const eventNames = Array.from(new Set([
-                    "Knockout","Free Throw Contest","3-Point Contest","1-on-1 Challenge","3-on-3 Tournament","Layup Contest"
-                  ]));
+                  const ALL_EVENT_NAMES = ["Knockout","Free Throw Contest","3-Point Contest","1-on-1 Challenge","3-on-3 Tournament","Layup Contest"];
+                  const teamName = (id: string) => teams.find(t => t.id === id)?.name || "";
                   return (
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      {eventNames.map(evtName => {
-                        const meta = CONTEST_META[evtName] || { abbr: evtName.slice(0,3).toUpperCase(), rule: "", color: "#333", time: "" };
-                        // Find events matching this name across divisions
-                        const evts = individualEvents.filter(e => e.name === evtName);
+                    <div className="space-y-4">
+                      {ALL_EVENT_NAMES.map(evtName => {
+                        const meta   = CONTEST_META[evtName] || { abbr: evtName.slice(0,3).toUpperCase(), rule: "", bg: "#333", color: "#fff", time: "" };
+                        const evts   = individualEvents.filter(e => e.name === evtName);
+                        if (evts.length === 0) return null; // only show events added by admin
+                        const anyLive     = evts.some(e => e.status === "live");
                         const anyComplete = evts.some(e => e.status === "complete");
-                        const anyLive    = evts.some(e => e.status === "live");
+
                         return (
-                          <div key={evtName} className="rounded-xl overflow-hidden border border-white/10">
-                            <div className="flex items-center gap-3 px-3 py-2.5" style={{ background: meta.color }}>
-                              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black">{meta.abbr}</div>
-                              <div className="flex-1">
-                                <div className="text-sm font-bold">{evtName}</div>
-                                <div className="text-[11px] opacity-60">{meta.time}</div>
+                          <div key={evtName} className={`rounded-xl overflow-hidden border transition-all ${
+                            anyLive ? "border-[#E03A3A]/60 shadow-lg shadow-[#E03A3A]/10" : "border-white/10"
+                          }`}>
+                            {/* Event header */}
+                            <div className="flex items-center gap-3 px-4 py-3" style={{ background: meta.bg }}>
+                              <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-xs font-black shrink-0"
+                                style={{ color: meta.color }}>{meta.abbr}</div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-sm" style={{ color: meta.color }}>{evtName}</div>
+                                <div className="text-[11px] opacity-60 mt-0.5" style={{ color: meta.color }}>{meta.time} · {meta.rule}</div>
                               </div>
-                              {anyLive    && <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 animate-pulse">LIVE</span>}
-                              {anyComplete && <span className="text-[9px] font-black px-2 py-0.5 rounded bg-black/30">DONE</span>}
+                              {anyLive     && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-white/20 text-white animate-pulse shrink-0">🔴 LIVE</span>}
+                              {anyComplete && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-black/30 text-white/70 shrink-0">✅ DONE</span>}
+                              {!anyLive && !anyComplete && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-black/20 shrink-0" style={{ color: meta.color, opacity: 0.6 }}>UPCOMING</span>}
                             </div>
-                            <div className="bg-white/3">
-                              {anyComplete && evts.length > 0 ? (
-                                <div className="divide-y divide-white/5">
-                                  {evts.map(e => (
-                                    <div key={e.id} className="px-3 py-2">
-                                      <div className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-1">{e.division} Div</div>
-                                      {e.winner && (
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-base">🥇</span>
-                                          <span className="text-sm font-bold text-white">{e.winner}</span>
-                                        </div>
-                                      )}
-                                      {e.runnerUp && (
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <span className="text-base">🥈</span>
-                                          <span className="text-sm text-white/50">{e.runnerUp}</span>
-                                        </div>
-                                      )}
+
+                            {/* Winner banner — shown when complete */}
+                            {anyComplete && evts.some(e => e.winner) && (
+                              <div className="px-4 py-3 border-b border-white/10" style={{ background: `${meta.bg}22` }}>
+                                {evts.filter(e => e.winner).map(e => (
+                                  <div key={e.id} className="flex flex-wrap items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-2xl">🥇</span>
+                                      <div>
+                                        <div className="text-[10px] font-bold uppercase tracking-widest text-white/35">{e.division} Champion</div>
+                                        <div className="text-base font-black text-white">{e.winner}</div>
+                                      </div>
                                     </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="px-3 py-2.5">
-                                  <div className="text-xs text-white/40 leading-relaxed">{meta.rule}</div>
-                                  {evts.length === 0 && (
-                                    <div className="text-[11px] text-white/20 mt-1 italic">Nominees TBA</div>
-                                  )}
-                                  {evts.length > 0 && evts.some(e => e.nominees.length > 0) && (
-                                    <div className="mt-2 space-y-1">
-                                      {evts.map(e => {
-                                        const nominated = e.nominees.flatMap(n => n.players.filter(p => p.trim()));
-                                        if (nominated.length === 0) return null;
-                                        return (
-                                          <div key={e.id}>
-                                            <div className="text-[10px] font-bold uppercase text-white/25 mb-0.5">{e.division}</div>
-                                            <div className="flex flex-wrap gap-1">
-                                              {nominated.map((p, pi) => (
-                                                <span key={pi} className="text-[11px] px-2 py-0.5 rounded bg-white/8 text-white/50">{camperShortName(p)}</span>
-                                              ))}
+                                    {e.runnerUp && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xl">🥈</span>
+                                        <div>
+                                          <div className="text-[10px] font-bold uppercase tracking-widest text-white/35">Runner-Up</div>
+                                          <div className="text-sm font-bold text-white/60">{e.runnerUp}</div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Participants by division */}
+                            <div className={`divide-y divide-white/5 ${anyComplete && evts.some(e => e.winner) ? "bg-white/2" : "bg-white/3"}`}>
+                              {evts.map(e => {
+                                const hasNominees = e.nominees.some(n => n.players.some(p => p.trim()));
+                                return (
+                                  <div key={e.id} className="px-4 py-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                                        e.division === "NBA" ? "bg-orange-500/20 text-orange-400" : "bg-blue-500/20 text-blue-400"
+                                      }`}>{e.division}</span>
+                                      <span className="text-[10px] text-white/25">{e.division === "NBA" ? "1st–4th Grade" : "5th–8th Grade"}</span>
+                                    </div>
+                                    {!hasNominees ? (
+                                      <p className="text-xs text-white/25 italic">Participants TBA</p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {e.nominees.map(nom => {
+                                          const players = nom.players.filter(p => p.trim());
+                                          if (players.length === 0) return null;
+                                          const tName = teamName(nom.teamId);
+                                          return (
+                                            <div key={nom.teamId} className="flex items-start gap-2">
+                                              {tName && (
+                                                <span className="text-[10px] font-bold text-white/35 pt-0.5 shrink-0 min-w-[60px]">{tName}</span>
+                                              )}
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {players.map((p, pi) => (
+                                                  <span key={pi} className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
+                                                    anyLive ? "bg-white/15 text-white" : "bg-white/8 text-white/65"
+                                                  }`}>
+                                                    {p}
+                                                  </span>
+                                                ))}
+                                              </div>
                                             </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );

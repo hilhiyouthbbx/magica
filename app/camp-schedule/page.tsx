@@ -342,15 +342,18 @@ export default function CampHubPage() {
     .badge-gray{background:#eee;color:#333;}
     .badge-gold{background:#F4A800;color:#000;}
     .badge-red{background:#c0392b;color:#fff;}
-    table{width:100%;border-collapse:collapse;border:1px solid #ddd;}
+    table{width:100%;border-collapse:collapse;border:1px solid #ddd;table-layout:fixed;}
     thead tr{background:#f0f0f0;}
-    th{padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#666;}
+    th{padding:6px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#666;}
     tr{border-bottom:1px solid #ebebeb;}
     tr:last-child{border-bottom:none;}
     tbody tr:nth-child(even){filter:brightness(0.985);}
-    .tc{padding:5px 10px;white-space:nowrap;width:80px;color:#555;font-size:10px;}
-    .ac{padding:5px 10px;font-size:10.5px;}
-    .nc{padding:5px 10px;font-size:9.5px;color:#888;width:140px;}
+    col.c-time{width:82px;}
+    col.c-act{width:55%;}
+    col.c-note{width:auto;}
+    .tc{padding:6px 10px;white-space:nowrap;color:#555;font-size:10px;vertical-align:top;}
+    .ac{padding:6px 10px;font-size:10.5px;vertical-align:top;word-break:break-word;}
+    .nc{padding:6px 10px;font-size:9.5px;color:#555;vertical-align:top;word-break:break-word;line-height:1.45;}
     .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
   </style>
 </head>
@@ -371,6 +374,11 @@ export default function CampHubPage() {
     </div>
   </div>
   <table>
+    <colgroup>
+      <col class="c-time" />
+      <col class="c-act" />
+      <col class="c-note" />
+    </colgroup>
     <thead><tr>
       <th>Time</th><th>Activity</th><th>Notes</th>
     </tr></thead>

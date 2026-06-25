@@ -2276,10 +2276,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           <div className="space-y-4">
                             <div className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-2 text-center">Quarterfinals</div>
                             {quarters.map((g,i) => (
-                              <BracketCard key={g.id} game={g}
-                                label={`QF ${i+1}`}
-                                accent={div === "NBA" ? "text-orange-400" : "text-blue-400"}
-                              />
+                              <div key={g.id}>{BracketCard({ game: g, label: `QF ${i+1}`, accent: div === "NBA" ? "text-orange-400" : "text-blue-400" })}</div>
                             ))}
                           </div>
                           {/* Connector arrow */}
@@ -2297,10 +2294,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           </button>
                         ) : (
                           semis.map((g,i) => (
-                            <BracketCard key={g.id} game={g}
-                              label={`SF ${i+1}`}
-                              accent="text-blue-400"
-                            />
+                            <div key={g.id}>{BracketCard({ game: g, label: `SF ${i+1}`, accent: "text-blue-400" })}</div>
                           ))
                         )}
                         {semis.length > 0 && (
@@ -2324,10 +2318,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           </button>
                         ) : (
                           finals.map(g => (
-                            <BracketCard key={g.id} game={g}
-                              label="🏆 Championship"
-                              accent="text-yellow-400"
-                            />
+                            <div key={g.id}>{BracketCard({ game: g, label: "🏆 Championship", accent: "text-yellow-400" })}</div>
                           ))
                         )}
                         {/* 3rd place */}
@@ -2340,10 +2331,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                             </button>
                           ) : (
                             thirds.map(g => (
-                              <BracketCard key={g.id} game={g}
-                                label="🥉 3rd Place"
-                                accent="text-gray-400"
-                              />
+                              <div key={g.id}>{BracketCard({ game: g, label: "🥉 3rd Place", accent: "text-gray-400" })}</div>
                             ))
                           )}
                         </div>

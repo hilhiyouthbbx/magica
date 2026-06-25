@@ -2020,7 +2020,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                               <input
                                 type="number" min={0} placeholder="0"
                                 value={game.score1 ?? ""}
-                                onChange={e => setPoolGameField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setPoolGameField(game.id, "score1", v === "" ? null : parseInt(v, 10)); }}
                                 className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
                               />
                             </div>
@@ -2029,7 +2029,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                               <input
                                 type="number" min={0} placeholder="0"
                                 value={game.score2 ?? ""}
-                                onChange={e => setPoolGameField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setPoolGameField(game.id, "score2", v === "" ? null : parseInt(v, 10)); }}
                                 className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
                               />
                             </div>
@@ -2192,9 +2192,9 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       <option value="">— Team 1 —</option>
                       {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
-                    <input type="number" min={0} placeholder="—" value={s1 ?? ""}
-                      onChange={e => setBracketField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
-                      className={`w-14 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-base font-black focus:outline-none transition-colors ${w1 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="—" value={s1 ?? ""}
+                      onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setBracketField(game.id, "score1", v === "" ? null : parseInt(v, 10)); }}
+                      className={`w-16 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-base font-black focus:outline-none transition-colors ${w1 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}
                     />
                   </div>
                   {/* Team 2 row */}
@@ -2204,9 +2204,9 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       <option value="">— Team 2 —</option>
                       {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
-                    <input type="number" min={0} placeholder="—" value={s2 ?? ""}
-                      onChange={e => setBracketField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
-                      className={`w-14 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-base font-black focus:outline-none transition-colors ${w2 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="—" value={s2 ?? ""}
+                      onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setBracketField(game.id, "score2", v === "" ? null : parseInt(v, 10)); }}
+                      className={`w-16 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-base font-black focus:outline-none transition-colors ${w2 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}
                     />
                   </div>
                   {/* Advance winner button */}

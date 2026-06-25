@@ -520,7 +520,7 @@ export default function CampHubPage() {
 </head>
 <body>
   <div class="header">
-    <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAAqAG8DASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD4D216DofwD8e+I/hnqPxB03w9LceD9OLi61QTwhYimN3yFw5xkdFPWuAAzX6gfscReFJv+Ceni+PxxLeQeEje3Y1KSwGZ1hzHnbwefoK9ScuVXRxRXM7Hwr4I/ZX+KfxH8I2Hijw54Sm1PQr64+yW94l1Agkl8zy9u1pAw+YYyRirniX9kD4veD/D2u65rHgyey0rQ+NRuGu7dhb/ACq3IWQk8Op4B61+rP7P8Hw+tv2ffB6fC+41C58GjxBF9lk1QETF/tn7zOQDjfuxkUftG6Rfa98Avjvp+mWVxqN/cSFIbW0iaWWVvs9tgKqgkn2ArD2z5rGns1Y/IDwl8CvHPjzwJr3jPQdAl1DwzoQkOpX6zxItuEjEjZVnDHCkH5Qa1fAP7MPxN+KPhM+JfDHhWXVtC+0/ZPta3MCDzdyrt2u4bqyjOMc192/sNeDE8IfshfGOw+J2ka14c0Oaa5k1GOe0kt7r7GbNBI8auuTwHAIB5Br279mu2+Gdr+z26fCe61S78K/27CRJqwIl87z4N4GVU46dR61UqrV7IShex+QXxJ+Fniz4NeJT4d8X6VJoeriFLj7I80ch8ts7WyjMOcHvXJmR8jDEY96+wP8Agqb/AMnTyf8AYEs/5yV8fgZrWNmkyJaOwquVIPU5zzSYwCOKXbS1TimLmZG8QdVU9F6U9QVRl3MQfU0tFNJCuAJHc/nTUBXufzp3HvS4Bp8qe4XI69J8P/tAfETw38LNR+HOl641v4M1QyG500WNu/mlsb/3rRmQfdHRhjFebAYr" alt="" style="height:44px;width:auto;border-radius:4px;flex-shrink:0;"/>
+    <img src="` + window.location.origin + `/logo.png" alt="Hilhi Youth Basketball Camp" style="height:44px;width:auto;border-radius:4px;flex-shrink:0;object-fit:contain;"/>
     <div class="header-text">
       <h1>Hilhi Youth Basketball Camp 2026</h1>
       <div class="day">Championship Day — Individual Events</div>
@@ -530,6 +530,144 @@ export default function CampHubPage() {
   <div class="grid">
     ${eventBlocks}
   </div>
+  <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow pop-ups to print."); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
+  // ── Print Bracket ─────────────────────────────────────────────────
+  const handlePrintBracket = () => {
+    if (bracketGames.length === 0) {
+      alert("No bracket games have been set up yet. Build the bracket in the admin panel first.");
+      return;
+    }
+
+    const teamName = (id: string) => teams.find(t => t.id === id)?.name || id || "TBD";
+
+    const roundLabel: Record<string, string> = {
+      quarter: "Quarterfinals",
+      semi:    "Semifinals",
+      final:   "Championship Final",
+      "3rd":   "3rd Place",
+    };
+    const roundOrder = ["quarter", "semi", "final", "3rd"];
+
+    const divConfigs = [
+      { div: "NBA",     label: "NBA Division",     grades: "1st – 4th Grade", headerBg: "#1B2A5E", headerColor: "#F4A800" },
+      { div: "College", label: "College Division",  grades: "5th – 8th Grade", headerBg: "#7B1212", headerColor: "#ffffff" },
+    ] as const;
+
+    const divBlocks = divConfigs.map(({ div, label, grades, headerBg, headerColor }) => {
+      const games = bracketGames.filter(g => g.division === div);
+      if (games.length === 0) return "";
+
+      const roundBlocks = roundOrder.map(round => {
+        const roundGames = games.filter(g => g.round === round).sort((a, b) => a.id.localeCompare(b.id));
+        if (roundGames.length === 0) return "";
+
+        const gameCards = roundGames.map(g => {
+          const t1 = teamName(g.team1Id);
+          const t2 = teamName(g.team2Id);
+          const isFinal = g.status === "final";
+          const isLive  = g.status === "live";
+          const w1 = isFinal && g.score1 !== null && g.score2 !== null && g.score1 > g.score2;
+          const w2 = isFinal && g.score1 !== null && g.score2 !== null && g.score2 > g.score1;
+
+          const statusBar = isLive
+            ? `<div class="status-bar live">● LIVE NOW</div>`
+            : isFinal
+            ? `<div class="status-bar final">FINAL</div>`
+            : "";
+
+          const row = (team: string, score: number | null, isWinner: boolean) => `
+            <div class="team-row ${isWinner ? "winner" : ""}">
+              <span class="team-name">${team}</span>
+              <span class="team-score">${score !== null ? score : "—"}</span>
+              ${isWinner ? `<span class="win-badge">W</span>` : ""}
+            </div>`;
+
+          return `
+            <div class="game-card ${isLive ? "game-live" : ""}">
+              ${statusBar}
+              <div class="teams">
+                ${row(t1, g.score1, w1)}
+                ${row(t2, g.score2, w2)}
+              </div>
+              ${g.court ? `<div class="court-label">${g.court}</div>` : ""}
+            </div>`;
+        }).join("");
+
+        return `
+          <div class="round-block">
+            <div class="round-label">${roundLabel[round] || round}</div>
+            <div class="games-row">${gameCards}</div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="div-section">
+          <div class="div-header" style="background:${headerBg};color:${headerColor};">
+            <span class="div-name">${label}</span>
+            <span class="div-grades">${grades}</span>
+          </div>
+          ${roundBlocks}
+        </div>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Championship Day — Bracket · Hilhi Youth Hoop Camp 2026</title>
+  <style>
+    @page{size:letter portrait;margin:12mm 14mm;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#111;background:#fff;}
+    .header{border-bottom:3px solid #F4A800;padding-bottom:8px;margin-bottom:14px;display:flex;align-items:center;gap:14px;}
+    .header-text h1{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;}
+    .header-text .day{font-size:19px;font-weight:900;color:#1B2A5E;margin:2px 0;}
+    .header-text .meta{font-size:9px;color:#666;margin-top:3px;}
+    .div-section{margin-bottom:16px;break-inside:avoid;}
+    .div-header{display:flex;align-items:baseline;justify-content:space-between;padding:7px 12px;border-radius:6px 6px 0 0;}
+    .div-name{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;}
+    .div-grades{font-size:9px;opacity:0.75;}
+    .round-block{margin-top:8px;}
+    .round-label{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:5px;padding-left:2px;}
+    .games-row{display:flex;flex-wrap:wrap;gap:8px;}
+    .game-card{border:1px solid #ddd;border-radius:6px;overflow:hidden;min-width:180px;flex:1;}
+    .game-live{border-color:#E03A3A;}
+    .status-bar{padding:3px 8px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:1px;}
+    .status-bar.live{background:#E03A3A;color:#fff;}
+    .status-bar.final{background:#f5f5f5;color:#aaa;}
+    .teams{border-bottom:1px solid #f0f0f0;}
+    .team-row{display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid #f5f5f5;}
+    .team-row:last-child{border-bottom:none;}
+    .team-row.winner{background:#fffbeb;}
+    .team-name{flex:1;font-size:10px;font-weight:700;color:#222;}
+    .team-row:not(.winner) .team-name{color:#666;}
+    .team-score{font-size:12px;font-weight:900;color:#222;margin-left:8px;}
+    .team-row:not(.winner) .team-score{color:#aaa;}
+    .win-badge{margin-left:5px;background:#F4A800;color:#000;font-size:7px;font-weight:900;padding:1px 4px;border-radius:3px;}
+    .court-label{font-size:8px;color:#bbb;padding:3px 8px;}
+    .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="` + window.location.origin + `/logo.png" alt="Hilhi Youth Basketball Camp" style="height:44px;width:auto;border-radius:4px;flex-shrink:0;object-fit:contain;"/>
+    <div class="header-text">
+      <h1>Hilhi Youth Basketball Camp 2026</h1>
+      <div class="day">Championship Day — Bracket</div>
+      <div class="meta">Thursday, June 25, 2026 &nbsp;·&nbsp; Hillsboro, OR &nbsp;·&nbsp; Grades 1st–8th</div>
+    </div>
+  </div>
+  ${divBlocks}
   <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
   <script>window.onload=()=>{window.print();}</script>
 </body>
@@ -591,6 +729,15 @@ export default function CampHubPage() {
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Print Schedule PDF
             </button>
+            {bracketGames.length > 0 && (
+              <button
+                onClick={handlePrintBracket}
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#F4A800]/60 hover:text-[#F4A800] transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Print Bracket PDF
+              </button>
+            )}
             {individualEvents.length > 0 && (
               <button
                 onClick={handlePrintEvents}

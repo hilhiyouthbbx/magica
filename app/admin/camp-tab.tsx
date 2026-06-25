@@ -2597,15 +2597,27 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                         </div>
                       </div>
 
-                      {evt.status === "complete" && (
-                        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
+                      {/* ── Winner / Runner-Up ─ always visible ── */}
+                      <div className="pt-3 border-t border-white/10 space-y-2">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">Results</p>
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-bold text-yellow-400 mb-1">🥇 Winner</label>
                             <input
                               value={evt.winner ?? ""}
-                              onChange={e => setEventField(evt.id, "winner", e.target.value)}
-                              placeholder="Winner name"
-                              className="w-full px-2.5 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-white text-sm focus:outline-none focus:border-yellow-400"
+                              onChange={e => {
+                                const val = e.target.value;
+                                // auto-complete status when a winner is entered
+                                const updated = (data.individualEvents ?? []).map(ev =>
+                                  ev.id === evt.id
+                                    ? { ...ev, winner: val, status: val.trim() ? "complete" as const : ev.status }
+                                    : ev
+                                );
+                                setData({ ...data, individualEvents: updated });
+                              }}
+                              onBlur={() => saveEvents()}
+                              placeholder="Enter winner name"
+                              className="w-full px-2.5 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-white text-sm focus:outline-none focus:border-yellow-400 placeholder-gray-600"
                             />
                           </div>
                           <div>
@@ -2613,12 +2625,16 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                             <input
                               value={evt.runnerUp ?? ""}
                               onChange={e => setEventField(evt.id, "runnerUp", e.target.value)}
-                              placeholder="Runner-up name"
-                              className="w-full px-2.5 py-2 rounded-lg bg-white/5 border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500"
+                              onBlur={() => saveEvents()}
+                              placeholder="Enter runner-up name"
+                              className="w-full px-2.5 py-2 rounded-lg bg-white/5 border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500 placeholder-gray-600"
                             />
                           </div>
                         </div>
-                      )}
+                        {(evt.winner || evt.runnerUp) && (
+                          <p className="text-[10px] text-green-400/70">✅ Results saved — visible on public schedule</p>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

@@ -395,6 +395,152 @@ export default function CampHubPage() {
     win.document.close();
   };
 
+  // ── Print Individual Events ───────────────────────────────────────────────
+  const handlePrintEvents = () => {
+    if (individualEvents.length === 0) {
+      alert("No individual events have been set up yet. Add events in the admin panel first.");
+      return;
+    }
+
+    const CONTEST_COLORS: Record<string, string> = {
+      "Knockout":           "#B91C1C",
+      "Free Throw Contest": "#1B4FC4",
+      "3-Point Contest":    "#C41B1B",
+      "1-on-1 Challenge":   "#1B7A3C",
+      "3-on-3 Tournament":  "#7B3F00",
+      "Layup Contest":      "#5B21B6",
+    };
+
+    const CONTEST_TIMES: Record<string, string> = {
+      "Knockout":           "8:15 AM",
+      "Free Throw Contest": "9:00 AM",
+      "3-Point Contest":    "9:30 AM",
+      "1-on-1 Challenge":   "10:00 AM",
+      "3-on-3 Tournament":  "10:30 AM",
+      "Layup Contest":      "11:15 AM",
+    };
+
+    const CONTEST_RULES: Record<string, string> = {
+      "Knockout":           "Last one standing wins!",
+      "Free Throw Contest": "Best of 10 shots. Tie = sudden death.",
+      "3-Point Contest":    "3 balls at 5 spots. 1 minute per shooter.",
+      "1-on-1 Challenge":   "First to 15 points. 2s and 3s count.",
+      "3-on-3 Tournament":  "First to 21 points. 2s and 3s count.",
+      "Layup Contest":      "Right 1 min + Left 1 min. Team total wins.",
+    };
+
+    const tName = (id: string) => teams.find(t => t.id === id)?.name || "";
+
+    // Group events by name
+    const eventNames = Array.from(new Set(individualEvents.map(e => e.name)));
+
+    const eventBlocks = eventNames.map(evtName => {
+      const color = CONTEST_COLORS[evtName] || "#333";
+      const time  = CONTEST_TIMES[evtName]  || "";
+      const rule  = CONTEST_RULES[evtName]  || "";
+      const evts  = individualEvents.filter(e => e.name === evtName);
+
+      const divBlocks = evts.map(evt => {
+        const hasNominees = evt.nominees.some(n => n.players.some(p => p.trim()));
+        const nomRows = hasNominees
+          ? evt.nominees.map(nom => {
+              const players = nom.players.filter(p => p.trim());
+              if (players.length === 0) return "";
+              const tn = tName(nom.teamId);
+              return `<tr>
+                <td class="team-cell">${tn}</td>
+                <td class="players-cell">${players.join(" &nbsp;·&nbsp; ")}</td>
+              </tr>`;
+            }).filter(Boolean).join("")
+          : `<tr><td colspan="2" class="tba">Participants TBA</td></tr>`;
+
+        const winnerBlock = evt.status === "complete" && (evt.winner || evt.runnerUp) ? `
+          <div class="winner-box">
+            ${evt.winner   ? `<div><span class="trophy">🥇</span> <strong>${evt.winner}</strong></div>` : ""}
+            ${evt.runnerUp ? `<div><span class="trophy">🥈</span> ${evt.runnerUp}</div>` : ""}
+          </div>` : "";
+
+        return `
+          <div class="div-block">
+            <div class="div-label ${evt.division === "NBA" ? "nba" : "college"}">${evt.division} Division &mdash; ${evt.division === "NBA" ? "1st&ndash;4th Grade" : "5th&ndash;8th Grade"}</div>
+            ${winnerBlock}
+            <table class="nom-table">
+              <thead><tr><th>Team</th><th>Participants</th></tr></thead>
+              <tbody>${nomRows}</tbody>
+            </table>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="event-card">
+          <div class="event-header" style="background:${color}">
+            <div class="event-title">${evtName}</div>
+            <div class="event-meta">${time}${rule ? " &nbsp;·&nbsp; " + rule : ""}</div>
+          </div>
+          <div class="event-body">${divBlocks}</div>
+        </div>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Championship Day — Individual Events · Hilhi Youth Hoop Camp 2026</title>
+  <style>
+    @page{size:letter portrait;margin:12mm 14mm;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#111;background:#fff;}
+    .header{border-bottom:3px solid #F4A800;padding-bottom:8px;margin-bottom:14px;display:flex;align-items:center;gap:14px;}
+    .header-text h1{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;}
+    .header-text .day{font-size:19px;font-weight:900;color:#E03A3A;margin:2px 0;}
+    .header-text .meta{font-size:9px;color:#666;margin-top:3px;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .event-card{border:1px solid #ddd;border-radius:8px;overflow:hidden;break-inside:avoid;}
+    .event-header{padding:7px 10px;color:#fff;}
+    .event-title{font-size:12px;font-weight:900;}
+    .event-meta{font-size:8.5px;opacity:0.75;margin-top:2px;}
+    .event-body{padding:8px 10px;background:#fafafa;}
+    .div-block{margin-bottom:7px;}
+    .div-block:last-child{margin-bottom:0;}
+    .div-label{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;padding:2px 6px;border-radius:3px;display:inline-block;margin-bottom:5px;}
+    .div-label.nba{background:#fff3cd;color:#7a5000;}
+    .div-label.college{background:#cfe2ff;color:#0a3578;}
+    .winner-box{background:#fffbeb;border:1px solid #f0d060;border-radius:4px;padding:4px 8px;margin-bottom:5px;font-size:10px;}
+    .winner-box div{margin-bottom:2px;} .winner-box div:last-child{margin-bottom:0;}
+    .trophy{font-size:11px;}
+    .nom-table{width:100%;border-collapse:collapse;font-size:9.5px;}
+    .nom-table th{text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:0.7px;color:#888;padding:0 0 3px;border-bottom:1px solid #e5e5e5;}
+    .nom-table td{padding:3px 0;border-bottom:1px solid #f0f0f0;vertical-align:top;}
+    .nom-table tr:last-child td{border-bottom:none;}
+    .team-cell{font-weight:700;color:#555;width:28%;padding-right:6px;white-space:nowrap;}
+    .players-cell{color:#222;}
+    .tba{color:#aaa;font-style:italic;padding:4px 0;}
+    .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAAqAG8DASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD4D216DofwD8e+I/hnqPxB03w9LceD9OLi61QTwhYimN3yFw5xkdFPWuAAzX6gfscReFJv+Ceni+PxxLeQeEje3Y1KSwGZ1hzHnbwefoK9ScuVXRxRXM7Hwr4I/ZX+KfxH8I2Hijw54Sm1PQr64+yW94l1Agkl8zy9u1pAw+YYyRirniX9kD4veD/D2u65rHgyey0rQ+NRuGu7dhb/ACq3IWQk8Op4B61+rP7P8Hw+tv2ffB6fC+41C58GjxBF9lk1QETF/tn7zOQDjfuxkUftG6Rfa98Avjvp+mWVxqN/cSFIbW0iaWWVvs9tgKqgkn2ArD2z5rGns1Y/IDwl8CvHPjzwJr3jPQdAl1DwzoQkOpX6zxItuEjEjZVnDHCkH5Qa1fAP7MPxN+KPhM+JfDHhWXVtC+0/ZPta3MCDzdyrt2u4bqyjOMc192/sNeDE8IfshfGOw+J2ka14c0Oaa5k1GOe0kt7r7GbNBI8auuTwHAIB5Br279mu2+Gdr+z26fCe61S78K/27CRJqwIl87z4N4GVU46dR61UqrV7IShex+QXxJ+Fniz4NeJT4d8X6VJoeriFLj7I80ch8ts7WyjMOcHvXJmR8jDEY96+wP8Agqb/AMnTyf8AYEs/5yV8fgZrWNmkyJaOwquVIPU5zzSYwCOKXbS1TimLmZG8QdVU9F6U9QVRl3MQfU0tFNJCuAJHc/nTUBXufzp3HvS4Bp8qe4XI69J8P/tAfETw38LNR+HOl641v4M1QyG500WNu/mlsb/3rRmQfdHRhjFebAYr" alt="" style="height:44px;width:auto;border-radius:4px;flex-shrink:0;"/>
+    <div class="header-text">
+      <h1>Hilhi Youth Basketball Camp 2026</h1>
+      <div class="day">Championship Day — Individual Events</div>
+      <div class="meta">Thursday, June 25, 2026 &nbsp;·&nbsp; Hillsboro, OR &nbsp;·&nbsp; Grades 1st–8th</div>
+    </div>
+  </div>
+  <div class="grid">
+    ${eventBlocks}
+  </div>
+  <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow pop-ups to print."); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
   // ── Spinner while waiting for first API response ──
   if (!loaded) {
     return (
@@ -436,8 +582,8 @@ export default function CampHubPage() {
             <span className="text-xs px-3 py-1.5 rounded-full font-bold" style={{ background: "#F4A800", color: "#0B0F1A" }}>NBA: 1st–4th Grade</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#E03A3A]">College: 5th–8th Grade</span>
           </div>
-          {/* Print Schedule PDF */}
-          <div className="flex justify-center mt-4">
+          {/* Print buttons */}
+          <div className="flex flex-wrap justify-center gap-3 mt-4">
             <button
               onClick={handleDownloadPDF}
               className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#F4A800]/60 hover:text-[#F4A800] transition-all"
@@ -445,6 +591,15 @@ export default function CampHubPage() {
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Print Schedule PDF
             </button>
+            {individualEvents.length > 0 && (
+              <button
+                onClick={handlePrintEvents}
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#E03A3A]/60 hover:text-[#E03A3A] transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Print Championship Events
+              </button>
+            )}
           </div>
         </div>
       </div>

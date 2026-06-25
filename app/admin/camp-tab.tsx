@@ -578,6 +578,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [eventDragOver, setEventDragOver] = useState<{eventId: string; teamId: string} | null>(null);
   const [addNomineeOpen, setAddNomineeOpen] = useState<{eventId: string; teamId: string} | null>(null);
   const [nomineeSearch, setNomineeSearch] = useState<string>("");
+  const [resultDragOver, setResultDragOver] = useState<{eventId: string; slot: "winner" | "runnerUp"} | null>(null);
   const [rosterError,  setRosterError]  = useState<string>("");
   const [checkIns,     setCheckIns]     = useState<CheckInMap>({});
   const [checkInDay,   setCheckInDay]   = useState<DayKey>("day1");
@@ -2575,8 +2576,17 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                                 ) : (
                                   <div className="flex flex-wrap gap-1">
                                     {nominees.map((p, idx) => (
-                                      <span key={idx} className="flex items-center gap-1 bg-purple-500/15 border border-purple-500/25 rounded-md px-2 py-0.5 text-[11px] text-purple-200">
-                                        {p}
+                                      <span
+                                        key={idx}
+                                        draggable
+                                        onDragStart={e => {
+                                          e.dataTransfer.setData("resultPlayer", p);
+                                          e.dataTransfer.effectAllowed = "copy";
+                                        }}
+                                        title="Drag to Winner or Runner-Up"
+                                        className="flex items-center gap-1 bg-purple-500/15 border border-purple-500/25 rounded-md px-2 py-0.5 text-[11px] text-purple-200 cursor-grab active:cursor-grabbing select-none"
+                                      >
+                                        ⠿ {p}
                                         <button onClick={() => removeNominee(evt.id, team.id, p)} className="text-purple-400/50 hover:text-red-400 transition-colors">
                                           <X className="w-2.5 h-2.5" />
                                         </button>
@@ -2597,42 +2607,82 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                         </div>
                       </div>
 
-                      {/* ── Winner / Runner-Up ─ always visible ── */}
+                      {/* ── Winner / Runner-Up — drag or type ── */}
                       <div className="pt-3 border-t border-white/10 space-y-2">
-                        <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">Results</p>
+                        <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">Results — drag a nominee chip or type a name</p>
                         <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-bold text-yellow-400 mb-1">🥇 Winner</label>
-                            <input
-                              value={evt.winner ?? ""}
-                              onChange={e => {
-                                const val = e.target.value;
-                                // auto-complete status when a winner is entered
-                                const updated = (data.individualEvents ?? []).map(ev =>
-                                  ev.id === evt.id
-                                    ? { ...ev, winner: val, status: val.trim() ? "complete" as const : ev.status }
-                                    : ev
-                                );
-                                setData({ ...data, individualEvents: updated });
-                              }}
-                              onBlur={() => saveEvents()}
-                              placeholder="Enter winner name"
-                              className="w-full px-2.5 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-white text-sm focus:outline-none focus:border-yellow-400 placeholder-gray-600"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-gray-400 mb-1">🥈 Runner-Up</label>
-                            <input
-                              value={evt.runnerUp ?? ""}
-                              onChange={e => setEventField(evt.id, "runnerUp", e.target.value)}
-                              onBlur={() => saveEvents()}
-                              placeholder="Enter runner-up name"
-                              className="w-full px-2.5 py-2 rounded-lg bg-white/5 border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500 placeholder-gray-600"
-                            />
-                          </div>
+                          {(["winner", "runnerUp"] as const).map(slot => {
+                            const isOver = resultDragOver?.eventId === evt.id && resultDragOver?.slot === slot;
+                            const val = slot === "winner" ? (evt.winner ?? "") : (evt.runnerUp ?? "");
+                            const label = slot === "winner" ? "🥇 Winner" : "🥈 Runner-Up";
+                            const borderCls = isOver
+                              ? slot === "winner" ? "border-yellow-400 bg-yellow-400/10" : "border-blue-400 bg-blue-400/10"
+                              : slot === "winner" ? "border-yellow-500/30 bg-yellow-500/10" : "border-white/20 bg-white/5";
+                            return (
+                              <div key={slot}>
+                                <label className={`block text-xs font-bold mb-1 ${slot === "winner" ? "text-yellow-400" : "text-gray-400"}`}>{label}</label>
+                                <div
+                                  className={`relative rounded-lg border-2 transition-all ${borderCls} ${isOver ? "scale-[1.02]" : ""}`}
+                                  onDragOver={e => { e.preventDefault(); setResultDragOver({ eventId: evt.id, slot }); }}
+                                  onDragLeave={() => setResultDragOver(null)}
+                                  onDrop={e => {
+                                    e.preventDefault();
+                                    setResultDragOver(null);
+                                    const playerName = e.dataTransfer.getData("resultPlayer");
+                                    if (!playerName) return;
+                                    const updated = (data.individualEvents ?? []).map(ev =>
+                                      ev.id === evt.id
+                                        ? {
+                                            ...ev,
+                                            [slot]: playerName,
+                                            status: slot === "winner" ? "complete" as const : ev.status,
+                                          }
+                                        : ev
+                                    );
+                                    setData({ ...data, individualEvents: updated });
+                                    setTimeout(() => saveEvents(), 50);
+                                  }}
+                                >
+                                  {val ? (
+                                    <div className="flex items-center justify-between px-2.5 py-2 gap-2">
+                                      <span className="text-white text-sm font-bold truncate">{val}</span>
+                                      <button
+                                        onClick={() => {
+                                          const updated = (data.individualEvents ?? []).map(ev =>
+                                            ev.id === evt.id ? { ...ev, [slot]: "" } : ev
+                                          );
+                                          setData({ ...data, individualEvents: updated });
+                                          setTimeout(() => saveEvents(), 50);
+                                        }}
+                                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <input
+                                      value=""
+                                      onChange={e => {
+                                        const v = e.target.value;
+                                        const updated = (data.individualEvents ?? []).map(ev =>
+                                          ev.id === evt.id
+                                            ? { ...ev, [slot]: v, status: slot === "winner" && v.trim() ? "complete" as const : ev.status }
+                                            : ev
+                                        );
+                                        setData({ ...data, individualEvents: updated });
+                                      }}
+                                      onBlur={() => saveEvents()}
+                                      placeholder={isOver ? "Drop here!" : "Drop chip or type name…"}
+                                      className="w-full px-2.5 py-2 bg-transparent text-white text-sm focus:outline-none placeholder-gray-600"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                         {(evt.winner || evt.runnerUp) && (
-                          <p className="text-[10px] text-green-400/70">✅ Results saved — visible on public schedule</p>
+                          <p className="text-[10px] text-green-400/70">✅ Results live on public schedule</p>
                         )}
                       </div>
                     </div>

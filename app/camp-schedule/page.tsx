@@ -25,7 +25,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Day 1", date: "Monday, June 22", theme: "Fundamentals",
     rows: [
-      { id:"1-1",  time:"7:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
+      { id:"1-1",  time:"8:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
       { id:"1-2",  time:"8:00 AM",  activity:"Welcome, Camp Overview & Introductions",        note:"All campers",                      type:"highlight" },
       { id:"1-3",  time:"8:15 AM",  activity:"Warm-Up & Dynamic Stretching",                  note:"",                                 type:"normal"    },
       { id:"1-4",  time:"8:30 AM",  activity:"SKILL STATION — Ballhandling Fundamentals",     note:"Both courts",                      type:"section"   },
@@ -44,7 +44,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Day 2", date: "Tuesday, June 23", theme: "Team Play",
     rows: [
-      { id:"2-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
+      { id:"2-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
       { id:"2-2",  time:"8:00 AM",  activity:"TEAM FORMATION & NAMING",                           note:"NBA: 1st-4th | College: 5th-8th",          type:"highlight" },
       { id:"2-3",  time:"8:15 AM",  activity:"SKILL STATION — Post Moves & Low-Post Finishing",   note:"Both courts",                              type:"section"   },
       { id:"2-4",  time:"9:00 AM",  activity:"SKILL STATION — Shooting Off Screens",              note:"Both courts",                              type:"section"   },
@@ -61,7 +61,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Day 3", date: "Wednesday, June 24", theme: "Advanced Skills",
     rows: [
-      { id:"3-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                          note:"",                                        type:"normal"    },
+      { id:"3-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                          note:"",                                        type:"normal"    },
       { id:"3-2",  time:"8:00 AM",  activity:"SKILL STATION — Pick & Roll Offense",         note:"Both courts",                              type:"section"   },
       { id:"3-3",  time:"8:45 AM",  activity:"SKILL STATION — Fast Break & Transition D",   note:"Both courts",                              type:"section"   },
       { id:"3-4",  time:"9:30 AM",  activity:"Seeding Round 3 — NBA Division",              note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",    type:"game"      },
@@ -78,7 +78,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Championship", date: "Thursday, June 25", theme: "Championship Day",
     rows: [
-      { id:"4-1",  time:"7:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                              type:"normal"    },
+      { id:"4-1",  time:"8:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                              type:"normal"    },
       { id:"4-2",  time:"8:00 AM",  activity:"Opening Ceremony",                      note:"All campers",                                   type:"highlight" },
       { id:"4-3",  time:"8:15 AM",  activity:"KNOCKOUT CONTEST — All Camp",           note:"Last one standing wins!",                       type:"game"      },
       { id:"4-4",  time:"9:00 AM",  activity:"FREE THROW CONTEST",                    note:"Best of 10, 2 at a time | Tie = Sudden Death",  type:"game"      },
@@ -364,7 +364,7 @@ export default function CampHubPage() {
       <div>
         <h1>Hilhi Youth Basketball Camp 2026</h1>
         <div class="day-title">${current.label} — ${current.theme ?? ""}</div>
-        <div class="meta">${current.date ?? ""}, 2026 · Hillsboro, OR · 7:30 AM – 3:00 PM</div>
+        <div class="meta">${current.date ?? ""}, 2026 · Hillsboro, OR · 8:30 AM – 3:00 PM</div>
       </div>
     </div>
     <div class="badges">
@@ -716,7 +716,7 @@ export default function CampHubPage() {
           <p className="text-white/45 mb-5">June 22–25, 2026 · Follow the action in real time</p>
           <div className="flex flex-wrap justify-center gap-2">
             <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">Grades 1st–8th</span>
-            <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">7:30 AM – 3:00 PM</span>
+            <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">8:30 AM – 3:00 PM</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold" style={{ background: "#F4A800", color: "#0B0F1A" }}>NBA: 1st–4th Grade</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#E03A3A]">College: 5th–8th Grade</span>
           </div>

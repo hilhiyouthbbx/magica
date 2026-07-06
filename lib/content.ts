@@ -22,7 +22,7 @@ async function kvSet(key: string, value: unknown): Promise<void> {
   await redis.set(key, value);
 }
 
-// ── Interfaces ────────────────────────────────────────────────────────────
+// ── Interfaces ─────────────────────────────────────────────────────
 export interface CampItem {
   id:          string;
   title:       string;
@@ -112,6 +112,19 @@ export interface SiteContent {
     siteName:     string;
     tagline:      string;
     showTryouts:  boolean;
+    // Per-link visibility toggles (default true = shown)
+    showHome:         boolean;
+    showAbout:        boolean;
+    showPrograms:     boolean;
+    showCamps:        boolean;
+    showTournaments:  boolean;
+    showYouthCoaches: boolean;
+    showHSCoaches:    boolean;
+    showHSSchedule:   boolean;
+    showMerch:        boolean;
+    showFilmRoom:     boolean;
+    showContact:      boolean;
+    showRegisterCta:  boolean;
     // Editable link labels (empty = use default)
     labelHome:         string;
     labelAbout:        string;
@@ -203,7 +216,7 @@ export interface SiteContent {
   };
 }
 
-// ── Defaults ──────────────────────────────────────────────────────────────
+// ── Defaults ────────────────────────────────────────────────────────────────
 export const DEFAULTS: SiteContent = {
   pageTitles: {
     home:         "",
@@ -221,6 +234,18 @@ export const DEFAULTS: SiteContent = {
     siteName:    "HILHI",
     tagline:     "Youth Basketball",
     showTryouts:  true,
+    showHome:         true,
+    showAbout:        true,
+    showPrograms:     true,
+    showCamps:        true,
+    showTournaments:  true,
+    showYouthCoaches: true,
+    showHSCoaches:    true,
+    showHSSchedule:   true,
+    showMerch:        true,
+    showFilmRoom:     true,
+    showContact:      true,
+    showRegisterCta:  true,
     labelHome:         "",
     labelAbout:        "",
     labelPrograms:     "",
@@ -424,7 +449,7 @@ export const DEFAULTS: SiteContent = {
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 
-// ── Merge saved data with defaults ────────────────────────────────────────
+// ── Merge saved data with defaults ────────────────────────────────────────────────────
 function mergeContent(saved: Partial<SiteContent>): SiteContent {
   return {
     pageTitles:   { ...DEFAULTS.pageTitles,   ...(saved.pageTitles ?? {}) },
@@ -475,7 +500,7 @@ function mergeContent(saved: Partial<SiteContent>): SiteContent {
   };
 }
 
-// ── File-based helpers (local dev only) ───────────────────────────────────
+// ── File-based helpers (local dev only) ─────────────────────────────────────────────
 function getContentFromFile(): SiteContent {
   if (!fs.existsSync(FILE)) return DEFAULTS;
   try {
@@ -485,7 +510,7 @@ function getContentFromFile(): SiteContent {
   } catch { return DEFAULTS; }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────
+// ── Public API ────────────────────────────────────────────────────────────────
 export async function getContent(): Promise<SiteContent> {
   if (hasKV()) {
     try {

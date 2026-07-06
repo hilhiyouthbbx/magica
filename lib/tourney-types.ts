@@ -37,10 +37,13 @@ export interface Division {
   games: PoolGame[]; bracket: BracketGame[];
   losersBracket: BracketGame[];
   bracketGenerated: boolean;
+  /** Overrides the tournament-wide bracketFormat for just this division (e.g. one division is pool-play-only while another plays a bracket). */
+  format?: BracketFormat;
 }
 
 export interface Tournament {
   id: string; name: string; date: string;
+  startDate?: string; endDate?: string;
   venues: VenueConfig[];
   gameDuration: number; breakBetweenGames: number; startTime: string;
   bracketFormat: BracketFormat;

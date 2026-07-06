@@ -11,12 +11,14 @@ export interface TournamentConfig {
   gender:               string;
   grades:               string;
   dates:                string;
+  startDate:            string;
+  endDate:              string;
   dayTime:              string;
   registrationDeadline: string;
+  registrationDeadlineDate: string;
   venue:                string;
   address:              string;
   entryFee:             number;
-  serviceFee:           number;
   divisions:            string[];
   format:               string;
   gamesGuaranteed:      string;
@@ -40,12 +42,14 @@ export const TOURNAMENT_DEFAULTS: Omit<TournamentConfig, "id"> = {
   gender:               "Boys & Girls",
   grades:               "3rd–8th Grade",
   dates:                "TBD",
+  startDate:            "",
+  endDate:              "",
   dayTime:              "",
   registrationDeadline: "TBD",
+  registrationDeadlineDate: "",
   venue:                "Hillsboro High School",
   address:              "3285 SE Rood Bridge Rd, Hillsboro, OR 97123",
   entryFee:             250,
-  serviceFee:           6.25,
   divisions:            ["3rd/4th Grade Boys","3rd/4th Grade Girls","5th/6th Grade Boys","5th/6th Grade Girls","7th Grade Boys","7th Grade Girls","8th Grade Boys","8th Grade Girls"],
   format:               "Double Elimination",
   gamesGuaranteed:      "3",

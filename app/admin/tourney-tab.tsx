@@ -320,10 +320,18 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
     toImport.forEach(c => {
       const divName = c.division?.trim() || "";
       let div = t.divisions.find(d => d.name.toLowerCase() === divName.toLowerCase());
-      if (!div && t.divisions.length > 0) div = t.divisions[0];
-      if (!div) return;
+      if (!div) {
+        // Category didn't exist yet on this bracket — create it so the team still lands in its own division.
+        div = { id: makeId(), name: divName || "Unassigned", teams: [], pools: [], games: [], bracket: [], losersBracket: [], bracketGenerated: false };
+        t.divisions.push(div);
+      }
       if (div.teams.some(team => team.name.toLowerCase() === c.teamName!.toLowerCase().trim())) return;
-      div.teams.push({ id: makeId(), name: c.teamName!.trim(), coachName: c.name });
+      const team = { id: makeId(), name: c.teamName!.trim(), coachName: c.name };
+      div.teams.push(team);
+      // Auto-place the team into its category's pool so it's ready for pool-game generation immediately.
+      if (div.pools.length === 0) div.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
+      const pool = div.pools[0];
+      if (!pool.teamIds.includes(team.id)) pool.teamIds.push(team.id);
     });
     t.updatedAt = new Date().toISOString();
     onImport(t);

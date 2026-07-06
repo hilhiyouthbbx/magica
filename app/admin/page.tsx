@@ -148,6 +148,29 @@ function IF({ label, value, onChange, ph="", type="text", required=false }: { la
 // ─────────────────────────────────────────────────────────────────────────────
 // Tournament form
 // ─────────────────────────────────────────────────────────────────────────────
+// Parse a YYYY-MM-DD string as a local date (avoids UTC off-by-one issues)
+function parseLocalDate(s: string): Date | null {
+  if (!s) return null;
+  const [y,m,d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m-1, d);
+}
+function formatSingleDate(s: string): string {
+  const d = parseLocalDate(s);
+  return d ? d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "";
+}
+function formatDateRange(start: string, end: string): string {
+  const sd = parseLocalDate(start), ed = parseLocalDate(end);
+  if (!sd) return "";
+  if (!ed || start === end) return sd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const sameMonth = sd.getMonth() === ed.getMonth() && sd.getFullYear() === ed.getFullYear();
+  const startStr = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const endStr = sameMonth
+    ? ed.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })
+    : ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return `${startStr}\u2013${endStr}`;
+}
+
 function TournamentForm({ initial, onSave, onCancel, adminKey }: {
   initial: TournamentConfig; onSave: (t: TournamentConfig) => void; onCancel: () => void; adminKey: string;
 }) {
@@ -189,15 +212,31 @@ function TournamentForm({ initial, onSave, onCancel, adminKey }: {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <IF label="Tournament Name" value={t.name} onChange={set("name")} ph="Hillsboro Spring Classic" required />
         <IF label="Tagline" value={t.tagline} onChange={set("tagline")} ph="Youth Basketball Tournament" />
-        <IF label="Dates" value={t.dates} onChange={set("dates")} ph="Feb 21–22, 2026" />
+        <IF label="Start Date" value={t.startDate ?? ""} type="date" onChange={v => {
+          set("startDate")(v);
+          const newEnd = (t.endDate && t.endDate < v) ? v : (t.endDate || v);
+          set("dates")(formatDateRange(v, newEnd));
+        }} />
+        <IF label="End Date" value={t.endDate ?? ""} type="date" onChange={v => {
+          set("endDate")(v);
+          set("dates")(formatDateRange(t.startDate || v, v));
+        }} />
         <IF label="Day / Time" value={t.dayTime} onChange={set("dayTime")} ph="Saturday 8am – Sunday 6pm" />
-        <IF label="Registration Deadline" value={t.registrationDeadline} onChange={set("registrationDeadline")} ph="February 7, 2026" />
+        <IF label="Registration Deadline" value={t.registrationDeadlineDate ?? ""} type="date" onChange={v => {
+          set("registrationDeadlineDate")(v);
+          set("registrationDeadline")(formatSingleDate(v));
+        }} />
         <IF label="Venue" value={t.venue} onChange={set("venue")} ph="Hillsboro High School" />
         <IF label="Address" value={t.address} onChange={set("address")} ph="3285 SE Rood Bridge Rd, Hillsboro, OR" />
         <IF label="Gender" value={t.gender} onChange={set("gender")} ph="Boys & Girls" />
         <IF label="Grades" value={t.grades} onChange={set("grades")} ph="3rd–8th Grade" />
         <IF label="Entry Fee ($)" value={String(t.entryFee)} onChange={v => set("entryFee")(parseFloat(v)||0)} type="number" />
-        <IF label="Service Fee ($)" value={String(t.serviceFee)} onChange={v => set("serviceFee")(parseFloat(v)||0)} type="number" />
+        <div>
+          <label className="block text-gray-400 text-xs font-semibold mb-1">Service Fee</label>
+          <div className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm">
+            3% of entry fee (auto-calculated at checkout)
+          </div>
+        </div>
         <IF label="Format" value={t.format} onChange={set("format")} ph="Double Elimination" />
         <IF label="Games Guaranteed" value={t.gamesGuaranteed} onChange={set("gamesGuaranteed")} ph="3" />
         <IF label="Max Teams" value={t.maxTeams} onChange={set("maxTeams")} ph="16" />
@@ -1748,6 +1787,20 @@ export default function AdminPage() {
     setContacts(prev => prev.filter(c => c.id !== id));
   }
 
+  async function toggleCheckIn(id: string) {
+    const contact = contacts.find(c => c.id === id);
+    if (!contact) return;
+    const v = (contact.checkedIn || "").trim().toLowerCase();
+    const isChecked = v !== "" && v !== "no" && v !== "false";
+    const newVal = isChecked ? "" : "Yes";
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, checkedIn: newVal } : c));
+    await fetch(`/api/admin/contacts?key=${adminKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", id, patch: { checkedIn: newVal } }),
+    });
+  }
+
   async function toggleTournament(t: TournamentConfig) {
     const updated = { ...t, enabled: !t.enabled };
     await fetch(`/api/tournament?key=${adminKey}`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(updated) });
@@ -2369,6 +2422,10 @@ export default function AdminPage() {
                           <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{c.orderDate || new Date(c.date).toLocaleDateString()}</td>
                           <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center gap-2">
+                              {(() => { const v=(c.checkedIn||"").trim().toLowerCase(); const chk=v!==""&&v!=="no"&&v!=="false"; return (
+                              <button onClick={() => toggleCheckIn(c.id)} className={`transition-colors ${chk ? "text-green-400 hover:text-gray-500" : "text-gray-600 hover:text-green-400"}`} title={chk ? "Checked In — click to undo" : "Check In"}>
+                                <CheckCircle className="w-4 h-4" />
+                              </button>); })()}
                               <button onClick={() => { setEditingContact(c); setEditPatch({}); setIsNewContact(false); }} className="text-gray-600 hover:text-blue-400 transition-colors" title="Edit">
                                 <Edit2 className="w-4 h-4" />
                               </button>
@@ -2409,7 +2466,7 @@ export default function AdminPage() {
                                 </div>
                                 <div><span className="text-gray-500 text-xs">Emergency Contact</span><div className="text-white">{c.emergencyContact||"—"}</div></div>
                                 <div><span className="text-gray-500 text-xs">Emergency Phone</span><div className="text-white">{c.emergencyPhone||"—"}</div></div>
-                                <div><span className="text-gray-500 text-xs">Checked In</span><div className={c.checkedIn==="Yes" ? "text-green-400 font-bold" : "text-gray-400"}>{c.checkedIn||"No"}</div></div>
+                                <div><span className="text-gray-500 text-xs">Checked In</span>{(() => { const v=(c.checkedIn||"").trim().toLowerCase(); const chk=v!==""&&v!=="no"&&v!=="false"; return <div className={chk ? "text-green-400 font-bold" : "text-gray-400"}>{chk ? c.checkedIn : "—"}</div>; })()}</div>
                                 <div><span className="text-gray-500 text-xs">Seat Info</span><div className="text-white">{c.seatInfo||"—"}</div></div>
                               </div>
                             </td>

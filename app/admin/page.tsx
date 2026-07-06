@@ -1079,12 +1079,24 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           </div>
         </div>
 
-        <Toggle
-          label="Show Tryout Link in Navigation"
-          desc="Display the Tryouts page link in the top nav and mobile menu."
-          checked={n.showTryouts}
-          onChange={v => { setN("showTryouts")(v); save("navbar", { navbar: { ...n, showTryouts: v } }); }}
-        />
+        <div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Show / Hide Links <span className="text-gray-600 normal-case font-normal">(toggle any link off to remove it from the nav bar)</span></p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <Toggle label="Home"           checked={n.showHome         ?? true} onChange={v => { setN("showHome")(v);         save("navbar", { navbar: { ...n, showHome: v } }); }} />
+            <Toggle label="About"          checked={n.showAbout        ?? true} onChange={v => { setN("showAbout")(v);        save("navbar", { navbar: { ...n, showAbout: v } }); }} />
+            <Toggle label="Programs"       checked={n.showPrograms     ?? true} onChange={v => { setN("showPrograms")(v);     save("navbar", { navbar: { ...n, showPrograms: v } }); }} />
+            <Toggle label="Camps / Clinic" checked={n.showCamps        ?? true} onChange={v => { setN("showCamps")(v);        save("navbar", { navbar: { ...n, showCamps: v } }); }} />
+            <Toggle label="Tournaments"    checked={n.showTournaments  ?? true} onChange={v => { setN("showTournaments")(v);  save("navbar", { navbar: { ...n, showTournaments: v } }); }} />
+            <Toggle label="Youth Tryout"   checked={n.showTryouts      ?? true} onChange={v => { setN("showTryouts")(v);      save("navbar", { navbar: { ...n, showTryouts: v } }); }} />
+            <Toggle label="Youth Coaches"  checked={n.showYouthCoaches ?? true} onChange={v => { setN("showYouthCoaches")(v); save("navbar", { navbar: { ...n, showYouthCoaches: v } }); }} />
+            <Toggle label="HS Coaches"     checked={n.showHSCoaches    ?? true} onChange={v => { setN("showHSCoaches")(v);    save("navbar", { navbar: { ...n, showHSCoaches: v } }); }} />
+            <Toggle label="HS Schedule"    checked={n.showHSSchedule   ?? true} onChange={v => { setN("showHSSchedule")(v);   save("navbar", { navbar: { ...n, showHSSchedule: v } }); }} />
+            <Toggle label="Merch"          checked={n.showMerch        ?? true} onChange={v => { setN("showMerch")(v);        save("navbar", { navbar: { ...n, showMerch: v } }); }} />
+            <Toggle label="Film Room"      checked={n.showFilmRoom     ?? true} onChange={v => { setN("showFilmRoom")(v);     save("navbar", { navbar: { ...n, showFilmRoom: v } }); }} />
+            <Toggle label="Contact"        checked={n.showContact      ?? true} onChange={v => { setN("showContact")(v);      save("navbar", { navbar: { ...n, showContact: v } }); }} />
+            <Toggle label="Register / Join Button" checked={n.showRegisterCta ?? true} onChange={v => { setN("showRegisterCta")(v); save("navbar", { navbar: { ...n, showRegisterCta: v } }); }} />
+          </div>
+        </div>
         <div className="flex justify-end"><SaveBtn k="navbar" save={save} saving={saving} saved={saved} /></div>
       </Section>
 

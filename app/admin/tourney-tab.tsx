@@ -87,6 +87,25 @@ const GRADE_PRESETS: { grade: string; presets: string[] }[] = [
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2,5)}`;
 
+// Parse a YYYY-MM-DD string as a local date (avoids UTC off-by-one issues)
+function parseLocalDate(s: string): Date | null {
+  if (!s) return null;
+  const [y,m,d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m-1, d);
+}
+function formatDateRange(start: string, end: string): string {
+  const sd = parseLocalDate(start), ed = parseLocalDate(end);
+  if (!sd) return "";
+  if (!ed || start === end) return sd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const sameMonth = sd.getMonth() === ed.getMonth() && sd.getFullYear() === ed.getFullYear();
+  const startStr = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const endStr = sameMonth
+    ? ed.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })
+    : ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return `${startStr}\u2013${endStr}`;
+}
+
 function totalCourts(venues: VenueConfig[]): number {
   return venues.reduce((s, v) => s + (v.courts || 1), 0);
 }
@@ -527,7 +546,7 @@ function MergeTextPanel({ tournament, onImport, onClose }: {
 // ── EDIT TOURNAMENT MODAL ─────────────────────────────────────────────────────
 
 interface EditFields {
-  name: string; date: string; venues: VenueConfig[];
+  name: string; date: string; startDate: string; endDate: string; venues: VenueConfig[];
   gameDuration: number; breakBetweenGames: number;
   startTime: string; bracketFormat: BracketFormat;
   gamesGuaranteed: number; tiebreaker: TiebreakerMethod;
@@ -539,6 +558,8 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
   const [f, setF] = useState<EditFields>({
     name:             tournament.name,
     date:             tournament.date,
+    startDate:        tournament.startDate ?? "",
+    endDate:          tournament.endDate ?? "",
     venues:           tournament.venues?.length ? tournament.venues : [{ name: "Main Gym", courts: 2 }],
     gameDuration:     tournament.gameDuration,
     breakBetweenGames:tournament.breakBetweenGames,
@@ -553,6 +574,8 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
       ...tournament,
       name:             f.name.trim() || tournament.name,
       date:             f.date,
+      startDate:        f.startDate,
+      endDate:          f.endDate,
       venues:           f.venues.filter(v => v.name.trim()),
       gameDuration:     f.gameDuration,
       breakBetweenGames:f.breakBetweenGames,
@@ -574,7 +597,13 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
         </div>
         <div className="p-5 space-y-5">
           <IF label="Tournament Name" value={f.name} onChange={v => setF(p=>({...p,name:v}))} />
-          <IF label="Date" value={f.date} onChange={v => setF(p=>({...p,date:v}))} placeholder="June 22–25, 2026" />
+          <div className="grid grid-cols-2 gap-3">
+            <IF label="Start Date" type="date" value={f.startDate} onChange={v => setF(p=>{
+              const endDate = (p.endDate && p.endDate < v) ? v : (p.endDate || v);
+              return {...p, startDate:v, endDate, date: formatDateRange(v, endDate)};
+            })} />
+            <IF label="End Date" type="date" value={f.endDate} onChange={v => setF(p=>({...p, endDate:v, date: formatDateRange(p.startDate||v, v)}))} />
+          </div>
           <VenueEditor venues={f.venues} onChange={v => setF(p=>({...p,venues:v}))} />
           <div className="grid grid-cols-2 gap-3">
             <IF label="Games Guaranteed" type="number" min="1" value={f.gamesGuaranteed} onChange={v => setF(p=>({...p,gamesGuaranteed:+v}))} />
@@ -601,9 +630,9 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
 
 // ── CREATE WIZARD ─────────────────────────────────────────────────────────────
 
-type WizDiv = { name: string; pools: number; teams: string[] };
+type WizDiv = { name: string; pools: number; teams: string[]; format?: BracketFormat };
 interface WizState {
-  name: string; date: string; venues: VenueConfig[];
+  name: string; date: string; startDate: string; endDate: string; venues: VenueConfig[];
   gameDuration: number; breakBetweenGames: number; startTime: string;
   bracketFormat: BracketFormat; gamesGuaranteed: number; tiebreaker: TiebreakerMethod;
   divisions: WizDiv[];
@@ -626,7 +655,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
 }) {
   const [step, setStep] = useState(1);
   const [w, setW] = useState<WizState>({
-    name: "", date: "", venues: [{ name: "Main Gym", courts: 2 }],
+    name: "", date: "", startDate: "", endDate: "", venues: [{ name: "Main Gym", courts: 2 }],
     gameDuration: 24, breakBetweenGames: 6, startTime: "08:00",
     bracketFormat: "single", gamesGuaranteed: 3, tiebreaker: "point_diff",
     divisions: [{ name: "", pools: 2, teams: ["","","","","","","",""] }],
@@ -672,10 +701,10 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
       const games: PoolGame[] = generateDivisionSchedule(
         pools, divId, safeVenues, w.gameDuration, w.breakBetweenGames, w.startTime
       );
-      return { id: divId, name: d.name, teams: allTeams, pools, games, bracket: [], losersBracket: [], bracketGenerated: false };
+      return { id: divId, name: d.name, teams: allTeams, pools, games, bracket: [], losersBracket: [], bracketGenerated: false, format: d.format };
     });
     const t: Tournament = {
-      id: tid, name: w.name, date: w.date, venues: safeVenues,
+      id: tid, name: w.name, date: w.date, startDate: w.startDate, endDate: w.endDate, venues: safeVenues,
       gameDuration: w.gameDuration, breakBetweenGames: w.breakBetweenGames,
       startTime: w.startTime, bracketFormat: w.bracketFormat,
       gamesGuaranteed: w.gamesGuaranteed, tiebreaker: w.tiebreaker,
@@ -767,7 +796,13 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
                 <div className="text-yellow-400/70 text-xs mt-0.5">Teams can be auto-filled from registrations in Step 2</div>
               </div>
             )}
-            <IF label="Date" value={w.date} onChange={v=>setW(p=>({...p,date:v}))} placeholder="June 22–25, 2026" />
+            <div className="grid grid-cols-2 gap-3">
+              <IF label="Start Date" type="date" value={w.startDate} onChange={v=>setW(p=>{
+                const endDate = (p.endDate && p.endDate < v) ? v : (p.endDate || v);
+                return {...p, startDate:v, endDate, date: formatDateRange(v, endDate)};
+              })} />
+              <IF label="End Date" type="date" value={w.endDate} onChange={v=>setW(p=>({...p, endDate:v, date: formatDateRange(p.startDate||v, v)}))} />
+            </div>
             <VenueEditor venues={w.venues} onChange={v=>setW(p=>({...p,venues:v}))} />
             <div className="grid grid-cols-2 gap-3">
               <IF label="Games Guaranteed" type="number" min="1" value={w.gamesGuaranteed} onChange={v=>setW(p=>({...p,gamesGuaranteed:+v}))} />
@@ -812,6 +847,16 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
                         <select value={div.pools} onChange={e=>setW(p=>{const d=[...p.divisions];d[di]={...d[di],pools:+e.target.value};return{...p,divisions:d};})}
                           className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none">
                           {[1,2,3,4].map(n=><option key={n} value={n} className="bg-slate-900">{n} Pool{n>1?"s":""}</option>)}
+                        </select>
+                      </div>
+                      <div className="w-40 flex-shrink-0">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Play Format</label>
+                        <select value={div.format ?? ""} onChange={e=>setW(p=>{const d=[...p.divisions];d[di]={...d[di],format:(e.target.value || undefined) as BracketFormat|undefined};return{...p,divisions:d};})}
+                          className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none">
+                          <option value="" className="bg-slate-900">Tournament Default</option>
+                          <option value="none" className="bg-slate-900">Pool Play Only</option>
+                          <option value="single" className="bg-slate-900">Pool → Single Elim</option>
+                          <option value="double" className="bg-slate-900">Pool → Double Elim</option>
                         </select>
                       </div>
                       {w.divisions.length > 1 && (
@@ -1180,12 +1225,16 @@ function StandingsView({ tournament }: { tournament: Tournament }) {
 function BracketView({ tournament, onUpdate }: { tournament: Tournament; onUpdate: (t: Tournament) => void }) {
   const [scoring, setScoring] = useState<{ divIdx: number; gameIdx: number }|null>(null);
 
-  if (tournament.bracketFormat === "none") {
+  function formatFor(div: Division): BracketFormat { return div.format ?? tournament.bracketFormat; }
+  function labelFor(fmt: BracketFormat) { return fmt==="double"?"Double Elimination":fmt==="none"?"Pool Play Only":"Single Elimination"; }
+
+  const allPoolPlayOnly = tournament.divisions.every(d => formatFor(d) === "none");
+  if (tournament.divisions.length > 0 && allPoolPlayOnly) {
     return (
       <div className="glass border border-white/10 rounded-2xl p-8 text-center">
         <Trophy className="w-10 h-10 text-gray-700 mx-auto mb-3"/>
         <h3 className="text-white font-bold mb-1">Pool Play Only</h3>
-        <p className="text-gray-500 text-sm">This tournament uses pool play standings to determine the champion — no bracket play.</p>
+        <p className="text-gray-500 text-sm">Every division uses pool play standings to determine the champion — no bracket play.</p>
       </div>
     );
   }
@@ -1211,22 +1260,30 @@ function BracketView({ tournament, onUpdate }: { tournament: Tournament; onUpdat
     onUpdate(t); setScoring(null);
   }
 
-  const formatLabel = tournament.bracketFormat === "double" ? "Double Elimination" : "Single Elimination";
-
   return (
     <div className="space-y-8">
-      {tournament.bracketFormat === "double" && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-2.5 text-sm text-blue-300">
-          🔵 <strong>Double Elimination</strong> — teams must lose twice to be eliminated.
-        </div>
-      )}
       {tournament.divisions.map((div,divIdx) => {
+        const fmt = formatFor(div);
+        const formatLabel = labelFor(fmt);
+        if (fmt === "none") {
+          return (
+            <div key={div.id} className="glass border border-white/10 rounded-2xl p-5 text-center">
+              <h3 className="text-white font-bold mb-1">{div.name}</h3>
+              <p className="text-gray-500 text-sm">Pool Play Only — standings decide this division&apos;s champion.</p>
+            </div>
+          );
+        }
         if (!div.bracketGenerated || div.bracket.length===0) {
           return (
             <div key={div.id} className="glass border border-white/10 rounded-2xl p-6 text-center">
               <Trophy className="w-10 h-10 text-gray-700 mx-auto mb-3"/>
               <h3 className="text-white font-bold mb-1">{div.name} Bracket</h3>
               <p className="text-xs text-gray-600 mb-3">{formatLabel}</p>
+              {fmt === "double" && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-2.5 text-sm text-blue-300 mb-3 text-left">
+                  🔵 <strong>Double Elimination</strong> — teams must lose twice to be eliminated.
+                </div>
+              )}
               {poolPlayDone(div)
                 ? <><p className="text-gray-500 text-sm mb-4">Pool play complete — ready to generate the bracket!</p>
                     <Btn onClick={()=>handleGenerate(divIdx)} className="bg-orange-600 hover:bg-orange-500 text-white">🏆 Generate Bracket</Btn></>
@@ -1292,16 +1349,152 @@ function BracketView({ tournament, onUpdate }: { tournament: Tournament; onUpdat
   );
 }
 
+// ── TEAMS & DIVISIONS VIEW (drag teams between divisions, set per-division format) ──
+
+function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate: (t: Tournament) => void }) {
+  const [dragOverDiv, setDragOverDiv] = useState<string|null>(null);
+
+  function moveTeam(teamId: string, fromDivId: string, toDivId: string) {
+    if (fromDivId === toDivId) return;
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const fromDiv = t.divisions.find(d => d.id === fromDivId);
+    const toDiv = t.divisions.find(d => d.id === toDivId);
+    if (!fromDiv || !toDiv) return;
+    const team = fromDiv.teams.find(tm => tm.id === teamId);
+    if (!team) return;
+
+    // Remove from old division: teams list, every pool's teamIds, and any pool games involving it
+    // (those games no longer make sense once the team has switched categories).
+    fromDiv.teams = fromDiv.teams.filter(tm => tm.id !== teamId);
+    fromDiv.pools.forEach(p => { p.teamIds = p.teamIds.filter(id => id !== teamId); });
+    fromDiv.games = fromDiv.games.filter(g => g.team1Id !== teamId && g.team2Id !== teamId);
+
+    // Add to new division: teams list + its first pool (create one if needed)
+    toDiv.teams.push(team);
+    if (toDiv.pools.length === 0) toDiv.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
+    if (!toDiv.pools[0].teamIds.includes(teamId)) toDiv.pools[0].teamIds.push(teamId);
+
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  function setDivisionFormat(divId: string, format: BracketFormat | "") {
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const div = t.divisions.find(d => d.id === divId);
+    if (!div) return;
+    div.format = format === "" ? undefined : format;
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  function renameDivision(divId: string, name: string) {
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const div = t.divisions.find(d => d.id === divId);
+    if (!div) return;
+    div.name = name;
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  function addDivision() {
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    t.divisions.push({ id: makeId(), name: "New Category", teams: [], pools: [], games: [], bracket: [], losersBracket: [], bracketGenerated: false });
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  function deleteDivision(divId: string) {
+    const div = tournament.divisions.find(d => d.id === divId);
+    if (!div) return;
+    if (div.teams.length > 0 && !confirm(`${div.name} has ${div.teams.length} team(s). Delete this category anyway?`)) return;
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    t.divisions = t.divisions.filter(d => d.id !== divId);
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  if (tournament.divisions.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-500">
+        <p className="mb-4">No categories yet.</p>
+        <Btn onClick={addDivision} className="bg-blue-600 hover:bg-blue-500 text-white">+ Add Category</Btn>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-gray-600">Drag a team card onto another category to move it there — handy when a category doesn&apos;t have enough teams yet.</p>
+      <div className="flex gap-4 overflow-x-auto pb-2">
+        {tournament.divisions.map(div => {
+          const isOver = dragOverDiv === div.id;
+          return (
+            <div key={div.id}
+              onDragOver={e=>{e.preventDefault(); setDragOverDiv(div.id);}}
+              onDragLeave={()=>setDragOverDiv(k=>k===div.id?null:k)}
+              onDrop={e=>{
+                e.preventDefault(); setDragOverDiv(null);
+                let data: { teamId: string; fromDivId: string };
+                try { data = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
+                moveTeam(data.teamId, data.fromDivId, div.id);
+              }}
+              className={`flex-shrink-0 w-64 glass border rounded-2xl p-3 space-y-2.5 transition-colors ${isOver ? "border-blue-500/60 bg-blue-500/5" : "border-white/10"}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <input value={div.name} onChange={e=>renameDivision(div.id, e.target.value)}
+                  className="flex-1 bg-transparent text-white font-bold text-sm px-1 py-0.5 rounded focus:outline-none focus:bg-white/5" />
+                <button onClick={()=>deleteDivision(div.id)} className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0">
+                  <Trash2 className="w-3.5 h-3.5"/>
+                </button>
+              </div>
+
+              <select value={div.format ?? ""} onChange={e=>setDivisionFormat(div.id, e.target.value as BracketFormat|"")}
+                className="w-full bg-white/5 border border-white/10 text-gray-300 text-xs px-2 py-1.5 rounded-lg focus:outline-none">
+                <option value="" className="bg-slate-900">Tournament Default</option>
+                <option value="none" className="bg-slate-900">Pool Play Only</option>
+                <option value="single" className="bg-slate-900">Pool → Single Elim</option>
+                <option value="double" className="bg-slate-900">Pool → Double Elim</option>
+              </select>
+
+              <div className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">{div.teams.length} team{div.teams.length!==1?"s":""}</div>
+
+              <div className="space-y-1.5 min-h-[40px]">
+                {div.teams.length === 0 && (
+                  <div className="text-center text-gray-700 text-xs py-4 border border-dashed border-white/10 rounded-lg">Drop a team here</div>
+                )}
+                {div.teams.map(team => (
+                  <div key={team.id}
+                    draggable
+                    onDragStart={e=>e.dataTransfer.setData("text/plain", JSON.stringify({ teamId: team.id, fromDivId: div.id }))}
+                    className="glass border border-white/10 hover:border-white/25 rounded-lg px-2.5 py-2 cursor-grab active:cursor-grabbing"
+                  >
+                    <div className="text-white font-bold text-xs truncate">{team.name}</div>
+                    {team.coachName && <div className="text-gray-600 text-[10px] truncate">Coach {team.coachName}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        <button onClick={addDivision}
+          className="flex-shrink-0 w-64 h-fit py-3 border border-dashed border-white/20 hover:border-blue-500/40 text-gray-500 hover:text-blue-400 rounded-2xl text-sm font-bold transition-colors">
+          + Add Category
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── TOURNAMENT DETAIL ─────────────────────────────────────────────────────────
 
-type DetailTab = "schedule"|"standings"|"bracket";
+type DetailTab = "teams"|"schedule"|"standings"|"bracket";
 
 function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
   tournament: Tournament; onBack: () => void; onUpdate: (t: Tournament) => void;
   contacts: RegistrationContact[];
 }) {
   const [tournament, setTournament] = useState(init);
-  const [tab, setTab] = useState<DetailTab>("schedule");
+  const [tab, setTab] = useState<DetailTab>("teams");
   const [editing, setEditing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [merging, setMerging] = useState(false);
@@ -1414,14 +1607,15 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
       </div>
 
       <div className="flex border-b border-white/10 mb-5">
-        {(["schedule","standings","bracket"] as DetailTab[]).map(k=>(
+        {(["teams","schedule","standings","bracket"] as DetailTab[]).map(k=>(
           <button key={k} onClick={()=>setTab(k)}
             className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${tab===k?"border-blue-500 text-blue-400":"border-transparent text-gray-500 hover:text-gray-300"}`}>
-            {k==="schedule"?"📅 Schedule":k==="standings"?"📊 Standings":"🏆 Bracket"}
+            {k==="teams"?"🧩 Teams":k==="schedule"?"📅 Schedule":k==="standings"?"📊 Standings":"🏆 Bracket"}
           </button>
         ))}
       </div>
 
+      {tab==="teams"     && <TeamsView     tournament={tournament} onUpdate={handleUpdate}/>}
       {tab==="schedule"  && <ScheduleView  tournament={tournament} onUpdate={handleUpdate}/>}
       {tab==="standings" && <StandingsView tournament={tournament}/>}
       {tab==="bracket"   && <BracketView   tournament={tournament} onUpdate={handleUpdate}/>}

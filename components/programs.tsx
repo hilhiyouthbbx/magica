@@ -20,17 +20,34 @@ const FALLBACK: ProgramCard[] = [
   { id:"prog-4", icon:"🛒", title:"Merchandise",    subtitle:"Official Gear",     desc:"Rep your team with official Hilhi Youth Basketball apparel. New arrivals available — jerseys, hoodies, and more.",             tag:"New Arrivals", link:"/merch",     highlight:false },
 ];
 
+// Map a program card's link to the navbar toggle that should gate its visibility.
+// Cards whose link doesn't match any known section are always shown.
+function navKeyForLink(link: string): keyof SiteContent["navbar"] | null {
+  if (link.includes("/events") || link.includes("/camp-schedule")) return "showCamps";
+  if (link.includes("/tournaments"))                                return "showTournaments";
+  if (link.includes("/tryout"))                                     return "showTryouts";
+  if (link.includes("/merch"))                                      return "showMerch";
+  return null;
+}
+
 export function Programs() {
   const [cards, setCards] = useState<ProgramCard[]>(FALLBACK);
+  const [navbar, setNavbar] = useState<SiteContent["navbar"] | null>(null);
 
   useEffect(() => {
     fetch("/api/content")
       .then(r => r.json())
       .then((data: SiteContent) => {
         if (data?.home?.programCards?.length) setCards(data.home.programCards);
+        if (data?.navbar) setNavbar(data.navbar);
       })
       .catch(() => {});
   }, []);
+
+  const visibleCards = cards.filter(p => {
+    const key = navKeyForLink(p.link);
+    return key ? navbar?.[key] !== false : true;
+  });
 
   return (
     <section id="programs" className="py-24 relative overflow-hidden">
@@ -64,7 +81,7 @@ export function Programs() {
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {cards.map((p, i) => (
+          {visibleCards.map((p, i) => (
             <motion.a key={p.id} href={p.link}
               target={p.link.startsWith("http") ? "_blank" : undefined}
               rel={p.link.startsWith("http") ? "noopener noreferrer" : undefined}

@@ -14,7 +14,7 @@ export function formatTime12(timeStr: string): string {
 }
 
 /** Map a 1-based court number to its venue name given per-venue court counts */
-function courtToVenueName(courtNum: number, venues: VenueConfig[]): string {
+export function courtToVenueName(courtNum: number, venues: VenueConfig[]): string {
   let cumulative = 0;
   for (const v of venues) {
     cumulative += v.courts;

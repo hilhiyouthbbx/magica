@@ -1,9 +1,11 @@
 "use client";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Calendar, Users } from "lucide-react";
 
 const EVENTS = [
   {
+    navKey:   "showCamps",
     tag:      "🏕️ Summer Camp",
     tagColor: "bg-orange-500",
     title:    "2026 Hilhi Youth Basketball Camp",
@@ -16,6 +18,7 @@ const EVENTS = [
     cta:      "View Live Schedule",
   },
   {
+    navKey:   "showTournaments",
     tag:      "🏆 Tournament",
     tagColor: "bg-blue-600",
     title:    "Hilhi Youth Basketball Tournament",
@@ -28,6 +31,7 @@ const EVENTS = [
     cta:      "View Tournaments",
   },
   {
+    navKey:   "showTryouts",
     tag:      "📋 Tryouts",
     tagColor: "bg-purple-600",
     title:    "Youth Team Tryouts",
@@ -41,7 +45,32 @@ const EVENTS = [
   },
 ];
 
+type NavKey = "showCamps" | "showTournaments" | "showTryouts";
+
 export function UpcomingEvents() {
+  const [navFlags, setNavFlags] = useState<Record<NavKey, boolean>>({
+    showCamps: true, showTournaments: true, showTryouts: true,
+  });
+
+  useEffect(() => {
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(d => {
+        const nb = d?.navbar;
+        if (nb) {
+          setNavFlags({
+            showCamps:       nb.showCamps       !== false,
+            showTournaments: nb.showTournaments !== false,
+            showTryouts:     nb.showTryouts     !== false,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const visibleEvents = EVENTS.filter(ev => navFlags[ev.navKey as NavKey] !== false);
+  if (visibleEvents.length === 0) return null;
+
   return (
     <section className="py-20 bg-[#080D1A]">
       <div className="max-w-7xl mx-auto px-6">
@@ -62,7 +91,7 @@ export function UpcomingEvents() {
 
         {/* Event cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {EVENTS.map((ev, i) => (
+          {visibleEvents.map((ev, i) => (
             <motion.a
               key={ev.title}
               href={ev.link}

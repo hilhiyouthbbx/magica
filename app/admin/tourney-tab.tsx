@@ -6,7 +6,7 @@ import type {
   BracketFormat, TiebreakerMethod, VenueConfig
 } from "@/lib/tourney-types";
 import { getAllTournaments, saveTournament, deleteTournament as deleteT } from "@/lib/tourney-storage";
-import { generateDivisionSchedule } from "@/lib/tourney-scheduler";
+import { generateDivisionSchedule, courtToVenueName } from "@/lib/tourney-scheduler";
 import { calculateStandings } from "@/lib/tourney-standings";
 import { generateBracket, advanceBracketWinner } from "@/lib/tourney-bracket";
 import { Plus, Trash2, ArrowLeft, Trophy, Calendar, MapPin, Users, Clock, Edit, X, Download, ChevronDown } from "lucide-react";
@@ -416,6 +416,106 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
   );
 }
 
+// ── REGISTRATION MERGE (paste-in) PANEL ───────────────────────────────────────
+
+interface MergeRow { teamName: string; coach: string; division: string; }
+
+function parseMergeText(raw: string): MergeRow[] {
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines[0]?.toLowerCase().includes("team")) lines.shift(); // skip header row
+  return lines.map(line => {
+    const parts = line.split(",").map(p => p.trim());
+    return { teamName: parts[0] ?? "", coach: parts[1] || "No Coach Listed", division: parts[2] || "Unassigned" };
+  }).filter(r => r.teamName);
+}
+
+function norm(v: string) { return (v || "").trim().toLowerCase().replace(/\s+/g, " "); }
+
+function MergeTextPanel({ tournament, onImport, onClose }: {
+  tournament: Tournament; onImport: (updated: Tournament) => void; onClose: () => void;
+}) {
+  const [raw, setRaw] = useState("");
+  const rows = parseMergeText(raw);
+
+  function loadSample() {
+    setRaw("Team Name, Coach Name, Division\nSunset Select, Coach Davis, 6th Grade Boys\nBeaverton Blue, Coach Lee, 5th Grade Boys");
+  }
+
+  function merge() {
+    if (!rows.length) return;
+    const t: Tournament = JSON.parse(JSON.stringify(tournament));
+    rows.forEach(r => {
+      let div = t.divisions.find(d => norm(d.name) === norm(r.division));
+      if (!div) {
+        div = { id: makeId(), name: r.division, teams: [], pools: [], games: [], bracket: [], losersBracket: [], bracketGenerated: false };
+        t.divisions.push(div);
+      }
+      const exists = div.teams.some(team => norm(team.name) === norm(r.teamName));
+      if (!exists) div.teams.push({ id: makeId(), name: r.teamName, coachName: r.coach });
+      // Ensure a pool exists to hold the team so pool-game generation works right away.
+      if (div.pools.length === 0) div.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
+      const pool = div.pools[0];
+      const teamId = div.teams.find(team => norm(team.name) === norm(r.teamName))!.id;
+      if (!pool.teamIds.includes(teamId)) pool.teamIds.push(teamId);
+    });
+    t.updatedAt = new Date().toISOString();
+    onImport(t);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="glass border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-white/10 flex-shrink-0">
+          <div>
+            <h2 className="text-white font-bold text-lg flex items-center gap-2">📋 Merge Registration Teams</h2>
+            <p className="text-gray-500 text-xs mt-0.5">Paste team rows to auto-create divisions &amp; teams.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5"/></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+          <label className="text-gray-400 text-xs font-semibold">Paste CSV rows: Team Name, Coach Name, Division</label>
+          <textarea value={raw} onChange={e=>setRaw(e.target.value)} rows={7}
+            placeholder="Sunset Select, Coach Davis, 6th Grade Boys&#10;Beaverton Blue, Coach Lee, 5th Grade Boys"
+            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm font-mono focus:outline-none focus:border-blue-500"/>
+          <button onClick={loadSample} className="text-xs text-blue-400 hover:text-blue-300 font-bold">Load sample rows</button>
+
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Preview {rows.length>0 && `(${rows.length})`}</p>
+            {rows.length === 0
+              ? <p className="text-gray-600 text-sm">No teams parsed yet.</p>
+              : <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                  {rows.map((r,i) => {
+                    const div = tournament.divisions.find(d => norm(d.name) === norm(r.division));
+                    const dup = div?.teams.some(team => norm(team.name) === norm(r.teamName));
+                    return (
+                      <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm ${dup ? "border-white/5 opacity-50" : "border-white/10"}`}>
+                        <div>
+                          <span className="text-white font-bold">{r.teamName}</span>
+                          <span className="text-gray-500 text-xs ml-2">Coach {r.coach}</span>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${div ? "bg-green-500/10 text-green-400" : "bg-orange-500/10 text-orange-400"}`}>
+                          {div ? r.division : `${r.division} (new)`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+            }
+          </div>
+          <p className="text-gray-600 text-xs leading-relaxed">New teams are added into each division&apos;s first pool. If you&apos;ve already split a division into multiple pools, move teams manually afterward.</p>
+        </div>
+        <div className="flex gap-3 p-5 border-t border-white/10 flex-shrink-0">
+          <Btn onClick={onClose} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-400">Cancel</Btn>
+          <Btn onClick={merge} disabled={rows.length === 0}
+            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white">
+            Merge {rows.length > 0 ? `${rows.length} Team${rows.length!==1?"s":""}` : "Teams"}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── EDIT TOURNAMENT MODAL ─────────────────────────────────────────────────────
 
 interface EditFields {
@@ -819,13 +919,51 @@ function ScoreDialog({ game, teamA, teamB, onSave, onClose }: {
 
 // ── SCHEDULE VIEW ─────────────────────────────────────────────────────────────
 
+function conflictKey(divIdx: number, gameIdx: number) { return `${divIdx}-${gameIdx}`; }
+
+/** Find which games (by divIdx/gameIdx) have a team double-booked at the same time slot. */
+function computeScheduleConflicts(tournament: Tournament): Set<string> {
+  const byTime = new Map<string, { divIdx: number; gameIdx: number; teamIds: string[] }[]>();
+  tournament.divisions.forEach((d, divIdx) => {
+    d.games.forEach((g, gameIdx) => {
+      const arr = byTime.get(g.time) ?? [];
+      arr.push({ divIdx, gameIdx, teamIds: [g.team1Id, g.team2Id] });
+      byTime.set(g.time, arr);
+    });
+  });
+  const conflicts = new Set<string>();
+  for (const entries of byTime.values()) {
+    const seen = new Map<string, string>(); // teamId -> conflictKey of first game seen
+    for (const e of entries) {
+      const k = conflictKey(e.divIdx, e.gameIdx);
+      for (const teamId of e.teamIds) {
+        if (seen.has(teamId)) {
+          conflicts.add(k);
+          conflicts.add(seen.get(teamId)!);
+        } else {
+          seen.set(teamId, k);
+        }
+      }
+    }
+  }
+  return conflicts;
+}
+
 function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpdate: (t: Tournament) => void }) {
   const [scoring, setScoring] = useState<{ divIdx: number; gameIdx: number }|null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string|null>(null);
 
   const allGames = tournament.divisions.flatMap((d,di) =>
     d.games.map((g,gi) => ({ game: g, divIdx: di, gameIdx: gi, divName: d.name }))
   );
   const slots = [...new Set(allGames.map(g=>g.game.time))].sort();
+  const courts = totalCourts(tournament.venues ?? []);
+  const courtNums = Array.from({length: Math.max(courts,1)}, (_,i)=>i+1);
+  const conflicts = computeScheduleConflicts(tournament);
+  const multiVenue = (tournament.venues?.length ?? 0) > 1;
+
+  const gameAt = (time: string, court: number) =>
+    allGames.find(g => g.game.time === time && g.game.court === court);
 
   function handleScore(s1: number, s2: number) {
     if (!scoring) return;
@@ -836,54 +974,120 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     onUpdate(t); setScoring(null);
   }
 
+  function handleDrop(e: React.DragEvent, time: string, court: number) {
+    e.preventDefault();
+    setDragOverKey(null);
+    let src: { divIdx: number; gameIdx: number };
+    try { src = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
+    const dest = gameAt(time, court);
+    if (dest && dest.divIdx === src.divIdx && dest.gameIdx === src.gameIdx) return; // dropped on itself
+
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const srcGame = t.divisions[src.divIdx].games[src.gameIdx];
+    const venue = courtToVenueName(court, t.venues ?? []);
+
+    if (dest) {
+      // Swap the two games' slots
+      const destGame = t.divisions[dest.divIdx].games[dest.gameIdx];
+      const srcSlot = { time: srcGame.time, court: srcGame.court, venue: srcGame.venue, timeSlot: srcGame.timeSlot };
+      srcGame.time = destGame.time; srcGame.court = destGame.court; srcGame.venue = destGame.venue; srcGame.timeSlot = destGame.timeSlot;
+      destGame.time = srcSlot.time; destGame.court = srcSlot.court; destGame.venue = srcSlot.venue; destGame.timeSlot = srcSlot.timeSlot;
+    } else {
+      // Move into an empty slot
+      srcGame.time = time; srcGame.court = court; srcGame.venue = venue;
+    }
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
   if (allGames.length === 0) return <div className="text-center py-12 text-gray-500">No games scheduled.</div>;
 
-  const multiVenue = (tournament.venues?.length ?? 0) > 1;
-
   return (
-    <div className="space-y-6">
-      {slots.map(slot => (
-        <div key={slot}>
-          <div className="flex items-center gap-3 mb-3">
-            <Clock className="w-4 h-4 text-gray-600"/>
-            <span className="text-gray-400 font-bold text-sm">{slot}</span>
-            <div className="flex-1 border-t border-white/5"/>
-          </div>
-          <div className="grid gap-2">
-            {allGames.filter(g=>g.game.time===slot).map(({game,divIdx,gameIdx,divName})=>{
-              const t1 = getTeamName(tournament, game.team1Id);
-              const t2 = getTeamName(tournament, game.team2Id);
-              const done = game.status==="completed";
-              const poolName = tournament.divisions[divIdx].pools.find(p=>p.id===game.poolId)?.name ?? "";
-              return (
-                <div key={game.id} className="glass border border-white/10 hover:border-white/20 rounded-xl p-3.5 flex items-center gap-4 transition-colors">
-                  <div className="shrink-0 text-center min-w-[72px]">
-                    <div className="text-xs text-gray-500 font-bold">Court {game.court}</div>
-                    {multiVenue && <div className="text-[10px] text-gray-600 truncate max-w-[72px]">{game.venue}</div>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
-                      <span>{divName}</span>{poolName&&<><span>·</span><span>{poolName}</span></>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`font-bold text-sm truncate ${done&&game.score1!>game.score2!?"text-white":"text-gray-300"}`}>{t1}</span>
-                      {done
-                        ? <span className="text-gray-500 font-black text-xs bg-white/5 px-2 py-0.5 rounded-md shrink-0">{game.score1} – {game.score2}</span>
-                        : <span className="text-gray-700 text-xs shrink-0">vs</span>
-                      }
-                      <span className={`font-bold text-sm truncate ${done&&game.score2!>game.score1!?"text-white":"text-gray-300"}`}>{t2}</span>
-                    </div>
-                  </div>
-                  <button onClick={()=>setScoring({divIdx,gameIdx})}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all shrink-0 ${done?"bg-white/5 text-gray-500 hover:text-blue-400":"bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"}`}>
-                    {done?"Edit":"Score →"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+    <div className="space-y-4">
+      <div className={`rounded-xl px-4 py-3 text-sm font-bold border ${conflicts.size>0?"bg-red-500/10 border-red-500/30 text-red-300":"bg-green-500/10 border-green-500/30 text-green-300"}`}>
+        {conflicts.size>0
+          ? `⚠️ ${conflicts.size} game${conflicts.size!==1?"s":""} have a team double-booked at the same time. Drag a game to an open slot to fix it.`
+          : "✓ Schedule looks good — no team is double-booked."}
+      </div>
+      <p className="text-xs text-gray-600">Drag any game card onto another slot to reschedule it. Dropping onto an occupied slot swaps the two games.</p>
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-separate" style={{ borderSpacing: "8px" }}>
+          <thead>
+            <tr>
+              <th className="text-left text-xs text-gray-600 font-bold w-20"></th>
+              {courtNums.map(c => (
+                <th key={c} className="text-left text-xs font-bold text-gray-400 px-2 py-1 min-w-[220px]">
+                  Court {c}{multiVenue && <span className="block text-[10px] text-gray-600 font-normal">{courtToVenueName(c, tournament.venues ?? [])}</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {slots.map(slot => (
+              <tr key={slot}>
+                <td className="align-top text-xs text-gray-500 font-bold pt-3 whitespace-nowrap">
+                  <Clock className="w-3.5 h-3.5 inline mr-1 text-gray-600"/>{slot}
+                </td>
+                {courtNums.map(court => {
+                  const entry = gameAt(slot, court);
+                  const key = `${slot}|${court}`;
+                  const isOver = dragOverKey === key;
+                  if (!entry) {
+                    return (
+                      <td key={court}
+                        onDragOver={e=>{e.preventDefault(); setDragOverKey(key);}}
+                        onDragLeave={()=>setDragOverKey(k=>k===key?null:k)}
+                        onDrop={e=>handleDrop(e, slot, court)}
+                        className={`align-top rounded-xl border-2 border-dashed ${isOver?"border-blue-500 bg-blue-500/10":"border-white/5"} h-20`}
+                      />
+                    );
+                  }
+                  const { game, divIdx, gameIdx, divName } = entry;
+                  const t1 = getTeamName(tournament, game.team1Id);
+                  const t2 = getTeamName(tournament, game.team2Id);
+                  const done = game.status==="completed";
+                  const poolName = tournament.divisions[divIdx].pools.find(p=>p.id===game.poolId)?.name ?? "";
+                  const conflicted = conflicts.has(conflictKey(divIdx, gameIdx));
+                  return (
+                    <td key={court}
+                      onDragOver={e=>{e.preventDefault(); setDragOverKey(key);}}
+                      onDragLeave={()=>setDragOverKey(k=>k===key?null:k)}
+                      onDrop={e=>handleDrop(e, slot, court)}
+                      className="align-top"
+                    >
+                      <div
+                        draggable
+                        onDragStart={e=>e.dataTransfer.setData("text/plain", JSON.stringify({divIdx,gameIdx}))}
+                        className={`glass border rounded-xl p-3 cursor-grab active:cursor-grabbing transition-colors ${
+                          conflicted ? "border-red-500/60 bg-red-500/5" : isOver ? "border-blue-500/60" : "border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-[11px] text-gray-600 mb-1 truncate">
+                          <span>{divName}</span>{poolName&&<><span>·</span><span>{poolName}</span></>}
+                        </div>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`font-bold text-xs truncate ${done&&game.score1!>game.score2!?"text-white":"text-gray-300"}`}>{t1}</span>
+                          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score1}</span>}
+                        </div>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`font-bold text-xs truncate ${done&&game.score2!>game.score1!?"text-white":"text-gray-300"}`}>{t2}</span>
+                          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score2}</span>}
+                        </div>
+                        <button onClick={()=>setScoring({divIdx,gameIdx})}
+                          className={`mt-1.5 w-full text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${done?"bg-white/5 text-gray-500 hover:text-blue-400":"bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"}`}>
+                          {done?"Edit Score":"Score →"}
+                        </button>
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       {scoring && (()=>{
         const g = tournament.divisions[scoring.divIdx].games[scoring.gameIdx];
         return <ScoreDialog game={g} teamA={getTeamName(tournament,g.team1Id)} teamB={getTeamName(tournament,g.team2Id)}
@@ -1092,6 +1296,7 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
   const [tab, setTab] = useState<DetailTab>("schedule");
   const [editing, setEditing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [merging, setMerging] = useState(false);
 
   const handleUpdate = useCallback((updated: Tournament) => {
     saveTournament(updated); setTournament({...updated}); onUpdate(updated);
@@ -1134,6 +1339,10 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
             }`}>
             <Download className="w-3.5 h-3.5"/>
             Import{unimportedRegs.length > 0 && <span className="bg-yellow-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">{unimportedRegs.length}</span>}
+          </button>
+          <button onClick={()=>setMerging(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-lg text-xs font-bold transition-all">
+            📋 Merge Teams
           </button>
           <button onClick={()=>setEditing(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-lg text-xs font-bold transition-all">
@@ -1211,6 +1420,7 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
 
       {editing && <EditTournamentModal tournament={tournament} onSave={t=>{handleUpdate(t);setEditing(false);}} onClose={()=>setEditing(false)}/>}
       {importing && <ImportPanel tournament={tournament} contacts={contacts} onImport={t=>{handleUpdate(t);setImporting(false);}} onClose={()=>setImporting(false)}/>}
+      {merging && <MergeTextPanel tournament={tournament} onImport={t=>{handleUpdate(t);setMerging(false);}} onClose={()=>setMerging(false)}/>}
     </div>
   );
 }

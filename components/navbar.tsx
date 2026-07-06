@@ -200,7 +200,7 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           {navConfig.showRegisterCta && (
             <a href="/join" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 whitespace-nowrap">
-              Register Now
+              Join HILHI
             </a>
           )}
         </div>
@@ -240,7 +240,7 @@ export function Navbar() {
           })}
           {navConfig.showRegisterCta && (
             <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
-              Register Now
+              Join HILHI
             </a>
           )}
         </div>

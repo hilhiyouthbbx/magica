@@ -25,7 +25,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Day 1", date: "Monday, June 22", theme: "Fundamentals",
     rows: [
-      { id:"1-1",  time:"7:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
+      { id:"1-1",  time:"8:30 AM",  activity:"Check-In & Registration",                      note:"",                                 type:"normal"    },
       { id:"1-2",  time:"8:00 AM",  activity:"Welcome, Camp Overview & Introductions",        note:"All campers",                      type:"highlight" },
       { id:"1-3",  time:"8:15 AM",  activity:"Warm-Up & Dynamic Stretching",                  note:"",                                 type:"normal"    },
       { id:"1-4",  time:"8:30 AM",  activity:"SKILL STATION — Ballhandling Fundamentals",     note:"Both courts",                      type:"section"   },
@@ -44,7 +44,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Day 2", date: "Tuesday, June 23", theme: "Team Play",
     rows: [
-      { id:"2-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
+      { id:"2-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                               note:"",                                        type:"normal"    },
       { id:"2-2",  time:"8:00 AM",  activity:"TEAM FORMATION & NAMING",                           note:"NBA: 1st-4th | College: 5th-8th",          type:"highlight" },
       { id:"2-3",  time:"8:15 AM",  activity:"SKILL STATION — Post Moves & Low-Post Finishing",   note:"Both courts",                              type:"section"   },
       { id:"2-4",  time:"9:00 AM",  activity:"SKILL STATION — Shooting Off Screens",              note:"Both courts",                              type:"section"   },
@@ -61,7 +61,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Day 3", date: "Wednesday, June 24", theme: "Advanced Skills",
     rows: [
-      { id:"3-1",  time:"7:30 AM",  activity:"Check-In & Warm-Up",                          note:"",                                        type:"normal"    },
+      { id:"3-1",  time:"8:30 AM",  activity:"Check-In & Warm-Up",                          note:"",                                        type:"normal"    },
       { id:"3-2",  time:"8:00 AM",  activity:"SKILL STATION — Pick & Roll Offense",         note:"Both courts",                              type:"section"   },
       { id:"3-3",  time:"8:45 AM",  activity:"SKILL STATION — Fast Break & Transition D",   note:"Both courts",                              type:"section"   },
       { id:"3-4",  time:"9:30 AM",  activity:"Seeding Round 3 — NBA Division",              note:"T1 vs T4 | T2 vs T3 | 2x12-min clock",    type:"game"      },
@@ -78,7 +78,7 @@ const DEFAULT_SCHEDULE: DayData[] = [
   {
     label: "Championship", date: "Thursday, June 25", theme: "Championship Day",
     rows: [
-      { id:"4-1",  time:"7:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                              type:"normal"    },
+      { id:"4-1",  time:"8:30 AM",  activity:"Doors Open & Warm-Up",                  note:"",                                              type:"normal"    },
       { id:"4-2",  time:"8:00 AM",  activity:"Opening Ceremony",                      note:"All campers",                                   type:"highlight" },
       { id:"4-3",  time:"8:15 AM",  activity:"KNOCKOUT CONTEST — All Camp",           note:"Last one standing wins!",                       type:"game"      },
       { id:"4-4",  time:"9:00 AM",  activity:"FREE THROW CONTEST",                    note:"Best of 10, 2 at a time | Tie = Sudden Death",  type:"game"      },
@@ -135,7 +135,7 @@ interface StandingRow {
 
 interface BracketGame {
   id: string;
-  round: "semi" | "final" | "3rd";
+  round: "quarter" | "semi" | "final" | "3rd";
   division: "NBA" | "College";
   team1Id: string;
   team2Id: string;
@@ -306,6 +306,379 @@ export default function CampHubPage() {
 
   const current = schedule[activeDay] ?? DEFAULT_SCHEDULE[0];
 
+
+  // ── PDF Print ──────────────────────────────────────────────────────────────
+  const handleDownloadPDF = () => {
+    const typeLabel = (type: RowType) => {
+      if (type === "section")   return "background:#fff8e8;color:#7a5000;font-weight:700;";
+      if (type === "highlight") return "background:#f0f0f0;color:#000;font-weight:700;";
+      if (type === "game")      return "color:#1a4080;font-weight:600;";
+      if (type === "break")     return "color:#999;font-style:italic;";
+      return "color:#333;";
+    };
+
+    const rows = current.rows.map(row => `
+      <tr style="${typeLabel(row.type)}">
+        <td class="tc">${row.time}</td>
+        <td class="ac">${row.activity}</td>
+        <td class="nc">${row.note ?? ""}</td>
+      </tr>`).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Hilhi Youth Basketball Camp 2026 — ${current.label}</title>
+  <style>
+    @page{size:letter portrait;margin:12mm 14mm;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#111;background:#fff;}
+    .header{border-bottom:3px solid #F4A800;padding-bottom:8px;margin-bottom:12px;}
+    .header h1{font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;}
+    .header .day-title{font-size:20px;font-weight:900;color:#F4A800;margin:2px 0;}
+    .header .meta{font-size:9px;color:#666;margin-top:3px;}
+    .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+    .badge{font-size:9px;padding:2px 9px;border-radius:10px;font-weight:700;}
+    .badge-gray{background:#eee;color:#333;}
+    .badge-gold{background:#F4A800;color:#000;}
+    .badge-red{background:#c0392b;color:#fff;}
+    table{width:100%;border-collapse:collapse;border:1px solid #ddd;table-layout:fixed;}
+    thead tr{background:#f0f0f0;}
+    th{padding:6px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:#666;}
+    tr{border-bottom:1px solid #ebebeb;}
+    tr:last-child{border-bottom:none;}
+    tbody tr:nth-child(even){filter:brightness(0.985);}
+    col.c-time{width:82px;}
+    col.c-act{width:auto;}
+    col.c-note{width:45%;}
+    .tc{padding:6px 10px;white-space:nowrap;color:#555;font-size:10px;vertical-align:top;}
+    .ac{padding:6px 10px;font-size:10.5px;vertical-align:top;word-break:break-word;}
+    .nc{padding:6px 10px;font-size:9.5px;color:#555;vertical-align:top;word-break:break-word;line-height:1.45;}
+    .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+      <img src="data:image/jpeg;base64,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" alt="Hilhi Youth Basketball Camp" style="height:48px;width:auto;object-fit:contain;flex-shrink:0;border-radius:4px;" />
+      <div>
+        <h1>Hilhi Youth Basketball Camp 2026</h1>
+        <div class="day-title">${current.label} — ${current.theme ?? ""}</div>
+        <div class="meta">${current.date ?? ""}, 2026 · Hillsboro, OR · 8:30 AM – 3:00 PM</div>
+      </div>
+    </div>
+    <div class="badges">
+      <span class="badge badge-gray">Grades 1st–8th</span>
+      <span class="badge badge-gold">NBA Division · 1st–4th Grade</span>
+      <span class="badge badge-red">College Division · 5th–8th Grade</span>
+    </div>
+  </div>
+  <table>
+    <colgroup>
+      <col class="c-time" />
+      <col class="c-act" />
+      <col class="c-note" />
+    </colgroup>
+    <thead><tr>
+      <th>Time</th><th>Activity</th><th>Notes</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow pop-ups to print the schedule."); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
+  // ── Print Individual Events ───────────────────────────────────────────────
+  const handlePrintEvents = () => {
+    if (individualEvents.length === 0) {
+      alert("No individual events have been set up yet. Add events in the admin panel first.");
+      return;
+    }
+
+    const CONTEST_COLORS: Record<string, string> = {
+      "Knockout":           "#B91C1C",
+      "Free Throw Contest": "#1B4FC4",
+      "3-Point Contest":    "#C41B1B",
+      "1-on-1 Challenge":   "#1B7A3C",
+      "3-on-3 Tournament":  "#7B3F00",
+      "Layup Contest":      "#5B21B6",
+    };
+
+    const CONTEST_TIMES: Record<string, string> = {
+      "Knockout":           "8:15 AM",
+      "Free Throw Contest": "9:00 AM",
+      "3-Point Contest":    "9:30 AM",
+      "1-on-1 Challenge":   "10:00 AM",
+      "3-on-3 Tournament":  "10:30 AM",
+      "Layup Contest":      "11:15 AM",
+    };
+
+    const CONTEST_RULES: Record<string, string> = {
+      "Knockout":           "Last one standing wins!",
+      "Free Throw Contest": "Best of 10 shots. Tie = sudden death.",
+      "3-Point Contest":    "3 balls at 5 spots. 1 minute per shooter.",
+      "1-on-1 Challenge":   "First to 15 points. 2s and 3s count.",
+      "3-on-3 Tournament":  "First to 21 points. 2s and 3s count.",
+      "Layup Contest":      "Right 1 min + Left 1 min. Team total wins.",
+    };
+
+    const tName = (id: string) => teams.find(t => t.id === id)?.name || "";
+
+    // Group events by name
+    const eventNames = Array.from(new Set(individualEvents.map(e => e.name)));
+
+    const eventBlocks = eventNames.map(evtName => {
+      const color = CONTEST_COLORS[evtName] || "#333";
+      const time  = CONTEST_TIMES[evtName]  || "";
+      const rule  = CONTEST_RULES[evtName]  || "";
+      const evts  = individualEvents.filter(e => e.name === evtName);
+
+      const divBlocks = evts.map(evt => {
+        const hasNominees = evt.nominees.some(n => n.players.some(p => p.trim()));
+        const nomRows = hasNominees
+          ? evt.nominees.map(nom => {
+              const players = nom.players.filter(p => p.trim());
+              if (players.length === 0) return "";
+              const tn = tName(nom.teamId);
+              return `<tr>
+                <td class="team-cell">${tn}</td>
+                <td class="players-cell">${players.join(" &nbsp;·&nbsp; ")}</td>
+              </tr>`;
+            }).filter(Boolean).join("")
+          : `<tr><td colspan="2" class="tba">Participants TBA</td></tr>`;
+
+        const winnerBlock = evt.status === "complete" && (evt.winner || evt.runnerUp) ? `
+          <div class="winner-box">
+            ${evt.winner   ? `<div><span class="trophy">🥇</span> <strong>${evt.winner}</strong></div>` : ""}
+            ${evt.runnerUp ? `<div><span class="trophy">🥈</span> ${evt.runnerUp}</div>` : ""}
+          </div>` : "";
+
+        return `
+          <div class="div-block">
+            <div class="div-label ${evt.division === "NBA" ? "nba" : "college"}">${evt.division} Division &mdash; ${evt.division === "NBA" ? "1st&ndash;4th Grade" : "5th&ndash;8th Grade"}</div>
+            ${winnerBlock}
+            <table class="nom-table">
+              <thead><tr><th>Team</th><th>Participants</th></tr></thead>
+              <tbody>${nomRows}</tbody>
+            </table>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="event-card">
+          <div class="event-header" style="background:${color}">
+            <div class="event-title">${evtName}</div>
+            <div class="event-meta">${time}${rule ? " &nbsp;·&nbsp; " + rule : ""}</div>
+          </div>
+          <div class="event-body">${divBlocks}</div>
+        </div>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Championship Day — Individual Events · Hilhi Youth Hoop Camp 2026</title>
+  <style>
+    @page{size:letter portrait;margin:12mm 14mm;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#111;background:#fff;}
+    .header{border-bottom:3px solid #F4A800;padding-bottom:8px;margin-bottom:14px;display:flex;align-items:center;gap:14px;}
+    .header-text h1{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;}
+    .header-text .day{font-size:19px;font-weight:900;color:#E03A3A;margin:2px 0;}
+    .header-text .meta{font-size:9px;color:#666;margin-top:3px;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .event-card{border:1px solid #ddd;border-radius:8px;overflow:hidden;break-inside:avoid;}
+    .event-header{padding:7px 10px;color:#fff;}
+    .event-title{font-size:12px;font-weight:900;}
+    .event-meta{font-size:8.5px;opacity:0.75;margin-top:2px;}
+    .event-body{padding:8px 10px;background:#fafafa;}
+    .div-block{margin-bottom:7px;}
+    .div-block:last-child{margin-bottom:0;}
+    .div-label{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;padding:2px 6px;border-radius:3px;display:inline-block;margin-bottom:5px;}
+    .div-label.nba{background:#fff3cd;color:#7a5000;}
+    .div-label.college{background:#cfe2ff;color:#0a3578;}
+    .winner-box{background:#fffbeb;border:1px solid #f0d060;border-radius:4px;padding:4px 8px;margin-bottom:5px;font-size:10px;}
+    .winner-box div{margin-bottom:2px;} .winner-box div:last-child{margin-bottom:0;}
+    .trophy{font-size:11px;}
+    .nom-table{width:100%;border-collapse:collapse;font-size:9.5px;}
+    .nom-table th{text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:0.7px;color:#888;padding:0 0 3px;border-bottom:1px solid #e5e5e5;}
+    .nom-table td{padding:3px 0;border-bottom:1px solid #f0f0f0;vertical-align:top;}
+    .nom-table tr:last-child td{border-bottom:none;}
+    .team-cell{font-weight:700;color:#555;width:28%;padding-right:6px;white-space:nowrap;}
+    .players-cell{color:#222;}
+    .tba{color:#aaa;font-style:italic;padding:4px 0;}
+    .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="` + window.location.origin + `/logo.png" alt="Hilhi Youth Basketball Camp" style="height:44px;width:auto;border-radius:4px;flex-shrink:0;object-fit:contain;"/>
+    <div class="header-text">
+      <h1>Hilhi Youth Basketball Camp 2026</h1>
+      <div class="day">Championship Day — Individual Events</div>
+      <div class="meta">Thursday, June 25, 2026 &nbsp;·&nbsp; Hillsboro, OR &nbsp;·&nbsp; Grades 1st–8th</div>
+    </div>
+  </div>
+  <div class="grid">
+    ${eventBlocks}
+  </div>
+  <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow pop-ups to print."); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
+  // ── Print Bracket ─────────────────────────────────────────────────
+  const handlePrintBracket = () => {
+    if (bracketGames.length === 0) {
+      alert("No bracket games have been set up yet. Build the bracket in the admin panel first.");
+      return;
+    }
+
+    const teamName = (id: string) => teams.find(t => t.id === id)?.name || id || "TBD";
+
+    const roundLabel: Record<string, string> = {
+      quarter: "Quarterfinals",
+      semi:    "Semifinals",
+      final:   "Championship Final",
+      "3rd":   "3rd Place",
+    };
+    const roundOrder = ["quarter", "semi", "final", "3rd"];
+
+    const divConfigs = [
+      { div: "NBA",     label: "NBA Division",     grades: "1st – 4th Grade", headerBg: "#1B2A5E", headerColor: "#F4A800" },
+      { div: "College", label: "College Division",  grades: "5th – 8th Grade", headerBg: "#7B1212", headerColor: "#ffffff" },
+    ] as const;
+
+    const divBlocks = divConfigs.map(({ div, label, grades, headerBg, headerColor }) => {
+      const games = bracketGames.filter(g => g.division === div);
+      if (games.length === 0) return "";
+
+      const roundBlocks = roundOrder.map(round => {
+        const roundGames = games.filter(g => g.round === round).sort((a, b) => a.id.localeCompare(b.id));
+        if (roundGames.length === 0) return "";
+
+        const gameCards = roundGames.map(g => {
+          const t1 = teamName(g.team1Id);
+          const t2 = teamName(g.team2Id);
+          const isFinal = g.status === "final";
+          const isLive  = g.status === "live";
+          const w1 = isFinal && g.score1 !== null && g.score2 !== null && g.score1 > g.score2;
+          const w2 = isFinal && g.score1 !== null && g.score2 !== null && g.score2 > g.score1;
+
+          const statusBar = isLive
+            ? `<div class="status-bar live">● LIVE NOW</div>`
+            : isFinal
+            ? `<div class="status-bar final">FINAL</div>`
+            : "";
+
+          const row = (team: string, score: number | null, isWinner: boolean) => `
+            <div class="team-row ${isWinner ? "winner" : ""}">
+              <span class="team-name">${team}</span>
+              <span class="team-score">${score !== null ? score : "—"}</span>
+              ${isWinner ? `<span class="win-badge">W</span>` : ""}
+            </div>`;
+
+          return `
+            <div class="game-card ${isLive ? "game-live" : ""}">
+              ${statusBar}
+              <div class="teams">
+                ${row(t1, g.score1, w1)}
+                ${row(t2, g.score2, w2)}
+              </div>
+              ${g.court ? `<div class="court-label">${g.court}</div>` : ""}
+            </div>`;
+        }).join("");
+
+        return `
+          <div class="round-block">
+            <div class="round-label">${roundLabel[round] || round}</div>
+            <div class="games-row">${gameCards}</div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="div-section">
+          <div class="div-header" style="background:${headerBg};color:${headerColor};">
+            <span class="div-name">${label}</span>
+            <span class="div-grades">${grades}</span>
+          </div>
+          ${roundBlocks}
+        </div>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Championship Day — Bracket · Hilhi Youth Hoop Camp 2026</title>
+  <style>
+    @page{size:letter portrait;margin:12mm 14mm;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:#111;background:#fff;}
+    .header{border-bottom:3px solid #F4A800;padding-bottom:8px;margin-bottom:14px;display:flex;align-items:center;gap:14px;}
+    .header-text h1{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#111;}
+    .header-text .day{font-size:19px;font-weight:900;color:#1B2A5E;margin:2px 0;}
+    .header-text .meta{font-size:9px;color:#666;margin-top:3px;}
+    .div-section{margin-bottom:16px;break-inside:avoid;}
+    .div-header{display:flex;align-items:baseline;justify-content:space-between;padding:7px 12px;border-radius:6px 6px 0 0;}
+    .div-name{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;}
+    .div-grades{font-size:9px;opacity:0.75;}
+    .round-block{margin-top:8px;}
+    .round-label{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:5px;padding-left:2px;}
+    .games-row{display:flex;flex-wrap:wrap;gap:8px;}
+    .game-card{border:1px solid #ddd;border-radius:6px;overflow:hidden;min-width:180px;flex:1;}
+    .game-live{border-color:#E03A3A;}
+    .status-bar{padding:3px 8px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:1px;}
+    .status-bar.live{background:#E03A3A;color:#fff;}
+    .status-bar.final{background:#f5f5f5;color:#aaa;}
+    .teams{border-bottom:1px solid #f0f0f0;}
+    .team-row{display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid #f5f5f5;}
+    .team-row:last-child{border-bottom:none;}
+    .team-row.winner{background:#fffbeb;}
+    .team-name{flex:1;font-size:10px;font-weight:700;color:#222;}
+    .team-row:not(.winner) .team-name{color:#666;}
+    .team-score{font-size:12px;font-weight:900;color:#222;margin-left:8px;}
+    .team-row:not(.winner) .team-score{color:#aaa;}
+    .win-badge{margin-left:5px;background:#F4A800;color:#000;font-size:7px;font-weight:900;padding:1px 4px;border-radius:3px;}
+    .court-label{font-size:8px;color:#bbb;padding:3px 8px;}
+    .footer{text-align:center;margin-top:14px;font-size:8px;color:#bbb;border-top:1px solid #eee;padding-top:8px;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="` + window.location.origin + `/logo.png" alt="Hilhi Youth Basketball Camp" style="height:44px;width:auto;border-radius:4px;flex-shrink:0;object-fit:contain;"/>
+    <div class="header-text">
+      <h1>Hilhi Youth Basketball Camp 2026</h1>
+      <div class="day">Championship Day — Bracket</div>
+      <div class="meta">Thursday, June 25, 2026 &nbsp;·&nbsp; Hillsboro, OR &nbsp;·&nbsp; Grades 1st–8th</div>
+    </div>
+  </div>
+  ${divBlocks}
+  <div class="footer">hilhiyouthbbx.com · Printed from the live Hilhi Youth Basketball Camp schedule</div>
+  <script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Please allow pop-ups to print."); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
   // ── Spinner while waiting for first API response ──
   if (!loaded) {
     return (
@@ -343,9 +716,37 @@ export default function CampHubPage() {
           <p className="text-white/45 mb-5">June 22–25, 2026 · Follow the action in real time</p>
           <div className="flex flex-wrap justify-center gap-2">
             <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">Grades 1st–8th</span>
-            <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">7:30 AM – 3:00 PM</span>
+            <span className="text-xs px-3 py-1.5 rounded-full bg-white/10">8:30 AM – 3:00 PM</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold" style={{ background: "#F4A800", color: "#0B0F1A" }}>NBA: 1st–4th Grade</span>
             <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#E03A3A]">College: 5th–8th Grade</span>
+          </div>
+          {/* Print buttons */}
+          <div className="flex flex-wrap justify-center gap-3 mt-4">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#F4A800]/60 hover:text-[#F4A800] transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Print Schedule PDF
+            </button>
+            {bracketGames.length > 0 && (
+              <button
+                onClick={handlePrintBracket}
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#F4A800]/60 hover:text-[#F4A800] transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Print Bracket PDF
+              </button>
+            )}
+            {individualEvents.length > 0 && (
+              <button
+                onClick={handlePrintEvents}
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 text-white/60 hover:border-[#E03A3A]/60 hover:text-[#E03A3A] transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Print Championship Events
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -671,11 +1072,13 @@ export default function CampHubPage() {
             <>
               {/* ── Semifinals ── */}
               {(["NBA", "College"] as const).map(div => {
-                const semis = bracketGames.filter(g => g.division === div && g.round === "semi");
+                const quarters = bracketGames.filter(g => g.division === div && g.round === "quarter").sort((a,b) => a.id.localeCompare(b.id));
+                const semis = bracketGames.filter(g => g.division === div && g.round === "semi").sort((a,b) => a.id.localeCompare(b.id));
                 const finals = bracketGames.filter(g => g.division === div && g.round === "final");
+                const thirds = bracketGames.filter(g => g.division === div && g.round === "3rd");
                 const divColor = div === "NBA" ? "#1B2A5E" : "#7B1212";
                 const accent   = div === "NBA" ? "#F4A800" : "#fff";
-                const hasGames = semis.length > 0 || finals.length > 0;
+                const hasGames = quarters.length > 0 || semis.length > 0 || finals.length > 0;
 
                 return (
                   <div key={div} className="mb-6">
@@ -717,9 +1120,15 @@ export default function CampHubPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
+                        {quarters.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest">Quarterfinals — 11:00 AM</p>
+                            {quarters.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
+                          </>
+                        )}
                         {semis.length > 0 && (
                           <>
-                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest">Semifinals — 12:45 PM</p>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest mt-4">Semifinals — 12:45 PM</p>
                             {semis.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
                           </>
                         )}
@@ -727,6 +1136,12 @@ export default function CampHubPage() {
                           <>
                             <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest mt-4">🏆 Championship Game — 2:05 PM</p>
                             {finals.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
+                          </>
+                        )}
+                        {thirds.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold uppercase text-white/28 tracking-widest mt-4">🥉 3rd Place — 2:05 PM</p>
+                            {thirds.map(g => <GameCard key={g.id} game={g} accentColor={accent} />)}
                           </>
                         )}
                       </div>
@@ -739,84 +1154,110 @@ export default function CampHubPage() {
               <div className="mb-6">
                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-3">Individual Contests</h3>
                 {(() => {
-                  const CONTEST_META: Record<string, { abbr: string; rule: string; color: string; time: string }> = {
-                    "Knockout":          { abbr:"KO",  rule:"Last one standing wins!",                              color:"#B91C1C", time:"8:15 AM"  },
-                    "Free Throw Contest":{ abbr:"FT",  rule:"Best of 10 shots. Tie = sudden death.",               color:"#1B4FC4", time:"9:00 AM"  },
-                    "3-Point Contest":   { abbr:"3PT", rule:"3 balls at 5 spots. 1 minute per shooter.",           color:"#C41B1B", time:"9:30 AM"  },
-                    "1-on-1 Challenge":  { abbr:"1v1", rule:"First to 15 points. 2s and 3s count.",               color:"#1B7A3C", time:"10:00 AM" },
-                    "3-on-3 Tournament": { abbr:"3v3", rule:"First to 21 points. 2s and 3s count.",               color:"#7B3F00", time:"10:30 AM" },
-                    "Layup Contest":     { abbr:"LAY", rule:"Right hand 1 min + Left hand 1 min. Team total wins.",color:"#5B21B6", time:"11:15 AM" },
+                  const CONTEST_META: Record<string, { abbr: string; rule: string; color: string; bg: string; time: string }> = {
+                    "Knockout":          { abbr:"KO",  rule:"Last one standing wins!",                               color:"#fff",   bg:"#B91C1C", time:"8:15 AM"  },
+                    "Free Throw Contest":{ abbr:"FT",  rule:"Best of 10 shots. Tie = sudden death.",                color:"#fff",   bg:"#1B4FC4", time:"9:00 AM"  },
+                    "3-Point Contest":   { abbr:"3PT", rule:"3 balls at 5 spots. 1 minute per shooter.",            color:"#fff",   bg:"#C41B1B", time:"9:30 AM"  },
+                    "1-on-1 Challenge":  { abbr:"1v1", rule:"First to 15 points. 2s and 3s count.",                color:"#fff",   bg:"#1B7A3C", time:"10:00 AM" },
+                    "3-on-3 Tournament": { abbr:"3v3", rule:"First to 21 points. 2s and 3s count.",                color:"#fff",   bg:"#7B3F00", time:"10:30 AM" },
+                    "Layup Contest":     { abbr:"LAY", rule:"Right hand 1 min + Left hand 1 min. Team total wins.", color:"#fff",   bg:"#5B21B6", time:"11:15 AM" },
                   };
-                  // Group events by name (both divisions together)
-                  const eventNames = Array.from(new Set([
-                    "Knockout","Free Throw Contest","3-Point Contest","1-on-1 Challenge","3-on-3 Tournament","Layup Contest"
-                  ]));
+                  const ALL_EVENT_NAMES = ["Knockout","Free Throw Contest","3-Point Contest","1-on-1 Challenge","3-on-3 Tournament","Layup Contest"];
+                  const teamName = (id: string) => teams.find(t => t.id === id)?.name || "";
                   return (
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      {eventNames.map(evtName => {
-                        const meta = CONTEST_META[evtName] || { abbr: evtName.slice(0,3).toUpperCase(), rule: "", color: "#333", time: "" };
-                        // Find events matching this name across divisions
-                        const evts = individualEvents.filter(e => e.name === evtName);
+                    <div className="space-y-4">
+                      {ALL_EVENT_NAMES.map(evtName => {
+                        const meta   = CONTEST_META[evtName] || { abbr: evtName.slice(0,3).toUpperCase(), rule: "", bg: "#333", color: "#fff", time: "" };
+                        const evts   = individualEvents.filter(e => e.name === evtName);
+                        if (evts.length === 0) return null; // only show events added by admin
+                        const anyLive     = evts.some(e => e.status === "live");
                         const anyComplete = evts.some(e => e.status === "complete");
-                        const anyLive    = evts.some(e => e.status === "live");
+
                         return (
-                          <div key={evtName} className="rounded-xl overflow-hidden border border-white/10">
-                            <div className="flex items-center gap-3 px-3 py-2.5" style={{ background: meta.color }}>
-                              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black">{meta.abbr}</div>
-                              <div className="flex-1">
-                                <div className="text-sm font-bold">{evtName}</div>
-                                <div className="text-[11px] opacity-60">{meta.time}</div>
+                          <div key={evtName} className={`rounded-xl overflow-hidden border transition-all ${
+                            anyLive ? "border-[#E03A3A]/60 shadow-lg shadow-[#E03A3A]/10" : "border-white/10"
+                          }`}>
+                            {/* Event header */}
+                            <div className="flex items-center gap-3 px-4 py-3" style={{ background: meta.bg }}>
+                              <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-xs font-black shrink-0"
+                                style={{ color: meta.color }}>{meta.abbr}</div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-sm" style={{ color: meta.color }}>{evtName}</div>
+                                <div className="text-[11px] opacity-60 mt-0.5" style={{ color: meta.color }}>{meta.time} · {meta.rule}</div>
                               </div>
-                              {anyLive    && <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 animate-pulse">LIVE</span>}
-                              {anyComplete && <span className="text-[9px] font-black px-2 py-0.5 rounded bg-black/30">DONE</span>}
+                              {anyLive     && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-white/20 text-white animate-pulse shrink-0">🔴 LIVE</span>}
+                              {anyComplete && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-black/30 text-white/70 shrink-0">✅ DONE</span>}
+                              {!anyLive && !anyComplete && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-black/20 shrink-0" style={{ color: meta.color, opacity: 0.6 }}>UPCOMING</span>}
                             </div>
-                            <div className="bg-white/3">
-                              {anyComplete && evts.length > 0 ? (
-                                <div className="divide-y divide-white/5">
-                                  {evts.map(e => (
-                                    <div key={e.id} className="px-3 py-2">
-                                      <div className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-1">{e.division} Div</div>
-                                      {e.winner && (
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-base">🥇</span>
-                                          <span className="text-sm font-bold text-white">{e.winner}</span>
-                                        </div>
-                                      )}
-                                      {e.runnerUp && (
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <span className="text-base">🥈</span>
-                                          <span className="text-sm text-white/50">{e.runnerUp}</span>
-                                        </div>
-                                      )}
+
+                            {/* Winner banner — shown when complete */}
+                            {anyComplete && evts.some(e => e.winner) && (
+                              <div className="px-4 py-3 border-b border-white/10" style={{ background: `${meta.bg}22` }}>
+                                {evts.filter(e => e.winner).map(e => (
+                                  <div key={e.id} className="flex flex-wrap items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-2xl">🥇</span>
+                                      <div>
+                                        <div className="text-[10px] font-bold uppercase tracking-widest text-white/35">{e.division} Champion</div>
+                                        <div className="text-base font-black text-white">{e.winner}</div>
+                                      </div>
                                     </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="px-3 py-2.5">
-                                  <div className="text-xs text-white/40 leading-relaxed">{meta.rule}</div>
-                                  {evts.length === 0 && (
-                                    <div className="text-[11px] text-white/20 mt-1 italic">Nominees TBA</div>
-                                  )}
-                                  {evts.length > 0 && evts.some(e => e.nominees.length > 0) && (
-                                    <div className="mt-2 space-y-1">
-                                      {evts.map(e => {
-                                        const nominated = e.nominees.flatMap(n => n.players.filter(p => p.trim()));
-                                        if (nominated.length === 0) return null;
-                                        return (
-                                          <div key={e.id}>
-                                            <div className="text-[10px] font-bold uppercase text-white/25 mb-0.5">{e.division}</div>
-                                            <div className="flex flex-wrap gap-1">
-                                              {nominated.map((p, pi) => (
-                                                <span key={pi} className="text-[11px] px-2 py-0.5 rounded bg-white/8 text-white/50">{camperShortName(p)}</span>
-                                              ))}
+                                    {e.runnerUp && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xl">🥈</span>
+                                        <div>
+                                          <div className="text-[10px] font-bold uppercase tracking-widest text-white/35">Runner-Up</div>
+                                          <div className="text-sm font-bold text-white/60">{e.runnerUp}</div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Participants by division */}
+                            <div className={`divide-y divide-white/5 ${anyComplete && evts.some(e => e.winner) ? "bg-white/2" : "bg-white/3"}`}>
+                              {evts.map(e => {
+                                const hasNominees = e.nominees.some(n => n.players.some(p => p.trim()));
+                                return (
+                                  <div key={e.id} className="px-4 py-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                                        e.division === "NBA" ? "bg-orange-500/20 text-orange-400" : "bg-blue-500/20 text-blue-400"
+                                      }`}>{e.division}</span>
+                                      <span className="text-[10px] text-white/25">{e.division === "NBA" ? "1st–4th Grade" : "5th–8th Grade"}</span>
+                                    </div>
+                                    {!hasNominees ? (
+                                      <p className="text-xs text-white/25 italic">Participants TBA</p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {e.nominees.map(nom => {
+                                          const players = nom.players.filter(p => p.trim());
+                                          if (players.length === 0) return null;
+                                          const tName = teamName(nom.teamId);
+                                          return (
+                                            <div key={nom.teamId} className="flex items-start gap-2">
+                                              {tName && (
+                                                <span className="text-[10px] font-bold text-white/35 pt-0.5 shrink-0 min-w-[60px]">{tName}</span>
+                                              )}
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {players.map((p, pi) => (
+                                                  <span key={pi} className={`text-xs px-2.5 py-1 rounded-lg font-medium ${
+                                                    anyLive ? "bg-white/15 text-white" : "bg-white/8 text-white/65"
+                                                  }`}>
+                                                    {p}
+                                                  </span>
+                                                ))}
+                                              </div>
                                             </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );

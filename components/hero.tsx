@@ -91,10 +91,10 @@ export function Hero({ content }: { content?: HeroContent }) {
 
           <div className="flex flex-col sm:flex-row gap-4">
             <a
-              href="/register"
+              href="/join"
               className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#F97316] hover:bg-orange-400 text-white font-black text-lg uppercase tracking-wide rounded-sm transition-all shadow-xl shadow-orange-500/30 hover:shadow-orange-500/50"
             >
-              Register Now <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              Join HILHI <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
             <a
               href="/events"

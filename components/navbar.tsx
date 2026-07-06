@@ -20,6 +20,18 @@ const DEFAULTS: Record<string, string> = {
 
 interface NavConfig {
   showTryouts:       boolean;
+  showHome:          boolean;
+  showAbout:         boolean;
+  showPrograms:      boolean;
+  showCamps:         boolean;
+  showTournaments:   boolean;
+  showYouthCoaches:  boolean;
+  showHSCoaches:     boolean;
+  showHSSchedule:    boolean;
+  showMerch:         boolean;
+  showFilmRoom:      boolean;
+  showContact:       boolean;
+  showRegisterCta:   boolean;
   labelHome:         string;
   labelAbout:        string;
   labelPrograms:     string;
@@ -44,6 +56,10 @@ export function Navbar() {
   const [campOpen,  setCampOpen]  = useState(false);
   const [navConfig, setNavConfig] = useState<NavConfig>({
     showTryouts:  true,
+    showHome: true, showAbout: true, showPrograms: true, showCamps: true,
+    showTournaments: true, showYouthCoaches: true, showHSCoaches: true,
+    showHSSchedule: true, showMerch: true, showFilmRoom: true, showContact: true,
+    showRegisterCta: true,
     labelHome: "", labelAbout: "", labelPrograms: "", labelCamps: "",
     labelTournaments: "", labelTryout: "", labelYouthCoaches: "",
     labelHSCoaches: "", labelMerch: "", labelFilmRoom: "", labelContact: "",
@@ -74,7 +90,19 @@ export function Navbar() {
         const nb = d?.navbar;
         if (nb) {
           setNavConfig({
-            showTryouts:       nb.showTryouts !== false,
+            showTryouts:       nb.showTryouts       !== false,
+            showHome:          nb.showHome          !== false,
+            showAbout:         nb.showAbout         !== false,
+            showPrograms:      nb.showPrograms      !== false,
+            showCamps:         nb.showCamps         !== false,
+            showTournaments:   nb.showTournaments   !== false,
+            showYouthCoaches:  nb.showYouthCoaches  !== false,
+            showHSCoaches:     nb.showHSCoaches     !== false,
+            showHSSchedule:    nb.showHSSchedule    !== false,
+            showMerch:         nb.showMerch         !== false,
+            showFilmRoom:      nb.showFilmRoom      !== false,
+            showContact:       nb.showContact       !== false,
+            showRegisterCta:   nb.showRegisterCta   !== false,
             labelHome:         nb.labelHome         ?? "",
             labelAbout:        nb.labelAbout        ?? "",
             labelPrograms:     nb.labelPrograms     ?? "",
@@ -92,26 +120,26 @@ export function Navbar() {
       .catch(() => {}); // silently keep defaults on error
   }, []);
 
-  // Build links dynamically from navConfig labels
+  // Build links dynamically from navConfig labels, filtering out hidden ones
   const links = [
-    { label: lbl(navConfig, "labelHome"),        href: "/" },
-    { label: lbl(navConfig, "labelAbout"),        href: "/#about" },
-    { label: lbl(navConfig, "labelPrograms"),     href: "/#programs" },
-    {
+    ...(navConfig.showHome         ? [{ label: lbl(navConfig, "labelHome"),        href: "/" }] : []),
+    ...(navConfig.showAbout        ? [{ label: lbl(navConfig, "labelAbout"),       href: "/#about" }] : []),
+    ...(navConfig.showPrograms     ? [{ label: lbl(navConfig, "labelPrograms"),    href: "/#programs" }] : []),
+    ...(navConfig.showCamps        ? [{
       label: lbl(navConfig, "labelCamps"),        href: "/events",
       dropdown: [
         { label: "📅 Camp Events",   href: "/events" },
         { label: "🏀 Camp Schedule", href: "/camp-schedule" },
       ],
-    },
-    { label: lbl(navConfig, "labelTournaments"),  href: "/tournaments" },
-    ...(navConfig.showTryouts ? [{ label: lbl(navConfig, "labelTryout"), href: "/tryout" }] : []),
-    { label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" },
-    { label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" },
-    { label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" },
-    { label: lbl(navConfig, "labelMerch"),        href: "/merch" },
-    { label: lbl(navConfig, "labelFilmRoom"),     href: "/film-room" },
-    { label: lbl(navConfig, "labelContact"),      href: "/#contact" },
+    }] : []),
+    ...(navConfig.showTournaments  ? [{ label: lbl(navConfig, "labelTournaments"), href: "/tournaments" }] : []),
+    ...(navConfig.showTryouts      ? [{ label: lbl(navConfig, "labelTryout"),      href: "/tryout" }] : []),
+    ...(navConfig.showYouthCoaches ? [{ label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" }] : []),
+    ...(navConfig.showHSCoaches    ? [{ label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" }] : []),
+    ...(navConfig.showHSSchedule   ? [{ label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" }] : []),
+    ...(navConfig.showMerch        ? [{ label: lbl(navConfig, "labelMerch"),        href: "/merch" }] : []),
+    ...(navConfig.showFilmRoom     ? [{ label: lbl(navConfig, "labelFilmRoom"),     href: "/film-room" }] : []),
+    ...(navConfig.showContact      ? [{ label: lbl(navConfig, "labelContact"),      href: "/#contact" }] : []),
   ];
 
   return (
@@ -170,9 +198,11 @@ export function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
-          <a href="/join" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 whitespace-nowrap">
-            Register Now
-          </a>
+          {navConfig.showRegisterCta && (
+            <a href="/join" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 whitespace-nowrap">
+              Register Now
+            </a>
+          )}
         </div>
 
         <button onClick={() => setOpen(!open)} className="md:hidden p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
@@ -208,9 +238,11 @@ export function Navbar() {
               className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all"
             >{l.label}</a>;
           })}
-          <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
-            Register Now
-          </a>
+          {navConfig.showRegisterCta && (
+            <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
+              Register Now
+            </a>
+          )}
         </div>
       )}
     </header>

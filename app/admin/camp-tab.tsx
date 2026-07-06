@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import {
   Plus, Save, Trash2, X, Loader2, CheckCircle,
-  Users, GripVertical, RefreshCw, Mail, Edit
+  Users, GripVertical, RefreshCw, Mail, Edit, ChevronRight
 } from "lucide-react";
 import type {
   CampScheduleData, CampTeam, BracketGame, IndividualEvent, Division,
@@ -11,10 +11,12 @@ import type {
 import type { DayKey, CheckInMap } from "@/lib/camp-checkin";
 
 const EVENT_NAMES = [
+  "Knockout",
   "Free Throw Contest",
   "3-Point Contest",
   "1-on-1 Challenge",
   "3-on-3 Tournament",
+  "Layup Contest",
 ];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -571,21 +573,59 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   const [editCamperSaving,  setEditCamperSaving]  = useState(false);
   const [dragOver,    setDragOver]    = useState<string | null>(null);
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
+  const [addPlayerOpen, setAddPlayerOpen] = useState<string | null>(null);
+  const [playerSearch, setPlayerSearch]   = useState<string>("");
+  const [eventDragOver, setEventDragOver] = useState<{eventId: string; teamId: string} | null>(null);
+  const [addNomineeOpen, setAddNomineeOpen] = useState<{eventId: string; teamId: string} | null>(null);
+  const [nomineeSearch, setNomineeSearch] = useState<string>("");
+  const [resultDragOver, setResultDragOver] = useState<{eventId: string; slot: "winner" | "runnerUp"} | null>(null);
   const [rosterError,  setRosterError]  = useState<string>("");
   const [checkIns,     setCheckIns]     = useState<CheckInMap>({});
   const [checkInDay,   setCheckInDay]   = useState<DayKey>("day1");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailResult,  setEmailResult]  = useState<string>("");
 
+  const CHECKIN_LS_KEY = `hilhi_checkins_${adminKey}`;
+
+  // Save checkIns map to localStorage so it survives sign-out / refresh
+  function persistLocally(map: CheckInMap) {
+    try { localStorage.setItem(CHECKIN_LS_KEY, JSON.stringify(map)); } catch {}
+  }
+
   useEffect(() => {
+    // 1. Show localStorage data immediately (instant — no loading flash)
+    try {
+      const cached = localStorage.getItem(CHECKIN_LS_KEY);
+      if (cached) setCheckIns(JSON.parse(cached) as CheckInMap);
+    } catch {}
+
     fetch("/api/camp-schedule")
       .then(r => r.json())
       .then(setData)
       .catch(() => {});
+
+    // 2. Load from Redis (authoritative source)
     fetch(`/api/camp-checkin?key=${adminKey}`)
       .then(r => r.json())
-      .then(d => { if (d.checkIns) setCheckIns(d.checkIns as CheckInMap); })
-      .catch(() => {});
+      .then(d => {
+        if (!d.checkIns) return;
+        const serverData = d.checkIns as CheckInMap;
+        // Check if Redis actually has any check-ins stored
+        const serverHasData = Object.values(serverData).some(ci =>
+          Object.values(ci).some(Boolean)
+        );
+        if (serverHasData) {
+          // Redis has data — use it as truth and refresh localStorage
+          setCheckIns(serverData);
+          persistLocally(serverData);
+        }
+        // If Redis is empty but localStorage had data, keep the localStorage
+        // version already set above (Redis may just not be configured yet).
+      })
+      .catch(() => {
+        // Network error — keep whatever localStorage provided above
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminKey]);
 
   // Recompute assignedIds whenever teams or roster changes
@@ -701,9 +741,25 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     if (!data) return;
     const team = data.teams.find(t => t.id === teamId);
     if (!team) return;
-    const arr = Array.from({ length: 6 }, (_, i) => team.players[i] ?? "");
+    const arr = [...team.players];
     arr[idx] = value;
     setData({ ...data, teams: data.teams.map(t => t.id === teamId ? { ...t, players: arr } : t) });
+  }
+
+  function addPlayerToTeam(teamId: string, playerFullName: string) {
+    if (!data) return;
+    const team = data.teams.find(t => t.id === teamId);
+    if (!team) return;
+    if (team.players.includes(playerFullName)) return; // already on team
+    const updatedTeams = data.teams.map(t =>
+      t.id !== teamId ? t : { ...t, players: [...t.players.filter(p => p.trim()), playerFullName] }
+    );
+    setData({ ...data, teams: updatedTeams });
+    // mark as assigned
+    const cam = roster.find(r => r.fullName === playerFullName || r.displayName === playerFullName);
+    if (cam) setAssignedIds(prev => new Set([...prev, cam.id]));
+    setAddPlayerOpen(null);
+    setPlayerSearch("");
   }
 
   function saveTeams() {
@@ -725,7 +781,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     const g: BracketGame = {
       id: Date.now().toString(), round, division,
       team1Id: "", team2Id: "", score1: null, score2: null,
-      court: "A", status: "scheduled",
+      court: "Court A", status: "scheduled",
     };
     save({ bracketGames: [...data.bracketGames, g] });
   }
@@ -740,6 +796,94 @@ export function CampTab({ adminKey }: { adminKey: string }) {
   function removeBracketGame(id: string) {
     if (!data || !confirm("Remove this game?")) return;
     save({ bracketGames: data.bracketGames.filter(g => g.id !== id) });
+  }
+
+  /** Fill bracket seeds from pool-play standings (1v4, 2v3 for 4-team; 1v8, 4v5, 2v7, 3v6 for 8-team) */
+  function autoSeedBracket(div: Division) {
+    if (!data) return;
+    const standings = calcPoolStandings(div);
+    const seeds = standings.map(r => r.team.id);
+    const divGames = [...data.bracketGames].filter(g => g.division === div);
+    const quarters = divGames.filter(g => g.round === "quarter").sort((a,b) => a.id.localeCompare(b.id));
+    const semis    = divGames.filter(g => g.round === "semi").sort((a,b) => a.id.localeCompare(b.id));
+
+    let updated = [...data.bracketGames];
+    const patch = (id: string, p: Partial<BracketGame>) => {
+      updated = updated.map(g => g.id === id ? { ...g, ...p } : g);
+    };
+
+    if (quarters.length >= 4 && seeds.length >= 4) {
+      // 8-team: 1v8, 4v5, 2v7, 3v6
+      const matchups = [[0,7],[3,4],[1,6],[2,5]];
+      quarters.slice(0,4).forEach((g,i) => {
+        const [s1,s2] = matchups[i];
+        patch(g.id, { team1Id: seeds[s1] ?? "", team2Id: seeds[s2] ?? "" });
+      });
+    } else if (semis.length >= 2 && seeds.length >= 2) {
+      // 4-team: 1v4, 2v3
+      const matchups = [[0,3],[1,2]];
+      semis.slice(0,2).forEach((g,i) => {
+        const [s1,s2] = matchups[i];
+        patch(g.id, { team1Id: seeds[s1] ?? "", team2Id: seeds[s2] ?? "" });
+      });
+    }
+    setData({ ...data, bracketGames: updated });
+  }
+
+  /** Advance the winner of a completed game into the next round */
+  function advanceWinner(gameId: string) {
+    if (!data) return;
+    const game = data.bracketGames.find(g => g.id === gameId);
+    if (!game || game.score1 === null || game.score2 === null) return;
+    const winnerId = game.score1 >= game.score2 ? game.team1Id : game.team2Id;
+    const loserId  = game.score1 >= game.score2 ? game.team2Id : game.team1Id;
+    const div = game.division;
+
+    const byRound = (r: BracketGame["round"]) =>
+      data.bracketGames.filter(g => g.division === div && g.round === r).sort((a,b) => a.id.localeCompare(b.id));
+
+    let updated = [...data.bracketGames];
+    const patch = (id: string, p: Partial<BracketGame>) => {
+      updated = updated.map(g => g.id === id ? { ...g, ...p } : g);
+    };
+
+    if (game.round === "quarter") {
+      const quarters = byRound("quarter");
+      const semis    = byRound("semi");
+      const idx = quarters.findIndex(g => g.id === gameId);
+      if (idx === -1) return;
+      const semiIdx  = Math.floor(idx / 2);
+      const slot     = idx % 2 === 0 ? "team1Id" : "team2Id";
+      if (semis[semiIdx]) patch(semis[semiIdx].id, { [slot]: winnerId });
+    } else if (game.round === "semi") {
+      const semis  = byRound("semi");
+      const finals = byRound("final");
+      const thirds = byRound("3rd");
+      const idx    = semis.findIndex(g => g.id === gameId);
+      if (idx === -1) return;
+      const slot = idx === 0 ? "team1Id" : "team2Id";
+      if (finals[0]) patch(finals[0].id, { [slot]: winnerId });
+      if (thirds[0]) patch(thirds[0].id, { [slot]: loserId });
+    }
+    setData({ ...data, bracketGames: updated });
+  }
+
+  function generateBracketTemplate(div: Division, format: "4-team" | "8-team") {
+    if (!data) return;
+    // Clear existing bracket games for this division
+    const others = data.bracketGames.filter(g => g.division !== div);
+    const newGames: BracketGame[] = [];
+    const mk = (round: BracketGame["round"]): BracketGame => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2,6)}`, round, division: div,
+      team1Id: "", team2Id: "", score1: null, score2: null, court: "Court A", status: "scheduled",
+    });
+    if (format === "8-team") {
+      newGames.push(mk("quarter"), mk("quarter"), mk("quarter"), mk("quarter"));
+    }
+    newGames.push(mk("semi"), mk("semi"));
+    newGames.push(mk("final"));
+    newGames.push(mk("3rd"));
+    save({ bracketGames: [...others, ...newGames] });
   }
 
   // ── Event helpers ─────────────────────────────────────────────────────────
@@ -782,9 +926,73 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     save({ individualEvents: cleaned });
   }
 
+  function assignResult(eventId: string, slot: "winner" | "runnerUp", playerName: string) {
+    if (!data) return;
+    const updated = (data.individualEvents ?? []).map(ev =>
+      ev.id === eventId
+        ? { ...ev, [slot]: playerName, status: slot === "winner" ? "complete" as const : ev.status }
+        : ev
+    );
+    setData({ ...data, individualEvents: updated });
+    setTimeout(() => {
+      const cleaned = updated.map(e => ({
+        ...e, nominees: e.nominees.map(n => ({ ...n, players: n.players.filter(p => p.trim() !== "") }))
+      }));
+      save({ individualEvents: cleaned });
+    }, 50);
+  }
+
   function removeEvent(id: string) {
     if (!data || !confirm("Remove this event?")) return;
     save({ individualEvents: (data.individualEvents ?? []).filter(e => e.id !== id) });
+  }
+
+  function addNominee(eventId: string, teamId: string, playerFullName: string) {
+    if (!data) return;
+    const events = (data.individualEvents ?? []).map(e => {
+      if (e.id !== eventId) return e;
+      const slots = e.name === "3-on-3 Tournament" ? 3 : 2;
+      const nomIdx = e.nominees.findIndex(n => n.teamId === teamId);
+      const nominees = [...e.nominees];
+      const curPlayers = nomIdx >= 0 ? nominees[nomIdx].players.filter(p => p.trim()) : [];
+      if (curPlayers.includes(playerFullName) || curPlayers.length >= slots) return e;
+      const newPlayers = [...curPlayers, playerFullName];
+      if (nomIdx >= 0) nominees[nomIdx] = { teamId, players: newPlayers };
+      else nominees.push({ teamId, players: newPlayers });
+      return { ...e, nominees };
+    });
+    setData({ ...data, individualEvents: events });
+    setAddNomineeOpen(null);
+    setNomineeSearch("");
+  }
+
+  function removeNominee(eventId: string, teamId: string, playerFullName: string) {
+    if (!data) return;
+    const events = (data.individualEvents ?? []).map(e => {
+      if (e.id !== eventId) return e;
+      const nomIdx = e.nominees.findIndex(n => n.teamId === teamId);
+      if (nomIdx === -1) return e;
+      const nominees = [...e.nominees];
+      nominees[nomIdx] = { ...nominees[nomIdx], players: nominees[nomIdx].players.filter(p => p !== playerFullName) };
+      return { ...e, nominees };
+    });
+    setData({ ...data, individualEvents: events });
+  }
+
+  function handleEventDragOver(e: React.DragEvent<HTMLDivElement>, eventId: string, teamId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setEventDragOver({ eventId, teamId });
+  }
+
+  function handleEventDrop(e: React.DragEvent<HTMLDivElement>, eventId: string, teamId: string) {
+    e.preventDefault();
+    setEventDragOver(null);
+    if (!data) return;
+    const raw = e.dataTransfer.getData("camper");
+    if (!raw) return;
+    const cam: CamperRosterEntry = JSON.parse(raw) as CamperRosterEntry;
+    addNominee(eventId, teamId, cam.fullName);
   }
 
   // ── Drag-and-drop helpers ─────────────────────────────────────────────────
@@ -810,18 +1018,16 @@ export function CampTab({ adminKey }: { adminKey: string }) {
     // Use fullName to avoid silent drop when two campers share the same "First L." display name
     const playerName = cam.fullName;
     if (team.players.includes(playerName)) return;
-    const arr = Array.from({ length: 6 }, (_, i) => team.players[i] ?? "");
-    const emptyIdx = arr.findIndex(p => !p.trim());
-    if (emptyIdx === -1) return;
-    arr[emptyIdx] = playerName;
-    const updatedTeams = data.teams.map(t => t.id === teamId ? { ...t, players: arr } : t);
+    const updatedTeams = data.teams.map(t =>
+      t.id !== teamId ? t : { ...t, players: [...t.players.filter(p => p.trim()), playerName] }
+    );
     setData({ ...data, teams: updatedTeams });
     setAssignedIds(prev => new Set([...prev, cam.id]));
   }
   function removeFromTeam(teamId: string, playerName: string) {
     if (!data) return;
     const updatedTeams = data.teams.map(t =>
-      t.id !== teamId ? t : { ...t, players: t.players.map(p => p === playerName ? "" : p) }
+      t.id !== teamId ? t : { ...t, players: t.players.filter(p => p !== playerName) }
     );
     setData({ ...data, teams: updatedTeams });
     const stillAssigned = updatedTeams.some(t => t.players.some(p => p === playerName));
@@ -886,27 +1092,56 @@ export function CampTab({ adminKey }: { adminKey: string }) {
 
   // ── Check-in helpers ──────────────────────────────────────────────────────
   async function toggleCheckIn(contactId: string, day: DayKey, checked: boolean) {
-    const updated = {
-      ...checkIns,
-      [contactId]: {
-        ...(checkIns[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
-        [day]: checked,
-      },
-    };
-    setCheckIns(updated); // optimistic
-    const res = await fetch(`/api/camp-checkin?key=${adminKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "toggle", contactId, day, checked }),
+    // Optimistic update — MUST use functional form (prev =>) so rapid clicks
+    // always build on the latest state, not a stale closure snapshot.
+    setCheckIns(prev => {
+      const next = {
+        ...prev,
+        [contactId]: {
+          ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+          [day]: checked,
+        },
+      };
+      // Persist immediately to localStorage so sign-out / refresh can restore it
+      persistLocally(next);
+      return next;
     });
-    const json = await res.json() as { checkIns?: CheckInMap };
-    if (json.checkIns) setCheckIns(json.checkIns);
+    try {
+      await fetch(`/api/camp-checkin?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle", contactId, day, checked }),
+      });
+      // Do NOT call setCheckIns from the server response — that overwrites any
+      // optimistic updates that happened while this request was in-flight,
+      // which is exactly what causes a check to vanish when you click another.
+    } catch {
+      // On network error revert this one toggle (and update localStorage too)
+      setCheckIns(prev => {
+        const next = {
+          ...prev,
+          [contactId]: {
+            ...(prev[contactId] ?? { day1: false, day2: false, day3: false, day4: false }),
+            [day]: !checked,
+          },
+        };
+        persistLocally(next);
+        return next;
+      });
+    }
   }
 
   async function sendAbsentEmails() {
     setSendingEmail(true);
     setEmailResult("");
     try {
+      // Collect the contactIds the admin has checked on-screen right now.
+      // Sending this to the server ensures it uses the exact same data the UI shows,
+      // not a stale or empty Redis snapshot (which caused the "emailed everyone" bug).
+      const presentIds = Object.entries(checkIns)
+        .filter(([, ci]) => ci[checkInDay])
+        .map(([id]) => id);
+
       const res  = await fetch(`/api/camp-checkin?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -914,6 +1149,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           action: "send-absent", day: checkInDay,
           dayLabel: { day1:"Day 1",day2:"Day 2",day3:"Day 3",day4:"Day 4" }[checkInDay],
           campName: data?.campName || "Hilhi Youth Basketball Camp",
+          presentIds, // ← authoritative list of who is present on this screen
         }),
       });
       const json = await res.json() as { ok?: boolean; sent?: number; failed?: number; total?: number; message?: string; error?: string };
@@ -1234,8 +1470,12 @@ export function CampTab({ adminKey }: { adminKey: string }) {
               gradeMap.get(cam.gradeNum)!.campers.push(cam);
             });
             const grades = [...gradeMap.entries()].sort((a,b) => a[0]-b[0]);
-            const totalPresent = roster.filter(cam => checkIns[cam.id]?.[checkInDay]).length;
-            const totalAbsent  = roster.length - totalPresent;
+            // Only count campers that are actually visible in the list (valid grade).
+            // Confirmed campers with unknown grade (gradeNum 99) are skipped in the
+            // display, so they must not inflate the absent counter.
+            const visibleRoster = confirmedRoster.filter(cam => cam.gradeNum !== 99);
+            const totalPresent = visibleRoster.filter(cam => checkIns[cam.id]?.[checkInDay]).length;
+            const totalAbsent  = visibleRoster.length - totalPresent;
             return (
               <div className="space-y-4">
                 {/* Summary bar */}
@@ -1249,7 +1489,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                     <div className="text-xs text-gray-500">Absent</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-black text-white">{confirmedRoster.length}</div>
+                    <div className="text-2xl font-black text-white">{visibleRoster.length}</div>
                     <div className="text-xs text-gray-500">Total</div>
                   </div>
                   <div className="flex-1" />
@@ -1471,7 +1711,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       {data.teams.filter(t => t.division === div).map(team => {
                         const isDragTarget  = dragOver === team.id;
                         const filledPlayers = team.players.filter(p => p.trim());
-                        const isFull        = filledPlayers.length >= 6;
+                        const isFull        = false; // no hard cap on team size
                         return (
                           <div
                             key={team.id}
@@ -1486,8 +1726,8 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                           >
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-white font-black text-sm">{team.name || "(unnamed)"}</span>
-                              <span className={`text-xs font-bold ${isFull ? "text-yellow-500" : "text-gray-600"}`}>
-                                {filledPlayers.length}/6{isFull ? " full" : ""}
+                              <span className="text-xs font-bold text-gray-600">
+                                {filledPlayers.length} player{filledPlayers.length !== 1 ? "s" : ""}
                               </span>
                             </div>
                             {filledPlayers.length === 0 ? (
@@ -1588,22 +1828,102 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                       </button>
                     </div>
 
-                    {/* 6 player slots */}
+                    {/* Players — dynamic list + add from roster */}
                     <div>
-                      <label className="block text-xs text-gray-400 font-semibold mb-2">Players (up to 6)</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <div key={i}>
-                            <label className="block text-[11px] text-gray-600 mb-1">Player {i + 1}</label>
-                            <input
-                              value={team.players[i] ?? ""}
-                              onChange={e => setPlayerName(team.id, i, e.target.value)}
-                              placeholder={`Player ${i + 1}`}
-                              className="w-full px-3 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700"
-                            />
-                          </div>
-                        ))}
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs text-gray-400 font-semibold">
+                          Players{team.players.filter(p=>p.trim()).length > 0 ? ` (${team.players.filter(p=>p.trim()).length})` : ""}
+                        </label>
+                        <button
+                          onClick={() => {
+                            setAddPlayerOpen(addPlayerOpen === team.id ? null : team.id);
+                            setPlayerSearch("");
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 hover:border-blue-500/60 text-blue-400 text-xs font-bold rounded-lg transition-all"
+                        >
+                          <Plus className="w-3 h-3" /> Add Player
+                        </button>
                       </div>
+
+                      {/* Add player dropdown */}
+                      {addPlayerOpen === team.id && (() => {
+                        const divisionForTeam = team.division;
+                        const gradeRange = divisionForTeam === "NBA" ? [1,4] : [5,8];
+                        const divRoster = roster
+                          .filter(cam => cam.gradeNum >= gradeRange[0] && cam.gradeNum <= gradeRange[1])
+                          .filter(cam => !team.players.includes(cam.fullName));
+                        const searchLower = playerSearch.toLowerCase();
+                        const filtered = playerSearch
+                          ? divRoster.filter(cam =>
+                              cam.fullName.toLowerCase().includes(searchLower) ||
+                              cam.displayName.toLowerCase().includes(searchLower)
+                            )
+                          : divRoster;
+                        // Sort: unassigned first, then by name
+                        const sorted = [...filtered].sort((a,b) => {
+                          const aAssigned = assignedIds.has(a.id);
+                          const bAssigned = assignedIds.has(b.id);
+                          if (aAssigned !== bAssigned) return aAssigned ? 1 : -1;
+                          return a.fullName.localeCompare(b.fullName);
+                        });
+                        return (
+                          <div className="mb-3 rounded-xl border border-blue-500/30 bg-[#0a1020] overflow-hidden">
+                            <div className="p-2 border-b border-white/10">
+                              <input
+                                autoFocus
+                                value={playerSearch}
+                                onChange={e => setPlayerSearch(e.target.value)}
+                                placeholder="Search by name…"
+                                className="w-full px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-blue-500 placeholder-gray-600"
+                              />
+                            </div>
+                            {sorted.length === 0 ? (
+                              <p className="text-xs text-gray-600 text-center py-3">
+                                {playerSearch ? "No matches" : `No more ${divisionForTeam} players available`}
+                              </p>
+                            ) : (
+                              <div className="max-h-48 overflow-y-auto divide-y divide-white/5">
+                                {sorted.map(cam => (
+                                  <button
+                                    key={cam.id}
+                                    onClick={() => addPlayerToTeam(team.id, cam.fullName)}
+                                    className="w-full text-left px-3 py-2 hover:bg-blue-500/15 transition-colors flex items-center justify-between gap-2"
+                                  >
+                                    <span className="text-white text-xs font-medium">{cam.fullName}</span>
+                                    <span className={`text-[10px] font-bold shrink-0 ${assignedIds.has(cam.id) ? "text-yellow-500/70" : "text-green-500/70"}`}>
+                                      {assignedIds.has(cam.id) ? "on a team" : `Gr. ${cam.gradeNum}`}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <div className="px-3 py-1.5 border-t border-white/10">
+                              <button onClick={() => { setAddPlayerOpen(null); setPlayerSearch(""); }} className="text-xs text-gray-600 hover:text-gray-400">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Player chips */}
+                      {team.players.filter(p => p.trim()).length === 0 ? (
+                        <p className="text-xs text-gray-700 italic py-2">No players yet — click Add Player or drag from the roster</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {team.players.filter(p => p.trim()).map((p, idx) => (
+                            <span key={idx} className="flex items-center gap-1 bg-white/8 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white">
+                              {p}
+                              <button
+                                onClick={() => removeFromTeam(team.id, p)}
+                                className="text-gray-600 hover:text-red-400 ml-0.5 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                   </div>
@@ -1700,7 +2020,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                               <input
                                 type="number" min={0} placeholder="0"
                                 value={game.score1 ?? ""}
-                                onChange={e => setPoolGameField(game.id, "score1", e.target.value === "" ? null : parseInt(e.target.value))}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setPoolGameField(game.id, "score1", v === "" ? null : parseInt(v, 10)); }}
                                 className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
                               />
                             </div>
@@ -1709,7 +2029,7 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                               <input
                                 type="number" min={0} placeholder="0"
                                 value={game.score2 ?? ""}
-                                onChange={e => setPoolGameField(game.id, "score2", e.target.value === "" ? null : parseInt(e.target.value))}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setPoolGameField(game.id, "score2", v === "" ? null : parseInt(v, 10)); }}
                                 className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
                               />
                             </div>
@@ -1823,89 +2143,205 @@ export function CampTab({ adminKey }: { adminKey: string }) {
       {/* ── BRACKET ── */}
       {section === "bracket" && (
         <div className="space-y-6">
-          {(["NBA", "College"] as Division[]).map(div => (
-            <div key={div} className="glass rounded-2xl border border-white/10 p-5">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <h3 className="text-white font-black text-base">{div} Division Bracket</h3>
-                <div className="flex flex-wrap gap-2">
-                  {(["semi","final","3rd"] as BracketGame["round"][]).map(r => (
-                    <button key={r} onClick={() => addBracketGame(div, r)}
-                      className="px-3 py-1.5 glass border border-white/15 hover:border-blue-500/40 text-gray-400 hover:text-blue-400 text-xs font-bold rounded-xl transition-all">
-                      + {r === "3rd" ? "3rd Place" : r === "semi" ? "Semifinal" : "Final"}
-                    </button>
-                  ))}
-                  <button onClick={saveBracket}
-                    className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
-                    <Save className="w-3 h-3" /> Save
-                  </button>
-                </div>
-              </div>
+          {(["NBA", "College"] as Division[]).map(div => {
+            const divGames    = data.bracketGames.filter(g => g.division === div);
+            const quarters    = divGames.filter(g => g.round === "quarter").sort((a,b) => a.id.localeCompare(b.id));
+            const semis       = divGames.filter(g => g.round === "semi").sort((a,b) => a.id.localeCompare(b.id));
+            const finals      = divGames.filter(g => g.round === "final");
+            const thirds      = divGames.filter(g => g.round === "3rd");
+            const hasQuarters = quarters.length > 0;
+            const opts        = teamOpts(div);
+            const divColor    = div === "NBA" ? "text-orange-400" : "text-blue-400";
 
-              {data.bracketGames.filter(g => g.division === div).length === 0 ? (
-                <p className="text-gray-600 text-sm">No bracket games yet. Add Semifinal, Final, and 3rd Place games above.</p>
-              ) : (
-                <div className="space-y-3">
-                  {data.bracketGames.filter(g => g.division === div).map(game => {
-                    const opts = teamOpts(div);
-                    return (
-                      <div key={game.id} className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-3">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <span className={`text-xs font-black uppercase px-2 py-0.5 rounded-full ${game.round === "final" ? "bg-yellow-500/20 text-yellow-400" : game.round === "semi" ? "bg-blue-500/20 text-blue-400" : "bg-gray-500/20 text-gray-400"}`}>
-                            {game.round === "3rd" ? "3rd Place" : game.round === "semi" ? "Semifinal" : "Championship"}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={game.status}
-                              onChange={e => setBracketField(game.id, "status", e.target.value)}
-                              className="px-2 py-1 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500">
-                              <option value="scheduled">Scheduled</option>
-                              <option value="live">🔴 Live</option>
-                              <option value="final">Final</option>
-                            </select>
-                            <div className="flex items-center gap-1">
-                              <span className="text-gray-500 text-xs">Court</span>
-                              <input
-                                value={game.court}
-                                onChange={e => setBracketField(game.id, "court", e.target.value)}
-                                className="w-12 text-center px-2 py-1 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500"
-                              />
-                            </div>
-                            <button onClick={() => removeBracketGame(game.id)}
-                              className="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-red-400 transition-colors">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+            /** Shared game card for any round */
+            const BracketCard = ({ game, label, accent }: { game: BracketGame; label: string; accent: string }) => {
+              const s1 = game.score1 ?? null;
+              const s2 = game.score2 ?? null;
+              const played    = s1 !== null && s2 !== null;
+              const w1        = played && s1! > s2!;
+              const w2        = played && s2! > s1!;
+              const canAdvance = played && (game.round === "semi" || game.round === "quarter");
+              return (
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/8 bg-white/[0.02]">
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${accent}`}>{label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <select value={game.status} onChange={e => setBracketField(game.id, "status", e.target.value)}
+                        className="px-1.5 py-0.5 rounded bg-[#0f1729] border border-white/15 text-white text-[10px] focus:outline-none focus:border-blue-500">
+                        <option value="scheduled">Scheduled</option>
+                        <option value="live">🔴 Live</option>
+                        <option value="final">✅ Final</option>
+                      </select>
+                      <select value={game.court} onChange={e => setBracketField(game.id, "court", e.target.value)}
+                        className="px-1.5 py-0.5 rounded bg-[#0f1729] border border-white/15 text-white text-[10px] focus:outline-none focus:border-blue-500">
+                        {["Court A","Court B","Court 1","Court 2","Main Court","Gym A","Gym B","Both Courts"].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <button onClick={() => removeBracketGame(game.id)}
+                        className="text-gray-700 hover:text-red-400 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Team 1 row */}
+                  <div className={`flex items-center gap-2 px-3 py-2 border-b border-white/5 ${w1 ? "bg-green-500/8" : ""}`}>
+                    <select value={game.team1Id} onChange={e => setBracketField(game.id, "team1Id", e.target.value)}
+                      className={`flex-1 px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-xs font-bold focus:outline-none transition-colors ${w1 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}>
+                      <option value="">— Team 1 —</option>
+                      {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="—" value={s1 ?? ""}
+                      onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setBracketField(game.id, "score1", v === "" ? null : parseInt(v, 10)); }}
+                      className={`w-16 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-base font-black focus:outline-none transition-colors ${w1 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}
+                    />
+                  </div>
+                  {/* Team 2 row */}
+                  <div className={`flex items-center gap-2 px-3 py-2 ${w2 ? "bg-green-500/8" : ""}`}>
+                    <select value={game.team2Id} onChange={e => setBracketField(game.id, "team2Id", e.target.value)}
+                      className={`flex-1 px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-xs font-bold focus:outline-none transition-colors ${w2 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}>
+                      <option value="">— Team 2 —</option>
+                      {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="—" value={s2 ?? ""}
+                      onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setBracketField(game.id, "score2", v === "" ? null : parseInt(v, 10)); }}
+                      className={`w-16 text-center px-2 py-1.5 rounded-lg bg-[#0f1729] border text-white text-base font-black focus:outline-none transition-colors ${w2 ? "border-green-500/40 text-green-300" : "border-white/15 focus:border-blue-500"}`}
+                    />
+                  </div>
+                  {/* Advance winner button */}
+                  {canAdvance && played && (
+                    <div className="px-3 py-1.5 border-t border-white/8 bg-white/[0.02]">
+                      <button onClick={() => advanceWinner(game.id)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors">
+                        <ChevronRight className="w-3 h-3" /> Advance winner →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            };
+
+            return (
+              <div key={div} className="glass rounded-2xl border border-white/10 p-5">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div>
+                    <h3 className={`font-black text-base ${divColor}`}>{div} Division — Championship Bracket</h3>
+                    <p className="text-gray-500 text-xs mt-0.5">{div === "NBA" ? "1st – 4th Grade" : "5th – 8th Grade"}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => generateBracketTemplate(div, "4-team")}
+                      className="px-3 py-1.5 glass border border-white/15 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 text-xs font-bold rounded-xl transition-all">
+                      ⚡ 4-Team Bracket
+                    </button>
+                    <button onClick={() => generateBracketTemplate(div, "8-team")}
+                      className="px-3 py-1.5 glass border border-white/15 hover:border-orange-500/40 text-gray-400 hover:text-orange-400 text-xs font-bold rounded-xl transition-all">
+                      ⚡ 8-Team Bracket
+                    </button>
+                    <button onClick={() => autoSeedBracket(div)}
+                      className="px-3 py-1.5 glass border border-white/15 hover:border-purple-500/40 text-gray-400 hover:text-purple-400 text-xs font-bold rounded-xl transition-all">
+                      🎯 Auto-Seed
+                    </button>
+                    <button onClick={saveBracket}
+                      className="flex items-center gap-1.5 px-3 py-1.5 glass border border-white/15 hover:border-green-500/40 text-gray-400 hover:text-green-400 text-xs font-bold rounded-xl transition-all">
+                      <Save className="w-3 h-3" /> Save
+                    </button>
+                  </div>
+                </div>
+
+                {divGames.length === 0 ? (
+                  <div className="text-center py-8 space-y-3">
+                    <p className="text-gray-600 text-sm">No bracket set up yet.</p>
+                    <div className="flex justify-center gap-3">
+                      <button onClick={() => generateBracketTemplate(div, "4-team")}
+                        className="px-4 py-2 bg-orange-600/20 hover:bg-orange-600/35 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-xl transition-all">
+                        Generate 4-Team Bracket (Semi → Final)
+                      </button>
+                      <button onClick={() => generateBracketTemplate(div, "8-team")}
+                        className="px-4 py-2 bg-orange-600/20 hover:bg-orange-600/35 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-xl transition-all">
+                        Generate 8-Team Bracket (QF → Semi → Final)
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Visual bracket tree ── */
+                  <div className="overflow-x-auto">
+                    <div className={`grid gap-4 min-w-[480px] ${hasQuarters ? "grid-cols-[1fr_auto_1fr_auto_1fr]" : "grid-cols-[1fr_auto_1fr]"}`}
+                      style={{ alignItems: "start" }}>
+
+                      {/* QUARTERFINALS column (only if exists) */}
+                      {hasQuarters && (
+                        <>
+                          <div className="space-y-4">
+                            <div className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-2 text-center">Quarterfinals</div>
+                            {quarters.map((g,i) => (
+                              <div key={g.id}>{BracketCard({ game: g, label: `QF ${i+1}`, accent: div === "NBA" ? "text-orange-400" : "text-blue-400" })}</div>
+                            ))}
                           </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          {([1, 2] as const).map(n => {
-                            const teamKey = `team${n}Id` as "team1Id" | "team2Id";
-                            const scoreKey = `score${n}` as "score1" | "score2";
-                            return (
-                              <div key={n} className="space-y-2">
-                                <select
-                                  value={game[teamKey]}
-                                  onChange={e => setBracketField(game.id, teamKey, e.target.value)}
-                                  className="w-full px-2 py-2 rounded-xl bg-[#0f1729] border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500">
-                                  <option value="">Select Team {n}…</option>
-                                  {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                                </select>
-                                <input
-                                  type="number" min={0} placeholder="Score"
-                                  value={game[scoreKey] ?? ""}
-                                  onChange={e => setBracketField(game.id, scoreKey, e.target.value === "" ? null : parseInt(e.target.value))}
-                                  className="w-full text-center px-3 py-3 rounded-xl bg-[#0f1729] border border-white/20 text-white text-lg font-black focus:outline-none focus:border-blue-500"
-                                />
-                              </div>
-                            );
-                          })}
+                          {/* Connector arrow */}
+                          <div className="flex items-center justify-center text-gray-700 text-xl pt-8">›</div>
+                        </>
+                      )}
+
+                      {/* SEMIFINALS column */}
+                      <div className="space-y-4">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-2 text-center">Semifinals</div>
+                        {semis.length === 0 ? (
+                          <button onClick={() => addBracketGame(div, "semi")}
+                            className="w-full py-3 border border-dashed border-white/15 rounded-xl text-gray-700 text-xs hover:border-blue-500/40 hover:text-blue-400 transition-all">
+                            + Add Semifinal
+                          </button>
+                        ) : (
+                          semis.map((g,i) => (
+                            <div key={g.id}>{BracketCard({ game: g, label: `SF ${i+1}`, accent: "text-blue-400" })}</div>
+                          ))
+                        )}
+                        {semis.length > 0 && (
+                          <button onClick={() => addBracketGame(div, "semi")}
+                            className="w-full py-1.5 border border-dashed border-white/10 rounded-lg text-gray-700 text-[10px] hover:border-blue-500/30 hover:text-blue-400 transition-all">
+                            + Add Semifinal
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Connector arrow */}
+                      <div className="flex items-center justify-center text-gray-700 text-xl pt-8">›</div>
+
+                      {/* FINAL + 3RD column */}
+                      <div className="space-y-4">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-2 text-center">Championship</div>
+                        {finals.length === 0 ? (
+                          <button onClick={() => addBracketGame(div, "final")}
+                            className="w-full py-3 border border-dashed border-white/15 rounded-xl text-gray-700 text-xs hover:border-yellow-500/40 hover:text-yellow-400 transition-all">
+                            + Add Championship Game
+                          </button>
+                        ) : (
+                          finals.map(g => (
+                            <div key={g.id}>{BracketCard({ game: g, label: "🏆 Championship", accent: "text-yellow-400" })}</div>
+                          ))
+                        )}
+                        {/* 3rd place */}
+                        <div className="mt-3">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-2 text-center">3rd Place</div>
+                          {thirds.length === 0 ? (
+                            <button onClick={() => addBracketGame(div, "3rd")}
+                              className="w-full py-3 border border-dashed border-white/15 rounded-xl text-gray-700 text-xs hover:border-gray-500/40 hover:text-gray-400 transition-all">
+                              + Add 3rd Place Game
+                            </button>
+                          ) : (
+                            thirds.map(g => (
+                              <div key={g.id}>{BracketCard({ game: g, label: "🥉 3rd Place", accent: "text-gray-400" })}</div>
+                            ))
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1915,9 +2351,81 @@ export function CampTab({ adminKey }: { adminKey: string }) {
           <div className="glass rounded-2xl border border-white/10 p-4">
             <p className="text-gray-400 text-sm">
               Track which players each team is nominating for individual skill events on Championship Day.
-              Add one section per event per division, enter nominees, then record the winner when done.
+              Add one section per event per division, then <strong className="text-white/70">drag players from the roster below</strong> into each event slot — or use the + Add button.
             </p>
           </div>
+
+          {/* ── Draggable Teams Panel ── */}
+          {data && data.teams.length > 0 && (() => {
+            // Build a name→CamperRosterEntry lookup so we can pass full roster data on drag
+            const rosterByName = new Map<string, CamperRosterEntry>();
+            roster.forEach(cam => {
+              rosterByName.set(cam.fullName.toLowerCase(), cam);
+            });
+
+            function dragTeamPlayer(e: React.DragEvent<HTMLDivElement>, playerFullName: string) {
+              // Try to find the matching roster entry for full metadata; fall back to name-only
+              const cam = rosterByName.get(playerFullName.toLowerCase()) ?? {
+                id: playerFullName, fullName: playerFullName,
+                displayName: playerFullName, grade: "", gradeNum: 99,
+                paymentStatus: "", confirmed: true,
+              };
+              e.dataTransfer.setData("camper", JSON.stringify(cam));
+              e.dataTransfer.effectAllowed = "copy";
+            }
+
+            return (
+              <div className="glass rounded-2xl border border-white/10 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <GripVertical className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-black text-white">Teams — Drag Players to Nominate</span>
+                  <span className="text-xs text-gray-600 ml-1">grab any player and drop into an event slot below</span>
+                </div>
+                {(["NBA", "College"] as Division[]).map(div => {
+                  const divTeamsList = data.teams.filter(t => t.division === div);
+                  if (divTeamsList.length === 0) return null;
+                  return (
+                    <div key={div} className="mb-4 last:mb-0">
+                      <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${div === "NBA" ? "text-orange-400" : "text-blue-400"}`}>
+                        {div} Division · {div === "NBA" ? "1st–4th Grade" : "5th–8th Grade"}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {divTeamsList.map(team => {
+                          const players = team.players.filter(p => p.trim());
+                          return (
+                            <div key={team.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                              <div className="text-xs font-black text-white mb-2">
+                                {team.name || "(unnamed)"}
+                                <span className="text-gray-600 font-normal ml-1.5">· {players.length} player{players.length !== 1 ? "s" : ""}</span>
+                              </div>
+                              {players.length === 0 ? (
+                                <p className="text-[11px] text-gray-700 italic">No players on this team yet</p>
+                              ) : (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {players.map((p, i) => (
+                                    <div
+                                      key={i}
+                                      draggable
+                                      onDragStart={e => dragTeamPlayer(e, p)}
+                                      title={`${p} — drag to an event slot`}
+                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium select-none cursor-grab active:cursor-grabbing transition-all bg-white/8 border border-white/12 text-white/65 hover:bg-white/15 hover:text-white hover:border-white/30"
+                                    >
+                                      <GripVertical className="w-2.5 h-2.5 opacity-35 flex-shrink-0" />
+                                      {p}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {(["NBA", "College"] as Division[]).map(div => (
             <div key={div} className="glass rounded-2xl border border-white/10 p-5">
@@ -1975,47 +2483,214 @@ export function CampTab({ adminKey }: { adminKey: string }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {teams.map(team => {
                             const nom = evt.nominees.find(n => n.teamId === team.id);
+                            const nominees = (nom?.players ?? []).filter(p => p.trim());
+                            const isFull = nominees.length >= slots;
+                            const isDropTarget = eventDragOver?.eventId === evt.id && eventDragOver?.teamId === team.id;
+                            const isNomineeOpen = addNomineeOpen?.eventId === evt.id && addNomineeOpen?.teamId === team.id;
                             return (
-                              <div key={team.id}>
-                                <label className="block text-xs font-semibold text-gray-400 mb-1.5">{team.name || "(unnamed)"}</label>
-                                <div className="space-y-1.5">
-                                  {Array.from({ length: slots }, (_, i) => (
-                                    <input key={i}
-                                      value={(nom?.players ?? [])[i] ?? ""}
-                                      onChange={e => setNominee(evt.id, team.id, i, e.target.value)}
-                                      placeholder={`Nominee ${i + 1}`}
-                                      className="w-full px-2.5 py-2 rounded-lg bg-[#0f1729] border border-white/20 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors placeholder-gray-700"
-                                    />
-                                  ))}
+                              <div key={team.id}
+                                onDragOver={e => !isFull && handleEventDragOver(e, evt.id, team.id)}
+                                onDragLeave={() => setEventDragOver(null)}
+                                onDrop={e => handleEventDrop(e, evt.id, team.id)}
+                                className={`rounded-xl border p-2.5 transition-all ${
+                                  isDropTarget ? "border-purple-400 bg-purple-500/15 scale-[1.01]"
+                                  : isFull     ? "border-white/10 bg-white/[0.02]"
+                                  :              "border-white/15 bg-white/[0.03] hover:border-white/25"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="text-xs font-semibold text-gray-400">{team.name || "(unnamed)"}</label>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`text-[10px] font-bold ${isFull ? "text-yellow-500" : "text-gray-600"}`}>
+                                      {nominees.length}/{slots}{isFull ? " full" : ""}
+                                    </span>
+                                    {!isFull && (
+                                      <button
+                                        onClick={() => {
+                                          setAddNomineeOpen(isNomineeOpen ? null : { eventId: evt.id, teamId: team.id });
+                                          setNomineeSearch("");
+                                        }}
+                                        className="flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-400 text-[10px] font-bold rounded-md transition-all"
+                                      >
+                                        <Plus className="w-2.5 h-2.5" /> Add
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
+
+                                {/* Add nominee dropdown */}
+                                {isNomineeOpen && (() => {
+                                  const teamPlayers = (data.teams.find(t => t.id === team.id)?.players ?? []).filter(p => p.trim());
+                                  const divisionForEvt = evt.division ?? div;
+                                  const gradeRange = divisionForEvt === "NBA" ? [1,4] : [5,8];
+                                  const divRoster = roster.filter(cam => cam.gradeNum >= gradeRange[0] && cam.gradeNum <= gradeRange[1]);
+                                  const searchLower = nomineeSearch.toLowerCase();
+                                  // Show team players first, then rest of division
+                                  const teamRoster = divRoster.filter(cam => teamPlayers.includes(cam.fullName));
+                                  const otherRoster = divRoster.filter(cam => !teamPlayers.includes(cam.fullName));
+                                  const allOptions = [...teamRoster, ...otherRoster].filter(cam => !nominees.includes(cam.fullName));
+                                  const filtered = nomineeSearch ? allOptions.filter(cam =>
+                                    cam.fullName.toLowerCase().includes(searchLower) || cam.displayName.toLowerCase().includes(searchLower)
+                                  ) : allOptions;
+                                  return (
+                                    <div className="mb-2 rounded-lg border border-purple-500/30 bg-[#0a0f1e] overflow-hidden">
+                                      <div className="p-1.5 border-b border-white/10">
+                                        <input
+                                          autoFocus
+                                          value={nomineeSearch}
+                                          onChange={e => setNomineeSearch(e.target.value)}
+                                          placeholder="Search player…"
+                                          className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/10 text-white text-[11px] focus:outline-none focus:border-purple-500 placeholder-gray-600"
+                                        />
+                                      </div>
+                                      {filtered.length === 0 ? (
+                                        <p className="text-[11px] text-gray-600 text-center py-2">
+                                          {nomineeSearch ? "No matches" : "No players available"}
+                                        </p>
+                                      ) : (
+                                        <div className="max-h-36 overflow-y-auto divide-y divide-white/5">
+                                          {filtered.map(cam => (
+                                            <button
+                                              key={cam.id}
+                                              onClick={() => addNominee(evt.id, team.id, cam.fullName)}
+                                              className="w-full text-left px-2.5 py-1.5 hover:bg-purple-500/15 transition-colors flex items-center justify-between gap-2"
+                                            >
+                                              <span className="text-white text-[11px] font-medium">{cam.fullName}</span>
+                                              <span className={`text-[10px] font-bold shrink-0 ${teamPlayers.includes(cam.fullName) ? "text-blue-400/70" : "text-gray-600"}`}>
+                                                {teamPlayers.includes(cam.fullName) ? "on team" : `Gr. ${cam.gradeNum}`}
+                                              </span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                      <div className="px-2 py-1 border-t border-white/10">
+                                        <button onClick={() => { setAddNomineeOpen(null); setNomineeSearch(""); }} className="text-[10px] text-gray-600 hover:text-gray-400">Cancel</button>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+
+                                {/* Nominee chips */}
+                                {nominees.length === 0 ? (
+                                  <p className={`text-[11px] text-center py-2 rounded-lg border border-dashed ${
+                                    isDropTarget ? "text-purple-400 border-purple-400/50" : "text-gray-700 border-white/10"
+                                  }`}>
+                                    {isDropTarget ? "Drop to nominate" : "Drop player here or click Add"}
+                                  </p>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1">
+                                    {nominees.map((p, idx) => (
+                                      <span
+                                        key={idx}
+                                        draggable
+                                        onDragStart={e => {
+                                          e.stopPropagation();
+                                          e.dataTransfer.clearData();
+                                          e.dataTransfer.setData("resultPlayer", p);
+                                          e.dataTransfer.effectAllowed = "copy";
+                                        }}
+                                        title="Drag to Winner/Runner-Up below, or click 🥇🥈"
+                                        className="group/chip flex items-center gap-1 bg-purple-500/15 border border-purple-500/25 rounded-md px-2 py-0.5 text-[11px] text-purple-200 cursor-grab active:cursor-grabbing select-none hover:border-purple-400/60"
+                                      >
+                                        <span className="text-purple-400/40 text-[9px]">⠿</span>
+                                        {p}
+                                        {/* Quick-assign buttons — visible on hover */}
+                                        <button
+                                          onClick={e => { e.stopPropagation(); assignResult(evt.id, "winner", p); }}
+                                          title="Set as 🥇 Winner"
+                                          className="hidden group-hover/chip:inline-flex items-center text-yellow-400/70 hover:text-yellow-300 transition-colors ml-0.5"
+                                        >🥇</button>
+                                        <button
+                                          onClick={e => { e.stopPropagation(); assignResult(evt.id, "runnerUp", p); }}
+                                          title="Set as 🥈 Runner-Up"
+                                          className="hidden group-hover/chip:inline-flex items-center text-gray-400/60 hover:text-gray-200 transition-colors"
+                                        >🥈</button>
+                                        <button onClick={() => removeNominee(evt.id, team.id, p)} className="text-purple-400/30 hover:text-red-400 transition-colors">
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      </span>
+                                    ))}
+                                    {!isFull && (
+                                      <span className={`text-[11px] border border-dashed rounded-md px-2 py-0.5 ${
+                                        isDropTarget ? "text-purple-400 border-purple-400/50" : "text-gray-700 border-white/10"
+                                      }`}>
+                                        + drop here
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
                         </div>
                       </div>
 
-                      {evt.status === "complete" && (
-                        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
-                          <div>
-                            <label className="block text-xs font-bold text-yellow-400 mb-1">🥇 Winner</label>
-                            <input
-                              value={evt.winner ?? ""}
-                              onChange={e => setEventField(evt.id, "winner", e.target.value)}
-                              placeholder="Winner name"
-                              className="w-full px-2.5 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-white text-sm focus:outline-none focus:border-yellow-400"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-gray-400 mb-1">🥈 Runner-Up</label>
-                            <input
-                              value={evt.runnerUp ?? ""}
-                              onChange={e => setEventField(evt.id, "runnerUp", e.target.value)}
-                              placeholder="Runner-up name"
-                              className="w-full px-2.5 py-2 rounded-lg bg-white/5 border border-white/20 text-white text-sm focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
+                      {/* ── Winner / Runner-Up — drag, click 🥇🥈 on chip, or type ── */}
+                      <div className="pt-3 border-t border-white/10 space-y-2">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-gray-500">
+                          Results — hover a chip and click 🥇🥈, or drag it here
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(["winner", "runnerUp"] as const).map(slot => {
+                            const isOver = resultDragOver?.eventId === evt.id && resultDragOver?.slot === slot;
+                            const val = slot === "winner" ? (evt.winner ?? "") : (evt.runnerUp ?? "");
+                            const label = slot === "winner" ? "🥇 Winner" : "🥈 Runner-Up";
+                            const accentOn  = slot === "winner" ? "border-yellow-400 bg-yellow-400/15 shadow-yellow-400/20 shadow-md" : "border-blue-400 bg-blue-400/15 shadow-blue-400/20 shadow-md";
+                            const accentOff = slot === "winner" ? "border-yellow-500/30 bg-yellow-500/8 hover:border-yellow-500/50" : "border-white/15 bg-white/4 hover:border-white/30";
+                            return (
+                              <div key={slot}>
+                                <label className={`block text-xs font-bold mb-1 ${slot === "winner" ? "text-yellow-400" : "text-gray-400"}`}>{label}</label>
+                                <div
+                                  className={`rounded-xl border-2 transition-all duration-150 min-h-[40px] ${isOver ? accentOn + " scale-[1.03]" : accentOff}`}
+                                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "copy"; setResultDragOver({ eventId: evt.id, slot }); }}
+                                  onDragLeave={e => { e.stopPropagation(); setResultDragOver(null); }}
+                                  onDrop={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setResultDragOver(null);
+                                    const playerName = e.dataTransfer.getData("resultPlayer");
+                                    if (!playerName) return;
+                                    assignResult(evt.id, slot, playerName);
+                                  }}
+                                >
+                                  {val ? (
+                                    /* Filled — show name chip */
+                                    <div className="flex items-center justify-between px-3 py-2.5 gap-2">
+                                      <span className="text-white text-sm font-bold truncate">{val}</span>
+                                      <button
+                                        onClick={() => assignResult(evt.id, slot, "")}
+                                        className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0"
+                                        title="Clear"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    /* Empty — editable text zone (NOT <input> to avoid browser drag intercept) */
+                                    <div
+                                      contentEditable
+                                      suppressContentEditableWarning
+                                      data-placeholder={isOver ? "⬇ Drop here" : "Drop or type…"}
+                                      onBlur={e => {
+                                        const txt = e.currentTarget.textContent?.trim() ?? "";
+                                        if (txt) assignResult(evt.id, slot, txt);
+                                        e.currentTarget.textContent = "";
+                                      }}
+                                      onKeyDown={e => {
+                                        if (e.key === "Enter") { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); }
+                                      }}
+                                      className={`px-3 py-2.5 text-sm text-white focus:outline-none min-h-[40px] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-600 empty:before:text-xs cursor-text`}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      )}
+                        {(evt.winner || evt.runnerUp) && (
+                          <p className="text-[10px] text-green-400/70">✅ Results live on public schedule</p>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

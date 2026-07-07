@@ -613,7 +613,6 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
             <IF label="Break Between Games (min)" type="number" min="0" value={f.breakBetweenGames} onChange={v => setF(p=>({...p,breakBetweenGames:+v}))} />
             <IF label="Start Time" type="time" value={f.startTime} onChange={v => setF(p=>({...p,startTime:v}))} />
           </div>
-          <BracketFormatPicker value={f.bracketFormat} onChange={v => setF(p=>({...p,bracketFormat:v}))} />
           <TiebreakerPicker value={f.tiebreaker} onChange={v => setF(p=>({...p,tiebreaker:v}))} />
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2.5 text-xs text-yellow-300">
             ⚠️ Changing game duration, break time, or start time will <strong>not</strong> automatically reschedule existing games.
@@ -812,7 +811,6 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
               <IF label="Break Between (min)" type="number" value={w.breakBetweenGames} onChange={v=>setW(p=>({...p,breakBetweenGames:+v}))} />
               <IF label="Start Time" type="time" value={w.startTime} onChange={v=>setW(p=>({...p,startTime:v}))} />
             </div>
-            <BracketFormatPicker value={w.bracketFormat} onChange={v=>setW(p=>({...p,bracketFormat:v}))} />
             <TiebreakerPicker value={w.tiebreaker} onChange={v=>setW(p=>({...p,tiebreaker:v}))} />
           </>}
 
@@ -901,7 +899,6 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
                   {venueLabel(w.venues)}
                 </p>
                 <p className="text-gray-400">{totalCourts(w.venues)} courts · {w.gameDuration}min games · {w.gamesGuaranteed} guaranteed · starts {w.startTime}</p>
-                <p className="text-gray-400">Bracket: {w.bracketFormat==="single"?"Single Elimination":w.bracketFormat==="double"?"Double Elimination":"Pool Play Only"}</p>
                 <p className="text-gray-400">Tiebreaker: {w.tiebreaker==="point_diff"?"Point Differential":"Least Points Allowed"}</p>
               </div>
               {w.divisions.map((d,di) => {
@@ -909,7 +906,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
                 return (
                   <div key={di} className="glass border border-white/10 rounded-xl p-4">
                     <p className="text-white font-bold">{d.name}</p>
-                    <p className="text-gray-500 text-xs mt-0.5">{filled.length} teams · {d.pools} pool{d.pools>1?"s":""}</p>
+                    <p className="text-gray-500 text-xs mt-0.5">{filled.length} teams · {d.pools} pool{d.pools>1?"s":""} · {d.format==="double"?"Pool → Double Elim":d.format==="none"?"Pool Play Only":"Pool → Single Elim"}</p>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {filled.map((tm,ti)=><span key={ti} className="bg-white/5 border border-white/10 text-gray-300 text-xs px-2 py-0.5 rounded-md">{tm}</span>)}
                     </div>

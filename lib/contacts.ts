@@ -228,6 +228,7 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
   const iCamperGrade  = col("camper grade") >= 0 ? col("camper grade") : col("grade");
   const iParentName   = col("parent name") >= 0 ? col("parent name") : col("parent na");
   const iPhone        = col("phone");
+  const iSchoolNext    = col("school attending");
   // Emergency: first and last occurrence
   const iEmerg1 = headers.findIndex(h => h.includes("emergenc"));
   const iEmerg2 = headers.length - 1 - [...headers].reverse().findIndex(h => h.includes("emergenc"));
@@ -298,10 +299,12 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
       })(),
       checkedIn:        get(row, iCheckedIn),
       seatInfo:         get(row, iSeatInfo),
+      nextSeasonSchool: get(row, iSchoolNext),
       notes: [
         camperName ? `Camper: ${camperName}` : "",
         get(row, iCamperGrade) ? `Grade: ${get(row, iCamperGrade)}` : "",
         get(row, iShirtSize)   ? `Shirt: ${get(row, iShirtSize)}`   : "",
+        get(row, iSchoolNext)  ? `School: ${get(row, iSchoolNext)}` : "",
       ].filter(Boolean).join(" | "),
     });
     imported++;

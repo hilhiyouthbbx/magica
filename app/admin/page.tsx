@@ -7,6 +7,7 @@ import { Trash2, Download, Upload, LogOut, Shield, Users, Trophy, Plus, Edit2, X
 import type { TournamentConfig } from "@/lib/tournament-client";
 import { TOURNAMENT_DEFAULTS } from "@/lib/tournament-client";
 import type { SiteContent, CampItem, Coach, FeaturedCoach, CoachStat, VideoItem, MerchProduct } from "@/lib/content";
+import { getAllTournaments } from "@/lib/tourney-storage";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types & helpers
@@ -273,10 +274,28 @@ function TournamentForm({ initial, onSave, onCancel, adminKey }: {
             </span>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 mb-2">
           <input value={newDiv} onChange={e => setNewDiv(e.target.value)} onKeyDown={e => { if (e.key==="Enter"&&newDiv.trim()) { set("divisions")([...t.divisions, newDiv.trim()]); setNewDiv(""); e.preventDefault(); }}}
             placeholder="Add division, press Enter" className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-xs focus:outline-none focus:border-blue-500 transition-colors" />
           <button type="button" onClick={() => { if (newDiv.trim()) { set("divisions")([...t.divisions, newDiv.trim()]); setNewDiv(""); }}} className="px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded-xl text-xs transition-colors">Add</button>
+        </div>
+        <div>
+          <div className="text-gray-600 text-[10px] font-semibold uppercase tracking-wider mb-1.5">Quick Add — Grade &amp; Gender Presets</div>
+          <div className="flex flex-wrap gap-1.5">
+            {["3rd/4th Grade","5th Grade","6th Grade","7th Grade","8th Grade"].flatMap(grade =>
+              ["Boys","Girls"].map(gender => {
+                const preset = `${grade} ${gender}`;
+                const already = t.divisions.includes(preset);
+                return (
+                  <button key={preset} type="button" disabled={already}
+                    onClick={() => { if (!already) set("divisions")([...t.divisions, preset]); }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${already ? "bg-white/5 text-gray-700 cursor-not-allowed" : "bg-white/5 hover:bg-blue-600/30 text-gray-400 hover:text-blue-300 border border-white/10"}`}>
+                    + {preset}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 
@@ -2185,12 +2204,21 @@ export default function AdminPage() {
                       </div>
                       <div className="mt-3">
                         <label className="block text-gray-400 text-xs font-semibold mb-1">Can&apos;t Play Same Time As Team</label>
-                        <input type="text"
+                        <input type="text" list="tourney-team-names"
                           className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600"
-                          placeholder="e.g. Portland Hawks"
+                          placeholder="e.g. Portland Hawks — start typing to pick from registered teams"
                           value={(editPatch.noOverlapWithTeam ?? editingContact.noOverlapWithTeam ?? "") as string}
                           onChange={e => setEditPatch(p => ({ ...p, noOverlapWithTeam: e.target.value }))}
                         />
+                        <datalist id="tourney-team-names">
+                          {getAllTournaments()
+                            .find(tt => tt.name.toLowerCase() === (editingContact.tournamentName || "").toLowerCase())
+                            ?.divisions.flatMap(d => d.teams)
+                            .filter(tm => tm.name.toLowerCase() !== (editingContact.teamName || "").toLowerCase())
+                            .map(tm => <option key={tm.id} value={tm.name} />)
+                          }
+                        </datalist>
+                        <p className="text-gray-600 text-[11px] mt-1">Start typing to pick from the exact team roster in the Tournament Manager — an exact match is what lets the Scheduler catch the conflict automatically.</p>
                       </div>
                       <div className="mt-3">
                         <label className="block text-gray-400 text-xs font-semibold mb-1">Other Scheduling Notes</label>

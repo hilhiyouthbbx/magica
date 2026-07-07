@@ -38,7 +38,7 @@ function buildGradePresets(grade: string): string[] {
 }
 
 const GRADE_PRESETS: { grade: string; presets: string[] }[] = [
-  "4th Grade", "5th Grade", "6th Grade", "7th Grade", "8th Grade",
+  "3rd/4th Grade", "5th Grade", "6th Grade", "7th Grade", "8th Grade",
 ].map(grade => ({ grade, presets: buildGradePresets(grade) }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1670,6 +1670,20 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     onUpdate(t);
   }
 
+  /** Manually pick (or clear) the team a given team can't be scheduled at the same time as —
+   *  picking from the actual roster (instead of free text) guarantees an exact name match so the
+   *  Scheduler's conflict checker reliably catches it. */
+  function setTeamNoOverlap(divId: string, teamId: string, otherTeamName: string) {
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const div = t.divisions.find(d => d.id === divId);
+    if (!div) return;
+    const team = div.teams.find(tm => tm.id === teamId);
+    if (!team) return;
+    team.noOverlapWithTeam = otherTeamName || undefined;
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
   function renameDivision(divId: string, name: string) {
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
     const div = t.divisions.find(d => d.id === divId);
@@ -1695,11 +1709,17 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     // Build games so most teams get exactly the guaranteed count (odd team counts mean
     // usually just one team gets an extra game, rather than everyone playing everyone).
     const built = buildUnscheduledPoolGames(d.pools, divId, t.gamesGuaranteed || 3);
+    // Games already scheduled in OTHER divisions occupy courts too — seed those so this
+    // division's auto-placement doesn't double-book the same court/time as another division.
+    const otherScheduledGames = t.divisions
+      .filter(x => x.id !== divId)
+      .flatMap(x => x.games)
+      .filter(g => g.time && g.court);
     // Auto-place each game onto a day/time/court slot right away — avoiding team, coach,
     // and scheduling-request conflicts. Anything that can't find a slot stays unscheduled.
     d.games = autoScheduleGames(
       built, d.teams, t.venues ?? [], t.gameDuration, t.breakBetweenGames, t.startTime,
-      t.startDate, t.endDate, t.dayWindows,
+      t.startDate, t.endDate, t.dayWindows, otherScheduledGames,
     );
     d.bracket = []; d.bracketGenerated = false;
     t.updatedAt = new Date().toISOString();
@@ -1813,6 +1833,25 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
                         <span className="line-clamp-2">{team.schedulingRequests}</span>
                       </div>
                     )}
+                    <select
+                      value={team.noOverlapWithTeam ?? ""}
+                      onChange={e => setTeamNoOverlap(div.id, team.id, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      onPointerDown={e => e.stopPropagation()}
+                      draggable={false}
+                      title="Pick the exact team this one can't be scheduled at the same time as — picking from the roster (instead of typing) guarantees the Scheduler catches the conflict."
+                      className="w-full mt-1.5 bg-white/5 border border-white/10 text-gray-400 text-[10px] px-1.5 py-1 rounded-md focus:outline-none focus:border-purple-500/50"
+                    >
+                      <option value="" className="bg-slate-900">🚫 Can't play same time as… (none)</option>
+                      {tournament.divisions.flatMap(d2 => d2.teams
+                        .filter(tm => tm.id !== team.id)
+                        .map(tm => (
+                          <option key={tm.id} value={tm.name} className="bg-slate-900">
+                            {tm.name}{d2.id !== div.id ? ` (${d2.name})` : ""}
+                          </option>
+                        ))
+                      )}
+                    </select>
                   </div>
                 ))}
               </div>

@@ -16,15 +16,25 @@ export function calculateStandings(
   );
 
   for (const g of games) {
-    if (g.excludeFromStandings) continue;
     if (g.status !== "completed" || g.score1 == null || g.score2 == null) continue;
+    const excluded = new Set(g.excludedTeamIds ?? []);
     const a = s.get(g.team1Id), b = s.get(g.team2Id);
-    if (!a || !b) continue;
-    a.pf += g.score1; a.pa += g.score2; a.gamesPlayed++;
-    b.pf += g.score2; b.pa += g.score1; b.gamesPlayed++;
-    if (g.score1 > g.score2) { a.wins++; b.losses++; a.points += 2; }
-    else if (g.score2 > g.score1) { b.wins++; a.losses++; b.points += 2; }
-    else { a.ties++; b.ties++; a.points++; b.points++; }
+    // Each team's participation in this game is counted independently — excluding one team
+    // (e.g. an extra game beyond their guarantee) doesn't affect the other team's record.
+    if (a && !excluded.has(g.team1Id)) {
+      a.pf += g.score1; a.pa += g.score2; a.gamesPlayed++;
+      if (g.score1 > g.score2) a.wins++;
+      else if (g.score2 > g.score1) a.losses++;
+      else a.ties++;
+      a.points += g.score1 > g.score2 ? 2 : g.score1 === g.score2 ? 1 : 0;
+    }
+    if (b && !excluded.has(g.team2Id)) {
+      b.pf += g.score2; b.pa += g.score1; b.gamesPlayed++;
+      if (g.score2 > g.score1) b.wins++;
+      else if (g.score1 > g.score2) b.losses++;
+      else b.ties++;
+      b.points += g.score2 > g.score1 ? 2 : g.score1 === g.score2 ? 1 : 0;
+    }
   }
 
   const list = [...s.values()].map(x => ({ ...x, pd: x.pf - x.pa }));
@@ -35,7 +45,8 @@ export function calculateStandings(
 
     // 2. Head-to-head (always checked first within a tie)
     const h2h = games.find(
-      g => g.status === "completed" && !g.excludeFromStandings &&
+      g => g.status === "completed" &&
+        !(g.excludedTeamIds?.includes(a.teamId)) && !(g.excludedTeamIds?.includes(b.teamId)) &&
         ((g.team1Id === a.teamId && g.team2Id === b.teamId) ||
          (g.team1Id === b.teamId && g.team2Id === a.teamId))
     );

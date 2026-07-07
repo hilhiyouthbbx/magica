@@ -29,8 +29,9 @@ export interface PoolGame {
   date?: string;
   team1Id: string; team2Id: string;
   score1?: number; score2?: number; status: GameStatus;
-  /** When true, this game is excluded from standings calculations (e.g. an extra game beyond the guarantee). */
-  excludeFromStandings?: boolean;
+  /** Team IDs (0, 1, or both) whose result in THIS game is excluded from their standings — e.g. an extra
+   *  game beyond the guarantee for one team, while the opponent's record still counts it normally. */
+  excludedTeamIds?: string[];
 }
 
 export interface BracketGame {

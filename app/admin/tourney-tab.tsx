@@ -1536,6 +1536,25 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     onUpdate(t);
   }
 
+  function generatePoolGames(divId: string) {
+    const div = tournament.divisions.find(d => d.id === divId);
+    if (!div) return;
+    if (div.teams.length < 2) { alert("Add at least 2 teams to this category first."); return; }
+    if (div.games.length > 0) {
+      if (!confirm(`${div.name} already has ${div.games.length} game(s). Generating fresh pool games will replace them (including any scores). Continue?`)) return;
+    }
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const d = t.divisions.find(x => x.id === divId)!;
+    // Make sure every team is in a pool — default to one big pool if none exist yet.
+    if (d.pools.length === 0) d.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
+    const assignedIds = new Set(d.pools.flatMap(p => p.teamIds));
+    d.teams.forEach(team => { if (!assignedIds.has(team.id)) d.pools[0].teamIds.push(team.id); });
+    d.games = buildUnscheduledPoolGames(d.pools, divId);
+    d.bracket = []; d.bracketGenerated = false;
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
   function addDivision() {
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
     t.divisions.push({ id: makeId(), name: "New Category", teams: [], pools: [], games: [], bracket: [], losersBracket: [], bracketGenerated: false });
@@ -1596,7 +1615,13 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
                 <option value="double" className="bg-slate-900">Pool → Double Elim</option>
               </select>
 
-              <div className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">{div.teams.length} team{div.teams.length!==1?"s":""}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">{div.teams.length} team{div.teams.length!==1?"s":""} · {div.games.length} game{div.games.length!==1?"s":""}</div>
+                <button onClick={()=>generatePoolGames(div.id)} disabled={div.teams.length<2}
+                  className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all whitespace-nowrap">
+                  🎲 Generate Games
+                </button>
+              </div>
 
               <div className="space-y-1.5 min-h-[40px]">
                 {div.teams.length === 0 && (

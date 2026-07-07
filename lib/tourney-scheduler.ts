@@ -167,17 +167,55 @@ export function autoScheduleGames(
     courtsByDayTime.set(key, used);
   });
 
+  // ── Spread each team's games evenly across the tournament's days ─────────────────────────────────────
+  // e.g. a 3-game guarantee over a Sat/Sun weekend should land as 1 game Saturday + 2
+  // Sunday, or 2 Saturday + 1 Sunday — never all 3 crammed onto a single day. We cap how
+  // many games of THIS division's set a team may play on any one day at
+  // ceil(team's total games / number of tournament days), then let the normal slot search
+  // naturally spill overflow onto the next day once a day hits its cap.
+  const numDays = Math.max(dayKeys.length, 1);
+  const totalGamesByTeam = new Map<string, number>();
+  games.forEach(g => {
+    totalGamesByTeam.set(g.team1Id, (totalGamesByTeam.get(g.team1Id) ?? 0) + 1);
+    totalGamesByTeam.set(g.team2Id, (totalGamesByTeam.get(g.team2Id) ?? 0) + 1);
+  });
+  const dayCountByTeam = new Map<string, Map<string, number>>(); // teamId -> day -> games already placed that day
+  // Seed with any games that came in already scheduled (e.g. manual drag-drop matchups).
+  games.forEach(g => {
+    if (!g.time) return;
+    [g.team1Id, g.team2Id].forEach(teamId => {
+      const perDay = dayCountByTeam.get(teamId) ?? new Map<string, number>();
+      perDay.set(g.date || "", (perDay.get(g.date || "") ?? 0) + 1);
+      dayCountByTeam.set(teamId, perDay);
+    });
+  });
+  function dayCapFor(teamId: string): number {
+    const total = totalGamesByTeam.get(teamId) ?? 0;
+    return Math.max(1, Math.ceil(total / numDays));
+  }
+
   return games.map(g => {
     if (g.time) return g; // already scheduled — leave as-is
     const t1 = teamById.get(g.team1Id), t2 = teamById.get(g.team2Id);
     const coach1 = t1?.coachName?.trim().toLowerCase();
     const coach2 = t2?.coachName?.trim().toLowerCase();
+    const cap1 = dayCapFor(g.team1Id);
+    const cap2 = dayCapFor(g.team2Id);
 
     for (const combo of slotCombos) {
       if (t1?.noPlayBefore && combo.time < t1.noPlayBefore) continue;
       if (t1?.noPlayAfter  && combo.time > t1.noPlayAfter)  continue;
       if (t2?.noPlayBefore && combo.time < t2.noPlayBefore) continue;
       if (t2?.noPlayAfter  && combo.time > t2.noPlayAfter)  continue;
+
+      // Don't let a team blow past its fair share of games on this one day when the
+      // tournament spans multiple days — forces the guarantee to spread across days
+      // instead of piling up on day one.
+      if (numDays > 1) {
+        const day1Count = dayCountByTeam.get(g.team1Id)?.get(combo.day) ?? 0;
+        const day2Count = dayCountByTeam.get(g.team2Id)?.get(combo.day) ?? 0;
+        if (day1Count >= cap1 || day2Count >= cap2) continue;
+      }
 
       const key = `${combo.day}|${combo.time}`;
       const busy = busyByDayTime.get(key) ?? new Set<string>();
@@ -196,6 +234,13 @@ export function autoScheduleGames(
       busyByDayTime.set(key, busy);
       usedCourts.add(court);
       courtsByDayTime.set(key, usedCourts);
+
+      const t1Days = dayCountByTeam.get(g.team1Id) ?? new Map<string, number>();
+      t1Days.set(combo.day, (t1Days.get(combo.day) ?? 0) + 1);
+      dayCountByTeam.set(g.team1Id, t1Days);
+      const t2Days = dayCountByTeam.get(g.team2Id) ?? new Map<string, number>();
+      t2Days.set(combo.day, (t2Days.get(combo.day) ?? 0) + 1);
+      dayCountByTeam.set(g.team2Id, t2Days);
 
       return { ...g, date: combo.day, time: combo.time, court, venue: courtToVenueName(court, safeVenues) };
     }

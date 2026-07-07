@@ -16,6 +16,7 @@ export function calculateStandings(
   );
 
   for (const g of games) {
+    if (g.excludeFromStandings) continue;
     if (g.status !== "completed" || g.score1 == null || g.score2 == null) continue;
     const a = s.get(g.team1Id), b = s.get(g.team2Id);
     if (!a || !b) continue;
@@ -34,7 +35,7 @@ export function calculateStandings(
 
     // 2. Head-to-head (always checked first within a tie)
     const h2h = games.find(
-      g => g.status === "completed" &&
+      g => g.status === "completed" && !g.excludeFromStandings &&
         ((g.team1Id === a.teamId && g.team2Id === b.teamId) ||
          (g.team1Id === b.teamId && g.team2Id === a.teamId))
     );

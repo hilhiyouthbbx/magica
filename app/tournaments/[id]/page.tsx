@@ -9,8 +9,9 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import type { TournamentConfig } from "@/lib/tournament";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
+import { PushOptIn } from "@/components/push-opt-in";
 
-// ─── Square config ─────────────────────────────────────────────────────
+// ─── Square config ─────────────────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
 const SQ_LOC_ID = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? "";
 const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
@@ -94,7 +95,7 @@ export default function TournamentDetailPage({ params }: Params) {
   // Multi-step: "form" | "pay"
   const [regStep, setRegStep] = useState<"form" | "pay">("form");
 
-  // ── Square state ─────────────────────────────────────────────────────
+  // ── Square state ───────────────────────────────────────────────
   const sqCardRef                  = useRef<any>(null);
   const [cardLoading,  setCardLoading]  = useState(false);
   const [squareError,  setSquareError]  = useState("");
@@ -110,7 +111,7 @@ export default function TournamentDetailPage({ params }: Params) {
       .catch(() => { setNotFound(true); setLoading(false); });
   }, [id]);
 
-  // ── Init Square card when payment step is active ─────────────────────────────────
+  // ── Init Square card when payment step is active ─────────────────────────
   useEffect(() => {
     if (regStep !== "pay" || !showForm) return;
     if ((appliedVoucher?.finalTotal ?? Infinity) === 0) return; // free — no card needed
@@ -188,7 +189,7 @@ export default function TournamentDetailPage({ params }: Params) {
     };
   }, [regStep, showForm, retryCount, appliedVoucher]);
 
-  // ── Advance to payment step ──────────────────────────────────────────
+  // ── Advance to payment step ────────────────────────────────────────────────────
   function handleFormNext(e: React.FormEvent) {
     e.preventDefault();
     setPaymentError("");
@@ -196,7 +197,7 @@ export default function TournamentDetailPage({ params }: Params) {
     setRegStep("pay");
   }
 
-  // ── Square payment + registration ──────────────────────────────────────────────
+  // ── Square payment + registration ────────────────────────────────────────────────
   async function handlePay() {
     if (!t) return;
     const isFreeReg = chargeTotal === 0;
@@ -440,7 +441,10 @@ export default function TournamentDetailPage({ params }: Params) {
                   <h3 className="text-white font-black text-lg mb-2">Registration Complete!</h3>
                   <p className="text-gray-400 text-sm mb-1">Payment received. Confirmation sent to:</p>
                   <p className="text-blue-400 font-bold text-sm mb-3">{coachEmail}</p>
-                  <p className="text-gray-500 text-xs">We&apos;ll be in touch with additional details shortly.</p>
+                  <p className="text-gray-500 text-xs mb-4">We&apos;ll be in touch with additional details shortly.</p>
+                  <div className="border-t border-white/10 pt-4 text-left">
+                    <PushOptIn tournamentName={t.name} teamName={orgName} contactEmail={coachEmail} />
+                  </div>
                 </div>
               ) : (
                 <div className="glass rounded-2xl border border-white/15 overflow-hidden">

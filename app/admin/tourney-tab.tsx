@@ -688,9 +688,10 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
 }) {
   const [step, setStep] = useState(1);
   const [w, setW] = useState<WizState>({
-    name: "", date: "", startDate: "", endDate: "", venues: [{ name: "Main Gym", courts: 2 }],
-    gameDuration: 24, breakBetweenGames: 6, startTime: "08:00",
-    bracketFormat: "single", gamesGuaranteed: 3, tiebreaker: "point_diff",
+    name: "", date: "", startDate: "", endDate: "",
+    venues: [{ name: "Main", courts: 2 }, { name: "Aux", courts: 1 }], // Court 1 (Main), Court 2 (Main), Court 3 (Aux)
+    gameDuration: 50, breakBetweenGames: 5, startTime: "08:00",
+    bracketFormat: "single", gamesGuaranteed: 3, tiebreaker: "least_pa",
     divisions: [{ name: "", pools: 2, teams: ["","","","","","","",""] }],
     dayWindows: {},
   });
@@ -720,7 +721,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
     const tid = makeId(); const now = new Date().toISOString();
     const safeVenues = w.venues.filter(v => v.name.trim()).length > 0
       ? w.venues.filter(v => v.name.trim())
-      : [{ name: "Main Gym", courts: 2 }];
+      : [{ name: "Main", courts: 2 }, { name: "Aux", courts: 1 }];
     const divisions: Division[] = w.divisions.map(d => {
       const divId = makeId();
       const poolTeamNames = snakePools(d.teams, d.pools);

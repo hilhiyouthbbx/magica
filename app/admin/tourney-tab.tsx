@@ -79,6 +79,27 @@ function matchingRegs(contacts: RegistrationContact[], tournamentName: string): 
     c.source === "tournament" && c.tournamentName?.toLowerCase().trim() === n && c.teamName?.trim()
   );
 }
+/** 7th/8th Grade divisions default to always trying the LAST court (typically the Aux court)
+ *  unless the coach has explicitly picked a different preference for that category. */
+function prefers7th8thAuxCourt(divisionName: string): boolean {
+  return /7th|8th/i.test(divisionName);
+}
+
+/** Builds the divisionId -> preferred-court map the scheduler uses. Respects an explicit
+ *  per-division choice first (including an explicit "no preference" of 0), and otherwise
+ *  auto-applies the 7th/8th Grade → last court heuristic. */
+function buildPreferredCourtMap(t: Tournament): Record<string, number> {
+  const totalCourtsCount = totalCourts(t.venues ?? []);
+  const map: Record<string, number> = {};
+  t.divisions.forEach(d => {
+    if (d.preferredCourt) { map[d.id] = d.preferredCourt; return; }
+    if (d.preferredCourt === undefined && prefers7th8thAuxCourt(d.name) && totalCourtsCount >= 1) {
+      map[d.id] = totalCourtsCount; // last court — Aux when venues are Main(x)+Aux(1)
+    }
+  });
+  return map;
+}
+
 function teamImported(tournament: Tournament, teamName: string, divisionName: string): boolean {
   const targetName = teamName.toLowerCase().trim();
   const targetDiv   = (divisionName || "").toLowerCase().trim();
@@ -1760,6 +1781,17 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     onUpdate(t);
   }
 
+  // value: "" = auto (let the 7th/8th Grade heuristic below decide), "0" = explicitly no
+  // preference, "1".."N" = always try that court first.
+  function setDivisionPreferredCourt(divId: string, value: string) {
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const div = t.divisions.find(d => d.id === divId);
+    if (!div) return;
+    div.preferredCourt = value === "" ? undefined : parseInt(value, 10);
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
   /** Manually pick (or clear) the team a given team can't be scheduled at the same time as —
    *  picking from the actual roster (instead of free text) guarantees an exact name match so the
    *  Scheduler's conflict checker reliably catches it. */
@@ -1807,9 +1839,10 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
       .filter(g => g.time && g.court);
     // Auto-place each game onto a day/time/court slot right away — avoiding team, coach,
     // and scheduling-request conflicts. Anything that can't find a slot stays unscheduled.
+    const preferredCourtByDivision = buildPreferredCourtMap(t);
     d.games = autoScheduleGames(
       built, d.teams, t.venues ?? [], t.gameDuration, t.breakBetweenGames, t.startTime,
-      t.startDate, t.endDate, t.dayWindows, otherScheduledGames,
+      t.startDate, t.endDate, t.dayWindows, otherScheduledGames, preferredCourtByDivision,
     );
     d.bracket = []; d.bracketGenerated = false;
     t.updatedAt = new Date().toISOString();
@@ -1845,9 +1878,10 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
       combinedTeams = combinedTeams.concat(d.teams);
     });
 
+    const preferredCourtByDivision = buildPreferredCourtMap(t);
     const scheduled = autoScheduleGames(
       combinedGames, combinedTeams, t.venues ?? [], t.gameDuration, t.breakBetweenGames, t.startTime,
-      t.startDate, t.endDate, t.dayWindows, [],
+      t.startDate, t.endDate, t.dayWindows, [], preferredCourtByDivision,
     );
 
     // Split the combined, now-scheduled games back out to their own division.
@@ -1924,6 +1958,20 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
                 <option value="none" className="bg-slate-900">Pool Play Only</option>
                 <option value="single" className="bg-slate-900">Pool → Single Elim</option>
                 <option value="double" className="bg-slate-900">Pool → Double Elim</option>
+              </select>
+
+              <select value={div.preferredCourt ?? ""} onChange={e=>setDivisionPreferredCourt(div.id, e.target.value)}
+                title="Which court the scheduler tries first for this category's games"
+                className="w-full bg-white/5 border border-white/10 text-gray-300 text-xs px-2 py-1.5 rounded-lg focus:outline-none">
+                <option value="" className="bg-slate-900">
+                  {prefers7th8thAuxCourt(div.name) ? `Auto — Court ${totalCourts(tournament.venues ?? [])} (7th/8th default)` : "Any court"}
+                </option>
+                <option value="0" className="bg-slate-900">No preference</option>
+                {Array.from({ length: totalCourts(tournament.venues ?? []) }, (_, i) => i + 1).map(c => (
+                  <option key={c} value={c} className="bg-slate-900">
+                    Always try Court {c}{c === totalCourts(tournament.venues ?? []) ? ` (${venueLabel((tournament.venues ?? []).slice(-1))})` : ""}
+                  </option>
+                ))}
               </select>
 
               <div className="flex items-center justify-between gap-2">

@@ -23,8 +23,40 @@ export function courtToVenueName(courtNum: number, venues: VenueConfig[]): strin
   return venues[0]?.name ?? "Main Gym";
 }
 
+/** Enumerate every calendar date (YYYY-MM-DD) between start and end, inclusive. */
+export function buildTournamentDates(startDate?: string, endDate?: string): string[] {
+  if (!startDate) return [];
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const end = endDate ? (() => { const [ey, em, ed] = endDate.split("-").map(Number); return new Date(ey, em - 1, ed); })() : start;
+  const dates: string[] = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    dates.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+/** Build the list of time-of-day slots for a single day, bounded by a start/end window. */
+export function buildDayTimeSlots(start: string, end: string, gameDuration: number, breakBetween: number): string[] {
+  const slots: string[] = [];
+  let cur = start;
+  let guard = 0;
+  while (minutesOf(cur) + gameDuration <= minutesOf(end) && guard < 200) {
+    slots.push(cur);
+    cur = addMinutes(cur, gameDuration + breakBetween);
+    guard++;
+  }
+  return slots;
+}
+function minutesOf(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
 /** Circle/polygon round-robin pairing algorithm */
-function roundRobinPairs(ids: string[]): [string, string][][] {
+export function roundRobinPairs(ids: string[]): [string, string][][] {
   const n = ids.length;
   if (n < 2) return [];
   const arr = n % 2 === 0 ? [...ids] : [...ids, "__BYE__"];
@@ -41,6 +73,35 @@ function roundRobinPairs(ids: string[]): [string, string][][] {
     arr.splice(1, 0, last);
   }
   return rounds;
+}
+
+/** Build round-robin pool games with NO date/time/court assigned yet — ready to drag onto the Scheduler grid. */
+export function buildUnscheduledPoolGames(pools: Pool[], divisionId: string): PoolGame[] {
+  const poolRounds = pools.map(p => roundRobinPairs(p.teamIds));
+  const maxRounds = Math.max(...poolRounds.map(r => r.length), 0);
+
+  type Pair = { team1Id: string; team2Id: string; poolId: string };
+  const pairs: Pair[] = [];
+  for (let r = 0; r < maxRounds; r++) {
+    pools.forEach((pool, pi) => {
+      const round = poolRounds[pi][r];
+      if (round) round.forEach(([t1, t2]) => pairs.push({ team1Id: t1, team2Id: t2, poolId: pool.id }));
+    });
+  }
+
+  return pairs.map((pair, i) => ({
+    id: `${pair.poolId}-${pair.team1Id.slice(-6)}-${pair.team2Id.slice(-6)}-${i}`,
+    poolId: pair.poolId,
+    divisionId,
+    court: 0,
+    venue: "",
+    timeSlot: -1,
+    time: "",
+    date: "",
+    team1Id: pair.team1Id,
+    team2Id: pair.team2Id,
+    status: "scheduled" as const,
+  }));
 }
 
 /** Greedy multi-pool scheduler: interleaves all pools' rounds, avoids team/court conflicts */

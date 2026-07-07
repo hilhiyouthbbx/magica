@@ -10,6 +10,8 @@ export interface VenueConfig {
 
 export interface Team {
   id: string; name: string; coachName: string;
+  /** Scheduling requests the team submitted at registration (e.g. "can't play before 10am Sat"). Shown in the Teams tab so it's not lost after import. */
+  schedulingRequests?: string;
 }
 
 export interface Pool {
@@ -20,8 +22,12 @@ export interface PoolGame {
   id: string; poolId: string; divisionId: string;
   court: number; venue: string;
   timeSlot: number; time: string;
+  /** Calendar date (YYYY-MM-DD) this game is scheduled on. Empty/undefined = not yet scheduled to a day/slot. */
+  date?: string;
   team1Id: string; team2Id: string;
   score1?: number; score2?: number; status: GameStatus;
+  /** When true, this game is excluded from standings calculations (e.g. an extra game beyond the guarantee). */
+  excludeFromStandings?: boolean;
 }
 
 export interface BracketGame {
@@ -51,6 +57,8 @@ export interface Tournament {
   tiebreaker: TiebreakerMethod;
   divisions: Division[]; status: TournamentStatus;
   createdAt: string; updatedAt: string;
+  /** Per-day first-game-start / last-game-finish windows, keyed by YYYY-MM-DD date. */
+  dayWindows?: Record<string, { start: string; end: string }>;
 }
 
 export interface TeamStanding {

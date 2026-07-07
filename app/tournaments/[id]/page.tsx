@@ -10,7 +10,7 @@ import { Footer } from "@/components/footer";
 import type { TournamentConfig } from "@/lib/tournament";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
-// ─── Square config ────────────────────────────────────────────────────────────
+// ─── Square config ──────────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
 const SQ_LOC_ID = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? "";
 const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
@@ -66,7 +66,7 @@ export default function TournamentDetailPage({ params }: Params) {
   // Multi-step: "form" | "pay"
   const [regStep, setRegStep] = useState<"form" | "pay">("form");
 
-  // ── Square state ──────────────────────────────────────────────────────────
+  // ── Square state ────────────────────────────────────────────────────────────────
   const sqCardRef                  = useRef<any>(null);
   const [cardLoading,  setCardLoading]  = useState(false);
   const [squareError,  setSquareError]  = useState("");
@@ -82,7 +82,7 @@ export default function TournamentDetailPage({ params }: Params) {
       .catch(() => { setNotFound(true); setLoading(false); });
   }, [id]);
 
-  // ── Init Square card when payment step is active ─────────────────────────
+  // ── Init Square card when payment step is active ────────────────────────
   useEffect(() => {
     if (regStep !== "pay" || !showForm) return;
     if ((appliedVoucher?.finalTotal ?? Infinity) === 0) return; // free — no card needed
@@ -160,7 +160,7 @@ export default function TournamentDetailPage({ params }: Params) {
     };
   }, [regStep, showForm, retryCount, appliedVoucher]);
 
-  // ── Advance to payment step ───────────────────────────────────────────────
+  // ── Advance to payment step ────────────────────────────────────────────────
   function handleFormNext(e: React.FormEvent) {
     e.preventDefault();
     setPaymentError("");

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       sourceId, total: clientTotal, basePrice: clientBase, quantity,
       tournamentId, tournamentName,
       orgName, coachName, coachEmail, coachPhone,
-      division, players, notes,
+      division, players, notes, schedulingRequests,
       voucherCode,
     } = await req.json();
 
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 
-    // ── Charge via Square (skip when free) ──────────────────────────────────
+    // ── Charge via Square (skip when free) ─────────────────────────────
     let paymentId: string | undefined;
     if (sourceId !== "FREE" && total > 0) {
       const sqRes = await fetch(`${SQ_BASE}/payments`, {
@@ -76,33 +76,33 @@ export async function POST(req: NextRequest) {
       paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
     }
 
-    // ── Redeem voucher ───────────────────────────────────────────────────────
+    // ── Redeem voucher ────────────────────────────────────────────
     if (voucherCode && voucherApplied) {
       try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
     }
 
-    // ── Save registration to tournament-register API ─────────────────────────
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/api/tournament-register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tournamentId, orgName, coachName, coachEmail, coachPhone, division, players, notes }),
-      });
-    } catch { /* non-fatal — payment succeeded, log anyway */ }
-
-    // ── Save contact ─────────────────────────────────────────────────────────
+    // ── Save contact ────────────────────────────────────────────────────
+    // (Previously this also fired a self-fetch to /api/tournament-register, which is
+    // fragile in serverless environments and was silently failing — meaning the only
+    // contact actually saved was this one, and it was missing tournamentName/teamName/
+    // division as structured fields. Fixed by populating them directly below and
+    // dropping the redundant self-fetch call entirely.)
     try {
       await saveContact({
-        name:   coachName || orgName,
-        email:  coachEmail || "noemail@noemail.com",
-        phone:  coachPhone || "",
-        source: "tournament",
-        notes:  `Tournament: ${tournamentName} | Team: ${orgName} | Division: ${division} | ${quantity} team(s) | $${total.toFixed(2)} | Square: ${paymentId ?? "n/a"}`,
+        name:               coachName || orgName,
+        email:              coachEmail || "noemail@noemail.com",
+        phone:              coachPhone || "",
+        source:             "tournament",
+        tournamentName:     tournamentName || "",
+        teamName:           orgName || "",
+        division:           division || "",
+        schedulingRequests: schedulingRequests || "",
+        notes:              `Tournament: ${tournamentName} | Team: ${orgName} | Division: ${division} | ${quantity} team(s) | $${total.toFixed(2)} | Square: ${paymentId ?? "n/a"}`,
       });
     } catch { /* non-fatal */ }
 
-    // ── Send emails ───────────────────────────────────────────────────────────
-    try { await sendEmails({ tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, quantity, total, paymentId }); } catch (e) {
+    // ── Send emails ───────────────────────────────────────────────
+    try { await sendEmails({ tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, schedulingRequests, quantity, total, paymentId }); } catch (e) {
       console.error("Tournament email send failed:", e);
     }
 
@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
 async function sendEmails(data: {
   tournamentName: string; orgName: string; coachName: string; coachEmail: string;
   coachPhone: string; division: string; players: string; notes: string;
+  schedulingRequests?: string;
   quantity: number; total: number; paymentId?: string;
 }) {
   const transporter = nodemailer.createTransport({
@@ -125,7 +126,7 @@ async function sendEmails(data: {
     auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 
-  const { tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, quantity, total, paymentId } = data;
+  const { tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, schedulingRequests, quantity, total, paymentId } = data;
 
   await Promise.allSettled([
     // Admin notification
@@ -148,6 +149,7 @@ async function sendEmails(data: {
           <p><strong>Email:</strong> ${coachEmail}</p>
           <p><strong>Phone:</strong> ${coachPhone || "—"}</p>
           ${players ? `<p><strong>Roster:</strong><br/>${players.replace(/\n/g, "<br/>")}</p>` : ""}
+          ${schedulingRequests ? `<p><strong>⚠️ Scheduling Requests:</strong> ${schedulingRequests}</p>` : ""}
           ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ""}
         </div>`,
     }),

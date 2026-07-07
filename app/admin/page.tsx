@@ -2810,7 +2810,7 @@ export default function AdminPage() {
         {tab === "vouchers"  && <VouchersTab  adminKey={adminKey} />}
         {tab === "filmroom"  && <FilmRoomTab  adminKey={adminKey} />}
         {tab === "camp"      && <CampTab      adminKey={adminKey} />}
-        {tab === "tourney"   && <TourneyTab contacts={contacts} tournaments={tournaments} />}
+        {tab === "tourney"   && <TourneyTab contacts={contacts} tournaments={tournaments} adminKey={adminKey} />}
         {tab === "pages"     && <PagesTab     adminKey={adminKey} />}
       </div>
     </main>

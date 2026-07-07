@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type {
   Tournament, Division, Pool, PoolGame, BracketGame, Team,
   BracketFormat, TiebreakerMethod, VenueConfig
 } from "@/lib/tourney-types";
-import { getAllTournaments, saveTournament, deleteTournament as deleteT } from "@/lib/tourney-storage";
+import { getAllTournaments, saveTournament, deleteTournament as deleteT, setTourneyAdminKey, syncTournamentsFromServer } from "@/lib/tourney-storage";
 import { generateDivisionSchedule, courtToVenueName, buildUnscheduledPoolGames, buildTournamentDates, buildDayTimeSlots, autoScheduleGames, formatTime12 } from "@/lib/tourney-scheduler";
 import { calculateStandings } from "@/lib/tourney-standings";
 import { generateBracket, advanceBracketWinner } from "@/lib/tourney-bracket";
@@ -2073,12 +2073,22 @@ function TournamentDetail({ tournament: init, onBack, onUpdate, contacts }: {
 
 // ── MAIN EXPORT ───────────────────────────────────────────────────────────────
 
-export function TourneyTab({ contacts = [], tournaments = [] }: { contacts?: RegistrationContact[]; tournaments?: TournamentConfig[] }) {
+export function TourneyTab({ contacts = [], tournaments = [], adminKey = "" }: { contacts?: RegistrationContact[]; tournaments?: TournamentConfig[]; adminKey?: string }) {
   const [list, setList] = useState<Tournament[]>(() =>
     getAllTournaments().sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   );
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Tournament|null>(null);
+
+  // Pull the authoritative copy from the server on mount so a tournament saved from another
+  // browser/device (or from "yesterday") shows up here instead of appearing to be gone.
+  useEffect(() => {
+    setTourneyAdminKey(adminKey);
+    syncTournamentsFromServer().then(merged => {
+      setList(merged.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminKey]);
 
   function handleCreated(t: Tournament) { setList(p=>[t,...p]); setCreating(false); setSelected(t); }
   function handleDelete(id: string) {

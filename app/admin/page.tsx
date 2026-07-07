@@ -1963,6 +1963,31 @@ export default function AdminPage() {
     contacts.map(c => (c.grade || "").trim()).filter(Boolean)
   )].sort((a, b) => gradeNum(a) - gradeNum(b));
 
+  // Every distinct source actually present in the data that ISN'T one of the built-in options below —
+  // covers custom import labels (e.g. "2025-2026 Youth Registration") so they're filterable/deletable too.
+  const BUILT_IN_SOURCES = new Set(["2026 Youth Summer Camp", "tournament", "merch-order", "import", "tryout"]);
+  const customSources = [...new Set(
+    contacts.map(c => c.source).filter(s => s && !BUILT_IN_SOURCES.has(s) && !isCampSource(s))
+  )].sort();
+
+  async function deleteAllInSource(source: string) {
+    const count = contacts.filter(c => c.source === source).length;
+    if (count === 0) return;
+    if (!confirm(`Delete all ${count} contact(s) with source "${SOURCE_LABELS[source] || source}"? This can't be undone.`)) return;
+    const res = await fetch(`/api/admin/contacts?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "deleteBySource", source }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alert(`Deleted ${data.removed} contact(s).`);
+      setSourceFilter("all");
+      fetch(`/api/admin/contacts?key=${adminKey}`).then(r=>r.json()).then(d => { setContacts(Array.isArray(d) ? d : (d.contacts ?? [])); setContactsLoaded(true); });
+    } else {
+      alert(data.error || "Delete failed");
+    }
+  }
+
   const stats = {
     total:      contacts.length,
     reg:        contacts.filter(c=>c.source==="registration"||c.source.includes("Camp")||c.source.includes("Summer")).length,
@@ -2378,7 +2403,16 @@ export default function AdminPage() {
                   <option value="merch-order"  className="bg-gray-900">Merch Orders</option>
                   <option value="import"       className="bg-gray-900">Imports</option>
                   <option value="tryout"       className="bg-gray-900">Tryout Registrations</option>
+                  {customSources.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
                 </select>
+
+                {sourceFilter !== "all" && (
+                  <button onClick={() => deleteAllInSource(sourceFilter)}
+                    title="Delete every contact currently matching this Source filter"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600/10 border border-red-500/30 text-red-300 hover:bg-red-600/20 text-xs font-semibold transition-all">
+                    <Trash2 className="w-3.5 h-3.5" /> Delete All in Source
+                  </button>
+                )}
 
                 {tournamentNames.length > 0 && (
                   <select value={tournFilter} onChange={e => setTournFilter(e.target.value)}

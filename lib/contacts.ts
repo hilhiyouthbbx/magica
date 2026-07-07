@@ -65,8 +65,11 @@ export interface Contact {
   tournamentName?:     string;
   teamName?:           string;
   division?:           string;
-  /** Free-text scheduling constraints the team requested at registration (e.g. "can't play before 10am Sat, no games same time as Portland Hawks"). */
+  /** Free-text scheduling notes the team added at registration (anything not covered by the structured fields below). */
   schedulingRequests?: string;
+  /** Structured scheduling constraints — enforced automatically by the Scheduler's conflict checker. */
+  noPlayBefore?: string; // "HH:MM" — team cannot be scheduled before this time
+  noPlayAfter?:  string; // "HH:MM" — team cannot be scheduled after this time
 }
 
 // ── Read all contacts ────────────────────────────────────────

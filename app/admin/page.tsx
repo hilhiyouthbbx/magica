@@ -25,6 +25,7 @@ interface Contact {
   source: string; notes?: string;
   tournamentName?: string; teamName?: string; division?: string;
   schedulingRequests?: string; noPlayBefore?: string; noPlayAfter?: string; noOverlapWithTeam?: string;
+  nextSeasonSchool?: string; address?: string; boundarySchool?: string; inHillsboroBoundary?: string;
   date: string;
   // Camper info
   camperName?: string; grade?: string; gender?: string;
@@ -2133,6 +2134,7 @@ export default function AdminPage() {
         {editingContact && (() => {
           const isCamp = isCampSource(editingContact.source);
           const isTourn = editingContact.source === "tournament";
+          const isTryout = editingContact.source === "tryout";
           function ef(label: string, key: keyof Contact, ph = "") {
             return (
               <div key={key}>
@@ -2273,8 +2275,41 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  {/* ── Tryout fields ── */}
+                  {isTryout && (
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Tryout Registration</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {ef("Player Name", "camperName")}
+                        {ef("Grade (2026-27 Season)", "grade")}
+                        {ef("School Attending Next Season", "nextSeasonSchool", "e.g. Hillsboro High School")}
+                        {ef("Home Address", "address", "123 SE Example St, Hillsboro, OR 97123")}
+                      </div>
+                      <div className="mt-3">
+                        <label className="block text-gray-400 text-xs font-semibold mb-1">Attendance Boundary Check Result</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600"
+                            placeholder="e.g. Hillsboro HS"
+                            value={(editPatch.boundarySchool ?? editingContact.boundarySchool ?? "") as string}
+                            onChange={e => setEditPatch(p => ({ ...p, boundarySchool: e.target.value }))}
+                          />
+                          <select
+                            className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                            value={(editPatch.inHillsboroBoundary ?? editingContact.inHillsboroBoundary ?? "unknown") as string}
+                            onChange={e => setEditPatch(p => ({ ...p, inHillsboroBoundary: e.target.value }))}
+                          >
+                            <option value="unknown">Not checked</option>
+                            <option value="yes">✅ In Hillsboro boundary</option>
+                            <option value="no">⚠️ Not in Hillsboro boundary</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* ── Merch / other quick fields ── */}
-                  {!isTourn && !isCamp && (
+                  {!isTourn && !isCamp && !isTryout && (
                     <div>
                       <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Details</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

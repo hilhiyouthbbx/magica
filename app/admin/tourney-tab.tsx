@@ -78,8 +78,23 @@ function matchingRegs(contacts: RegistrationContact[], tournamentName: string): 
   );
 }
 function teamImported(tournament: Tournament, teamName: string, divisionName: string): boolean {
-  const div = tournament.divisions.find(d => d.name.toLowerCase() === divisionName.toLowerCase());
-  return !!div?.teams.some(t => t.name.toLowerCase() === teamName.toLowerCase().trim());
+  const targetName = teamName.toLowerCase().trim();
+  const targetDiv   = (divisionName || "").toLowerCase().trim();
+
+  // The public registration page builds its own "division" label (Grade/Gender + Team Type)
+  // independently of the exact division names typed into the Tournament Manager, so an exact
+  // string match here is too strict and can permanently mark an already-imported team as
+  // "not imported" (offering to duplicate it). Match fuzzily the same way the rest of this file
+  // already does for filling divisions from registrations.
+  const div = tournament.divisions.find(d => {
+    const dn = d.name.toLowerCase().trim();
+    return dn === targetDiv || (targetDiv && (dn.includes(targetDiv) || targetDiv.includes(dn)));
+  });
+  if (div) return div.teams.some(t => t.name.toLowerCase().trim() === targetName);
+
+  // No division matched at all — fall back to checking the whole tournament for a team with
+  // this exact name, so a real division-name mismatch doesn't cause a false "not imported".
+  return tournament.divisions.some(d => d.teams.some(t => t.name.toLowerCase().trim() === targetName));
 }
 
 function Btn({ children, onClick, className = "", disabled = false, type: t = "button" }: {
@@ -330,13 +345,23 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
     const t: Tournament = JSON.parse(JSON.stringify(tournament));
     toImport.forEach(c => {
       const divName = c.division?.trim() || "";
-      let div = t.divisions.find(d => d.name.toLowerCase() === divName.toLowerCase());
+      const targetDivLower = divName.toLowerCase();
+      // Fuzzy-match the division the same way teamImported() does — the public registration
+      // page's division label doesn't always exactly match what was typed into the Tournament
+      // Manager, so a strict match here was creating brand-new duplicate divisions/teams instead
+      // of recognizing the team already belonged to an existing one.
+      let div = t.divisions.find(d => {
+        const dn = d.name.toLowerCase().trim();
+        return dn === targetDivLower || (targetDivLower && (dn.includes(targetDivLower) || targetDivLower.includes(dn)));
+      });
       if (!div) {
         // Category didn't exist yet on this bracket — create it so the team still lands in its own division.
         div = { id: makeId(), name: divName || "Unassigned", teams: [], pools: [], games: [], bracket: [], losersBracket: [], bracketGenerated: false };
         t.divisions.push(div);
       }
-      if (div.teams.some(team => team.name.toLowerCase() === c.teamName!.toLowerCase().trim())) return;
+      // Skip if this team already exists ANYWHERE in the tournament — not just in this one division —
+      // so it never gets duplicated into a second division/category.
+      if (t.divisions.some(d => d.teams.some(team => team.name.toLowerCase().trim() === c.teamName!.toLowerCase().trim()))) return;
       const team = {
         id: makeId(), name: c.teamName!.trim(), coachName: c.name,
         schedulingRequests: c.schedulingRequests || undefined,

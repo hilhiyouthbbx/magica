@@ -39,6 +39,7 @@ export default function JoinPage() {
   const [loading,      setLoading]        = useState(false);
   const [success,      setSuccess]        = useState(false);
   const [error,        setError]          = useState("");
+  const [website,      setWebsite]        = useState(""); // honeypot — real users never see or fill this
 
   function addPlayer() {
     setPlayers(p => [...p, { firstName: "", lastName: "", grade: "" }]);
@@ -69,7 +70,7 @@ export default function JoinPage() {
       const res = await fetch("/api/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guardianName, email, phone, players, howHeard }),
+        body: JSON.stringify({ guardianName, email, phone, players, howHeard, website }),
       });
       if (!res.ok) throw new Error("Failed");
       setSuccess(true);
@@ -198,6 +199,12 @@ export default function JoinPage() {
                       placeholder="503-555-0100"
                       className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors" />
                   </div>
+                </div>
+                {/* Honeypot — hidden from real users via CSS + off-screen positioning; bots that auto-fill every field will trip it */}
+                <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", overflow: "hidden" }}>
+                  <label htmlFor="website">Website</label>
+                  <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off"
+                    value={website} onChange={e => setWebsite(e.target.value)} />
                 </div>
               </div>
             </div>

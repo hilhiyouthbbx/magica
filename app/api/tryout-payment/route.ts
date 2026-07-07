@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const {
       sourceId, total: clientTotal, basePrice: clientBase, quantity,
       parentName, email, phone,
-      playerName, grade, session,
+      playerName, grade,
       nextSeasonSchool, address, boundarySchool, inHillsboroBoundary,
       uniformSize, waiverSigned, waiverName,
       voucherCode,
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
           amount_money:    { amount: Math.round(total * 100), currency: "USD" },
           location_id:     process.env.SQUARE_LOCATION_ID,
           buyer_email_address: email,
-          note: `Tryout Reg — ${playerName || ""} | ${grade || ""} | ${session || ""}`,
+          note: `Tryout Reg — ${playerName || ""} | ${grade || ""}`,
         }),
       });
       const sqData = await sqRes.json();
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       boundarySchool: boundarySchool || "",
       inHillsboroBoundary: inHillsboroBoundary || "unknown",
       shirtSize: uniformSize || "",
-      notes:  `Player: ${playerName} | Grade: ${grade} | Session: ${session} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
+      notes:  `Player: ${playerName} | Grade: ${grade} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
     });
 
     return NextResponse.json({ success: true, paymentId });

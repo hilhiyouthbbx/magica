@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import {
   MapPin, Clock, Calendar, Users, ChevronRight,
   CheckCircle, Loader2, Share2, Facebook, Twitter, Linkedin,
-  AlertCircle, Lock, Check, FileText,
+  AlertCircle, Lock, Check, FileText, Download,
 } from "lucide-react";
 import type { SiteContent } from "@/lib/content";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
@@ -80,7 +80,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [phone,       setPhone]      = useState("");
   const [playerName,  setPlayerName] = useState("");
   const [grade,       setGrade]      = useState("");
-  const [session,     setSession]    = useState("");
   const [nextSeasonSchool, setNextSeasonSchool] = useState("");
   const [address,     setAddress]    = useState("");
   const [uniformSize, setUniformSize] = useState("");
@@ -127,7 +126,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const sqRef     = useRef<any>(null);
 
   const grades = ["3rd Grade","4th Grade","5th Grade","6th Grade","7th Grade","8th Grade"];
-  const sessionLabels = t.sessions.map(s => `${s.label} · ${s.time}`);
 
   // Init Square when on pay step
   useEffect(() => {
@@ -201,7 +199,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
           basePrice:   t.price * qty,
           quantity:    qty,
           parentName, email, phone,
-          playerName, grade, session,
+          playerName, grade,
           nextSeasonSchool, address, uniformSize,
           waiverSigned, waiverName,
           boundarySchool: boundaryResult?.schoolName ?? "",
@@ -416,7 +414,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   <SF label="Grade (2026-27 Season)" value={grade}      onChange={setGrade}      options={grades} req />
                   <IF label="School Attending Next Season" value={nextSeasonSchool} onChange={setNextSeasonSchool} ph="e.g. Hillsboro High School" req />
                   <SF label="Jersey / Uniform Size" value={uniformSize} onChange={setUniformSize} options={UNIFORM_SIZES} req />
-                  <SF label="Preferred Tryout Session" value={session}  onChange={setSession}    options={sessionLabels} req />
 
                   {/* Home address + Hillsboro HS attendance-boundary check */}
                   <div>
@@ -461,6 +458,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <p className="mb-2"><strong className="text-gray-300">3. MEDICAL AUTHORIZATION:</strong> In case of emergency, I authorize staff to obtain medical treatment for my child if I cannot be reached. I accept financial responsibility for any medical costs incurred.</p>
                       <p><strong className="text-gray-300">4. CODE OF CONDUCT:</strong> I agree that my child will follow all program rules and that disruptive behavior may result in dismissal from tryouts or the season without refund.</p>
                     </div>
+
+                    <a href="https://galaxy-prod.tlcdn.com/view/user_34cYMUBillHvO8MzqYYaa9tzVg5/12d5f89055d8493aae89976ca36404d8.pdf"
+                      target="_blank" rel="noopener noreferrer" download="Hilhi-Parents-Players-Code-of-Conduct.pdf"
+                      className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-xs font-semibold mb-4 transition-colors">
+                      <Download className="w-3.5 h-3.5" /> Download Parents &amp; Players Code of Conduct (PDF)
+                    </a>
 
                     <label className="flex items-start gap-3 cursor-pointer group mb-4">
                       <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${waiverSigned ? "bg-blue-600 border-blue-600" : "border-white/30 group-hover:border-blue-500"}`}

@@ -1239,7 +1239,10 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
   }
   function entryTeamId(g: PoolGame, slot: "team1Id"|"team2Id") { return g[slot]; }
 
-  /** Drop a team (dragged from the roster, or from another game's slot) into an empty/occupied game slot. */
+  /** Drop a team (dragged from the roster, or from another game's slot) into an empty/occupied game slot.
+   *  This COPIES the team in — dragging a team out of one game to fill another slot leaves them in
+   *  their original game too (e.g. so a team can pick up an extra/overage game without losing their
+   *  regular one). Use the ✕ button on a slot if you actually want to remove a team from a game. */
   function dropTeamIntoSlot(divIdx: number, gameIdx: number, slot: "team1Id"|"team2Id", e: React.DragEvent) {
     e.preventDefault(); e.stopPropagation();
     setTeamSlotDragOver(null);
@@ -1256,13 +1259,6 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     const otherSlot = slot === "team1Id" ? "team2Id" : "team1Id";
     if (g[otherSlot] === data.teamId) { alert("A team can't play itself."); return; }
 
-    // If dragging from another game's slot, clear that original slot (this is a move, not a copy).
-    if (data.fromGame) {
-      const src = t.divisions[data.fromGame.divIdx].games[data.fromGame.gameIdx];
-      if (!(data.fromGame.divIdx === divIdx && data.fromGame.gameIdx === gameIdx && data.fromGame.slot === slot)) {
-        src[data.fromGame.slot] = "";
-      }
-    }
     g[slot] = data.teamId;
     t.updatedAt = new Date().toISOString();
     onUpdate(t);
@@ -1307,7 +1303,7 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
               onDragLeave={()=>setTeamSlotDragOver(k=>k===slotKey(slot)?null:k)}
               onDrop={e=>dropTeamIntoSlot(divIdx, gameIdx, slot, e)}
               className={`flex items-center justify-between gap-1 rounded-lg px-1 -mx-1 transition-colors ${isDragOver ? "bg-blue-500/20 ring-1 ring-blue-500/60" : ""}`}
-              title="Drop a team here (drag from the Teams tab, or drag a team from another game slot) to assign or swap it in."
+              title="Drop a team here (drag from another game's slot) to assign them to this extra game — they'll stay in their original game too."
             >
               <label className="flex items-center gap-1 flex-1 min-w-0 cursor-pointer">
                 <input type="checkbox" checked={excluded.has(teamId)} disabled={!teamId} onChange={()=>toggleExcludeTeam(divIdx,gameIdx,teamId)} className="w-3 h-3 accent-yellow-500 flex-shrink-0"
@@ -1316,7 +1312,7 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
                   <span draggable
                     onDragStart={e=>{ e.stopPropagation(); e.dataTransfer.setData("text/plain", JSON.stringify({ teamId, fromGame: { divIdx, gameIdx, slot } })); }}
                     className={`font-bold text-xs truncate cursor-grab active:cursor-grabbing ${excluded.has(teamId) ? "text-yellow-500/70 line-through" : winning ? "text-white" : "text-gray-300"}`}
-                    title="Drag this team onto another game's slot to move/swap it there.">
+                    title="Drag this team onto another game's slot to add them there too (they stay in this game as well) — use the ✕ if you want to remove them from a game instead.">
                     {name}
                   </span>
                 )}

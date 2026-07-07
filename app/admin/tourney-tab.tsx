@@ -987,8 +987,19 @@ function conflictKey(divIdx: number, gameIdx: number) { return `${divIdx}-${game
  * different teams (common when one coach runs multiple teams). Coach conflicts apply even
  * across different courts and different divisions, since a coach can only be on one court.
  */
-function computeScheduleConflicts(tournament: Tournament): Set<string> {
-  type Entry = { divIdx: number; gameIdx: number; teamIds: string[]; coachNames: string[] };
+function fmtConflictDay(day: string): string {
+  if (!day) return "";
+  return new Date(day + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + " ";
+}
+
+/**
+ * Find every team/coach double-booking across the WHOLE tournament (every division, not just
+ * the one currently shown in the filter) — this is what catches a coach running teams in two
+ * different divisions. Returns both a highlight Set (for bordering game cards) and a plain-English
+ * list of exactly which games/teams/times collide, so it's visible even when filtered to one division.
+ */
+function computeScheduleConflicts(tournament: Tournament): { keys: Set<string>; details: string[] } {
+  type Entry = { divIdx: number; gameIdx: number; divName: string; team1: string; team2: string; teamIds: string[]; coachNames: string[] };
   const byDayTime = new Map<string, Entry[]>();
   tournament.divisions.forEach((d, divIdx) => {
     const teamById = new Map(d.teams.map(t => [t.id, t]));
@@ -999,27 +1010,48 @@ function computeScheduleConflicts(tournament: Tournament): Set<string> {
       const coachNames = [g.team1Id, g.team2Id]
         .map(id => teamById.get(id)?.coachName?.trim().toLowerCase())
         .filter((c): c is string => !!c);
-      arr.push({ divIdx, gameIdx, teamIds: [g.team1Id, g.team2Id], coachNames });
+      arr.push({
+        divIdx, gameIdx, divName: d.name,
+        team1: teamById.get(g.team1Id)?.name ?? "?", team2: teamById.get(g.team2Id)?.name ?? "?",
+        teamIds: [g.team1Id, g.team2Id], coachNames,
+      });
       byDayTime.set(key, arr);
     });
   });
-  const conflicts = new Set<string>();
-  for (const entries of byDayTime.values()) {
-    const seenTeam = new Map<string, string>();
-    const seenCoach = new Map<string, string>();
+
+  const keys = new Set<string>();
+  const details: string[] = [];
+
+  for (const [dayTimeKey, entries] of byDayTime.entries()) {
+    const [day, time] = dayTimeKey.split("|");
+    const whenLabel = `${fmtConflictDay(day)}${formatTime12(time)}`;
+    const seenTeam = new Map<string, Entry>();
+    const seenCoach = new Map<string, Entry>();
     for (const e of entries) {
       const k = conflictKey(e.divIdx, e.gameIdx);
       for (const teamId of e.teamIds) {
-        if (seenTeam.has(teamId)) { conflicts.add(k); conflicts.add(seenTeam.get(teamId)!); }
-        else seenTeam.set(teamId, k);
+        const teamName = teamId === (e.teamIds[0]) ? e.team1 : e.team2;
+        const prior = seenTeam.get(teamId);
+        if (prior) {
+          keys.add(k); keys.add(conflictKey(prior.divIdx, prior.gameIdx));
+          details.push(`⏰ ${whenLabel} — ${teamName} is scheduled for two games at once (${prior.divName}: ${prior.team1} vs ${prior.team2} · ${e.divName}: ${e.team1} vs ${e.team2})`);
+        } else {
+          seenTeam.set(teamId, e);
+        }
       }
       for (const coach of e.coachNames) {
-        if (seenCoach.has(coach)) { conflicts.add(k); conflicts.add(seenCoach.get(coach)!); }
-        else seenCoach.set(coach, k);
+        const prior = seenCoach.get(coach);
+        if (prior) {
+          keys.add(k); keys.add(conflictKey(prior.divIdx, prior.gameIdx));
+          details.push(`⏰ ${whenLabel} — coach is double-booked across divisions: ${prior.divName} (${prior.team1} vs ${prior.team2}) and ${e.divName} (${e.team1} vs ${e.team2})`);
+        } else {
+          seenCoach.set(coach, e);
+        }
       }
     }
   }
-  return conflicts;
+
+  return { keys, details };
 }
 
 /** Games scheduled outside a team's requested "can't play before/after" window. */
@@ -1069,7 +1101,7 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
 
   const guarantee = tournament.gamesGuaranteed || 3;
   const overage = computeGameOverage(tournament);
-  const conflicts = computeScheduleConflicts(tournament);
+  const { keys: conflicts, details: conflictDetails } = computeScheduleConflicts(tournament);
   const timeViolations = computeTimeViolations(tournament);
   const timeViolationKeys = new Set(timeViolations.map(v => conflictKey(v.divIdx, v.gameIdx)));
   const courts = totalCourts(tournament.venues ?? []);
@@ -1120,6 +1152,17 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     if (!confirm("Delete this game? This can't be undone.")) return;
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
     t.divisions[divIdx].games.splice(gameIdx, 1);
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  /** Delete every game scheduled at this exact day+time across ALL divisions/courts — a full reset for that slot. */
+  function deleteGamesAtSlot(day: string, time: string) {
+    const count = tournament.divisions.reduce((n, d) => n + d.games.filter(g => g.time === time && (g.date || "") === day).length, 0);
+    if (count === 0) return;
+    if (!confirm(`Delete all ${count} game${count!==1?"s":""} scheduled at ${formatTime12(time)}${day?` on ${fmtConflictDay(day)}`:""}? This can't be undone.`)) return;
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    t.divisions.forEach(d => { d.games = d.games.filter(g => !(g.time === time && (g.date || "") === day)); });
     t.updatedAt = new Date().toISOString();
     onUpdate(t);
   }
@@ -1222,10 +1265,16 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
         </select>
       )}
 
-      <div className={`rounded-xl px-4 py-3 text-sm font-bold border ${conflicts.size>0?"bg-red-500/10 border-red-500/30 text-red-300":"bg-green-500/10 border-green-500/30 text-green-300"}`}>
-        {conflicts.size>0
-          ? `⚠️ ${conflicts.size} game${conflicts.size!==1?"s":""} have a team or coach double-booked at the same time (same coach running two teams counts, even on a different court). Drag a game to an open slot to fix it.`
-          : "✓ Schedule looks good — no team or coach is double-booked."}
+      <div className={`rounded-xl px-4 py-3 text-sm border ${conflicts.size>0?"bg-red-500/10 border-red-500/30 text-red-300":"bg-green-500/10 border-green-500/30 text-green-300"}`}>
+        {conflicts.size>0 ? (
+          <>
+            <p className="font-bold mb-1">⚠️ {conflictDetails.length} scheduling conflict{conflictDetails.length!==1?"s":""} found — including across other categories (e.g. one coach running two teams in different divisions):</p>
+            <ul className="text-xs space-y-1">
+              {conflictDetails.map((msg,i) => <li key={i}>{msg}</li>)}
+            </ul>
+            <p className="text-xs mt-1.5 text-red-400/70">Drag a game to an open slot to fix it, or use the clear-time buttons below to reset a slot and start over.</p>
+          </>
+        ) : "✓ Schedule looks good — no team or coach is double-booked."}
       </div>
 
       {timeViolations.length > 0 && (
@@ -1295,7 +1344,13 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
                   {slots.map(slot => (
                     <tr key={slot}>
                       <td className="align-top text-xs text-gray-500 font-bold pt-3 whitespace-nowrap">
-                        <Clock className="w-3.5 h-3.5 inline mr-1 text-gray-600"/>{formatTime12(slot)}
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-gray-600"/>{formatTime12(slot)}
+                          <button onClick={()=>deleteGamesAtSlot(day, slot)} title="Delete all games at this time — start this slot over"
+                            className="text-gray-700 hover:text-red-400 transition-colors">
+                            <Trash2 className="w-3 h-3"/>
+                          </button>
+                        </div>
                       </td>
                       {courtNums.map(court => {
                         const entry = gameAt(day, slot, court);

@@ -18,7 +18,7 @@ export interface RegistrationContact {
   id: string; name: string; email: string; phone: string;
   source: string;
   tournamentName?: string; teamName?: string; division?: string;
-  schedulingRequests?: string;
+  schedulingRequests?: string; noPlayBefore?: string; noPlayAfter?: string;
   date: string;
 }
 
@@ -337,7 +337,12 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
         t.divisions.push(div);
       }
       if (div.teams.some(team => team.name.toLowerCase() === c.teamName!.toLowerCase().trim())) return;
-      const team = { id: makeId(), name: c.teamName!.trim(), coachName: c.name, schedulingRequests: c.schedulingRequests || undefined };
+      const team = {
+        id: makeId(), name: c.teamName!.trim(), coachName: c.name,
+        schedulingRequests: c.schedulingRequests || undefined,
+        noPlayBefore: c.noPlayBefore || undefined,
+        noPlayAfter:  c.noPlayAfter || undefined,
+      };
       div.teams.push(team);
       // Auto-place the team into its category's pool so it's ready for pool-game generation immediately.
       if (div.pools.length === 0) div.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
@@ -976,34 +981,67 @@ function ScoreDialog({ game, teamA, teamB, onSave, onClose }: {
 
 function conflictKey(divIdx: number, gameIdx: number) { return `${divIdx}-${gameIdx}`; }
 
-/** Find which games (by divIdx/gameIdx) have a team double-booked at the same day+time slot. */
+/**
+ * Find which games (by divIdx/gameIdx) conflict at the same day+time slot — either because
+ * the same TEAM is double-booked, or because the same COACH is double-booked across two
+ * different teams (common when one coach runs multiple teams). Coach conflicts apply even
+ * across different courts and different divisions, since a coach can only be on one court.
+ */
 function computeScheduleConflicts(tournament: Tournament): Set<string> {
-  const byDayTime = new Map<string, { divIdx: number; gameIdx: number; teamIds: string[] }[]>();
+  type Entry = { divIdx: number; gameIdx: number; teamIds: string[]; coachNames: string[] };
+  const byDayTime = new Map<string, Entry[]>();
   tournament.divisions.forEach((d, divIdx) => {
+    const teamById = new Map(d.teams.map(t => [t.id, t]));
     d.games.forEach((g, gameIdx) => {
       if (!g.time) return; // unscheduled — can't conflict
       const key = `${g.date || ""}|${g.time}`;
       const arr = byDayTime.get(key) ?? [];
-      arr.push({ divIdx, gameIdx, teamIds: [g.team1Id, g.team2Id] });
+      const coachNames = [g.team1Id, g.team2Id]
+        .map(id => teamById.get(id)?.coachName?.trim().toLowerCase())
+        .filter((c): c is string => !!c);
+      arr.push({ divIdx, gameIdx, teamIds: [g.team1Id, g.team2Id], coachNames });
       byDayTime.set(key, arr);
     });
   });
   const conflicts = new Set<string>();
   for (const entries of byDayTime.values()) {
-    const seen = new Map<string, string>();
+    const seenTeam = new Map<string, string>();
+    const seenCoach = new Map<string, string>();
     for (const e of entries) {
       const k = conflictKey(e.divIdx, e.gameIdx);
       for (const teamId of e.teamIds) {
-        if (seen.has(teamId)) {
-          conflicts.add(k);
-          conflicts.add(seen.get(teamId)!);
-        } else {
-          seen.set(teamId, k);
-        }
+        if (seenTeam.has(teamId)) { conflicts.add(k); conflicts.add(seenTeam.get(teamId)!); }
+        else seenTeam.set(teamId, k);
+      }
+      for (const coach of e.coachNames) {
+        if (seenCoach.has(coach)) { conflicts.add(k); conflicts.add(seenCoach.get(coach)!); }
+        else seenCoach.set(coach, k);
       }
     }
   }
   return conflicts;
+}
+
+/** Games scheduled outside a team's requested "can't play before/after" window. */
+function computeTimeViolations(tournament: Tournament): { divIdx: number; gameIdx: number; message: string }[] {
+  const violations: { divIdx: number; gameIdx: number; message: string }[] = [];
+  tournament.divisions.forEach((d, divIdx) => {
+    const teamById = new Map(d.teams.map(t => [t.id, t]));
+    d.games.forEach((g, gameIdx) => {
+      if (!g.time) return;
+      [g.team1Id, g.team2Id].forEach(teamId => {
+        const team = teamById.get(teamId);
+        if (!team) return;
+        if (team.noPlayBefore && g.time < team.noPlayBefore) {
+          violations.push({ divIdx, gameIdx, message: `${team.name} can't play before ${team.noPlayBefore} (scheduled ${g.time})` });
+        }
+        if (team.noPlayAfter && g.time > team.noPlayAfter) {
+          violations.push({ divIdx, gameIdx, message: `${team.name} can't play after ${team.noPlayAfter} (scheduled ${g.time})` });
+        }
+      });
+    });
+  });
+  return violations;
 }
 
 /** Teams playing more games than the tournament's guarantee — surfaced as a warning. */
@@ -1032,6 +1070,8 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
   const guarantee = tournament.gamesGuaranteed || 3;
   const overage = computeGameOverage(tournament);
   const conflicts = computeScheduleConflicts(tournament);
+  const timeViolations = computeTimeViolations(tournament);
+  const timeViolationKeys = new Set(timeViolations.map(v => conflictKey(v.divIdx, v.gameIdx)));
   const courts = totalCourts(tournament.venues ?? []);
   const courtNums = Array.from({length: Math.max(courts,1)}, (_,i)=>i+1);
   const multiVenue = (tournament.venues?.length ?? 0) > 1;
@@ -1118,17 +1158,19 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     const t2 = getTeamName(tournament, game.team2Id);
     const done = game.status==="completed";
     const poolName = tournament.divisions[divIdx].pools.find(p=>p.id===game.poolId)?.name ?? "";
+    const timeViolated = timeViolationKeys.has(conflictKey(divIdx, gameIdx));
     return (
       <div
         draggable
         onDragStart={e=>e.dataTransfer.setData("text/plain", JSON.stringify({divIdx,gameIdx}))}
         className={`glass border rounded-xl p-3 cursor-grab active:cursor-grabbing transition-colors ${
-          conflicted ? "border-red-500/60 bg-red-500/5" : isOver ? "border-blue-500/60" : game.excludeFromStandings ? "border-yellow-500/30 opacity-70" : "border-white/10 hover:border-white/20"
+          conflicted ? "border-red-500/60 bg-red-500/5" : timeViolated ? "border-orange-500/60 bg-orange-500/5" : isOver ? "border-blue-500/60" : game.excludeFromStandings ? "border-yellow-500/30 opacity-70" : "border-white/10 hover:border-white/20"
         }`}
       >
         <div className="flex items-center gap-2 text-[11px] text-gray-600 mb-1 truncate">
           <span>{divName}</span>{poolName&&<><span>·</span><span>{poolName}</span></>}
           {game.excludeFromStandings && <span className="text-yellow-500 font-bold">· doesn't count</span>}
+          {timeViolated && <span className="text-orange-400 font-bold">· ⏰ time conflict</span>}
         </div>
         <div className="flex items-center justify-between gap-1">
           <span className={`font-bold text-xs truncate ${done&&game.score1!>game.score2!?"text-white":"text-gray-300"}`}>{t1}</span>
@@ -1166,9 +1208,18 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
 
       <div className={`rounded-xl px-4 py-3 text-sm font-bold border ${conflicts.size>0?"bg-red-500/10 border-red-500/30 text-red-300":"bg-green-500/10 border-green-500/30 text-green-300"}`}>
         {conflicts.size>0
-          ? `⚠️ ${conflicts.size} game${conflicts.size!==1?"s":""} have a team double-booked at the same time. Drag a game to an open slot to fix it.`
-          : "✓ Schedule looks good — no team is double-booked."}
+          ? `⚠️ ${conflicts.size} game${conflicts.size!==1?"s":""} have a team or coach double-booked at the same time (same coach running two teams counts, even on a different court). Drag a game to an open slot to fix it.`
+          : "✓ Schedule looks good — no team or coach is double-booked."}
       </div>
+
+      {timeViolations.length > 0 && (
+        <div className="rounded-xl px-4 py-3 text-sm border bg-orange-500/10 border-orange-500/30 text-orange-300">
+          <p className="font-bold mb-1">⏰ {timeViolations.length} game{timeViolations.length!==1?"s":""} violate a team's scheduling request:</p>
+          <ul className="text-xs space-y-0.5">
+            {timeViolations.map((v,i) => <li key={i}>· {v.message}</li>)}
+          </ul>
+        </div>
+      )}
 
       {overage.length > 0 && (
         <div className="rounded-xl px-4 py-3 text-sm border bg-yellow-500/10 border-yellow-500/30 text-yellow-300">
@@ -1644,6 +1695,12 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
                   >
                     <div className="text-white font-bold text-xs truncate">{team.name}</div>
                     {team.coachName && <div className="text-gray-600 text-[10px] truncate">Coach {team.coachName}</div>}
+                    {(team.noPlayBefore || team.noPlayAfter) && (
+                      <div className="text-blue-300/90 text-[10px] mt-1 flex items-center gap-1">
+                        <span className="flex-shrink-0">⏰</span>
+                        <span>{team.noPlayBefore && `Not before ${team.noPlayBefore}`}{team.noPlayBefore && team.noPlayAfter && " · "}{team.noPlayAfter && `Not after ${team.noPlayAfter}`}</span>
+                      </div>
+                    )}
                     {team.schedulingRequests && (
                       <div className="text-yellow-400/90 text-[10px] mt-1 flex items-start gap-1">
                         <span className="flex-shrink-0">⚠️</span>

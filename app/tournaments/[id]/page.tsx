@@ -10,7 +10,7 @@ import { Footer } from "@/components/footer";
 import type { TournamentConfig } from "@/lib/tournament";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
-// ─── Square config ──────────────────────────────────────────────────────────────────
+// ─── Square config ────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
 const SQ_LOC_ID = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? "";
 const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
@@ -60,13 +60,16 @@ export default function TournamentDetailPage({ params }: Params) {
   const [teamType,    setTeamType]    = useState("");
   const division = [gradeGender, teamType].filter(Boolean).join(" ");
   const [players,    setPlayers]    = useState("");
+  const [scheduleConstraint, setScheduleConstraint] = useState(""); // "" | "before" | "after" | "both"
+  const [noPlayBefore, setNoPlayBefore] = useState("");
+  const [noPlayAfter,  setNoPlayAfter]  = useState("");
   const [schedulingRequests, setSchedulingRequests] = useState("");
   const [regNotes,   setRegNotes]   = useState("");
 
   // Multi-step: "form" | "pay"
   const [regStep, setRegStep] = useState<"form" | "pay">("form");
 
-  // ── Square state ────────────────────────────────────────────────────────────────
+  // ── Square state ──────────────────────────────────────────────────────────
   const sqCardRef                  = useRef<any>(null);
   const [cardLoading,  setCardLoading]  = useState(false);
   const [squareError,  setSquareError]  = useState("");
@@ -82,7 +85,7 @@ export default function TournamentDetailPage({ params }: Params) {
       .catch(() => { setNotFound(true); setLoading(false); });
   }, [id]);
 
-  // ── Init Square card when payment step is active ────────────────────────
+  // ── Init Square card when payment step is active ─────────────────────────
   useEffect(() => {
     if (regStep !== "pay" || !showForm) return;
     if ((appliedVoucher?.finalTotal ?? Infinity) === 0) return; // free — no card needed
@@ -160,7 +163,7 @@ export default function TournamentDetailPage({ params }: Params) {
     };
   }, [regStep, showForm, retryCount, appliedVoucher]);
 
-  // ── Advance to payment step ────────────────────────────────────────────────
+  // ── Advance to payment step ───────────────────────────────────────────────
   function handleFormNext(e: React.FormEvent) {
     e.preventDefault();
     setPaymentError("");
@@ -202,6 +205,8 @@ export default function TournamentDetailPage({ params }: Params) {
           coachPhone,
           division,
           players,
+          noPlayBefore: (scheduleConstraint === "before" || scheduleConstraint === "both") ? noPlayBefore : "",
+          noPlayAfter:  (scheduleConstraint === "after"  || scheduleConstraint === "both") ? noPlayAfter  : "",
           schedulingRequests,
           notes: regNotes,
           voucherCode:    appliedVoucher?.code ?? null,
@@ -498,8 +503,30 @@ export default function TournamentDetailPage({ params }: Params) {
                               className={inputCls + " resize-none"} />
                           </div>
                           <div>
-                            <label className="block text-gray-400 text-xs font-semibold mb-1">Scheduling Requests (optional)</label>
-                            <textarea rows={3} value={schedulingRequests} onChange={e => setSchedulingRequests(e.target.value)} placeholder="e.g. Can't play before 10am Saturday, no games after 6pm Sunday, can't play same time as Portland Hawks…"
+                            <label className="block text-gray-400 text-xs font-semibold mb-1">Scheduling Constraint (optional)</label>
+                            <select value={scheduleConstraint} onChange={e => setScheduleConstraint(e.target.value)} className={inputCls}>
+                              <option value="" className="bg-gray-900">No constraint</option>
+                              <option value="before" className="bg-gray-900">Can't play before a certain time</option>
+                              <option value="after" className="bg-gray-900">Can't play after a certain time</option>
+                              <option value="both" className="bg-gray-900">Can't play before AND after certain times</option>
+                            </select>
+                            {(scheduleConstraint === "before" || scheduleConstraint === "both") && (
+                              <div className="mt-2">
+                                <label className="block text-gray-500 text-xs mb-1">Earliest we can play</label>
+                                <input type="time" required value={noPlayBefore} onChange={e => setNoPlayBefore(e.target.value)} className={inputCls} />
+                              </div>
+                            )}
+                            {(scheduleConstraint === "after" || scheduleConstraint === "both") && (
+                              <div className="mt-2">
+                                <label className="block text-gray-500 text-xs mb-1">Latest we can play</label>
+                                <input type="time" required value={noPlayAfter} onChange={e => setNoPlayAfter(e.target.value)} className={inputCls} />
+                              </div>
+                            )}
+                            <p className="text-gray-600 text-[11px] mt-1">If your coach is also coaching another team in this tournament, we automatically avoid scheduling both teams at the same time — no need to request that separately.</p>
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 text-xs font-semibold mb-1">Anything Else? (optional)</label>
+                            <textarea rows={2} value={schedulingRequests} onChange={e => setSchedulingRequests(e.target.value)} placeholder="Any other scheduling note we should know about…"
                               className={inputCls + " resize-none"} />
                             <p className="text-gray-600 text-[11px] mt-1">We'll do our best to honor scheduling requests, but they can't always be guaranteed.</p>
                           </div>

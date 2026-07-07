@@ -23,7 +23,7 @@ interface Contact {
   id: string; name: string; email: string; phone: string;
   source: string; notes?: string;
   tournamentName?: string; teamName?: string; division?: string;
-  schedulingRequests?: string;
+  schedulingRequests?: string; noPlayBefore?: string; noPlayAfter?: string;
   date: string;
   // Camper info
   camperName?: string; grade?: string; gender?: string;
@@ -2165,12 +2165,30 @@ export default function AdminPage() {
                         {ef("Team Name", "teamName", "e.g. Portland Hawks")}
                         {ef("Division", "division", "e.g. 5th Grade Boys Competitive")}
                       </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <label className="block text-gray-400 text-xs font-semibold mb-1">Can&apos;t Play Before</label>
+                          <input type="time"
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                            value={(editPatch.noPlayBefore ?? editingContact.noPlayBefore ?? "") as string}
+                            onChange={e => setEditPatch(p => ({ ...p, noPlayBefore: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 text-xs font-semibold mb-1">Can&apos;t Play After</label>
+                          <input type="time"
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                            value={(editPatch.noPlayAfter ?? editingContact.noPlayAfter ?? "") as string}
+                            onChange={e => setEditPatch(p => ({ ...p, noPlayAfter: e.target.value }))}
+                          />
+                        </div>
+                      </div>
                       <div className="mt-3">
-                        <label className="block text-gray-400 text-xs font-semibold mb-1">Scheduling Requests</label>
+                        <label className="block text-gray-400 text-xs font-semibold mb-1">Other Scheduling Notes</label>
                         <textarea
                           rows={2}
                           className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600 resize-none"
-                          placeholder="e.g. Can't play before 10am Sat, no games same time as Portland Hawks"
+                          placeholder="e.g. no games same time as Portland Hawks (same coach)"
                           value={(editPatch.schedulingRequests ?? editingContact.schedulingRequests ?? "") as string}
                           onChange={e => setEditPatch(p => ({ ...p, schedulingRequests: e.target.value }))}
                         />

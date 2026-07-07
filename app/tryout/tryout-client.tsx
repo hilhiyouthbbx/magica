@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import {
   MapPin, Clock, Calendar, Users, ChevronRight,
   CheckCircle, Loader2, Share2, Facebook, Twitter, Linkedin,
-  AlertCircle, Lock, Check, FileText,
+  AlertCircle, Lock, Check, FileText, Download,
 } from "lucide-react";
 import type { SiteContent } from "@/lib/content";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
@@ -458,6 +458,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <p className="mb-2"><strong className="text-gray-300">3. MEDICAL AUTHORIZATION:</strong> In case of emergency, I authorize staff to obtain medical treatment for my child if I cannot be reached. I accept financial responsibility for any medical costs incurred.</p>
                       <p><strong className="text-gray-300">4. CODE OF CONDUCT:</strong> I agree that my child will follow all program rules and that disruptive behavior may result in dismissal from tryouts or the season without refund.</p>
                     </div>
+
+                    <a href="https://galaxy-prod.tlcdn.com/view/user_34cYMUBillHvO8MzqYYaa9tzVg5/12d5f89055d8493aae89976ca36404d8.pdf"
+                      target="_blank" rel="noopener noreferrer" download="Hilhi-Parents-Players-Code-of-Conduct.pdf"
+                      className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-xs font-semibold mb-4 transition-colors">
+                      <Download className="w-3.5 h-3.5" /> Download Parents &amp; Players Code of Conduct (PDF)
+                    </a>
 
                     <label className="flex items-start gap-3 cursor-pointer group mb-4">
                       <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${waiverSigned ? "bg-blue-600 border-blue-600" : "border-white/30 group-hover:border-blue-500"}`}

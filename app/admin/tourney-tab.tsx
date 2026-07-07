@@ -57,10 +57,12 @@ function formatDateRange(start: string, end: string): string {
   if (!sd) return "";
   if (!ed || start === end) return sd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const sameMonth = sd.getMonth() === ed.getMonth() && sd.getFullYear() === ed.getFullYear();
+  if (sameMonth) {
+    const monthName = sd.toLocaleDateString("en-US", { month: "short" });
+    return `${monthName} ${sd.getDate()}\u2013${ed.getDate()}, ${ed.getFullYear()}`;
+  }
   const startStr = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const endStr = sameMonth
-    ? ed.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })
-    : ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const endStr = ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return `${startStr}\u2013${endStr}`;
 }
 
@@ -782,9 +784,9 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
                         fmt.includes("double") ? "double" :
                         (fmt.includes("pool") || fmt.includes("none")) ? "none" : "single";
                       const gamesGuaranteed = parseInt(tc.gamesGuaranteed) || 3;
-                      const venues: VenueConfig[] = tc.venue?.trim()
-                        ? [{ name: tc.venue.trim(), courts: 2 }]
-                        : [{ name: "Main Gym", courts: 2 }];
+                      // Always keep the Main/Aux court default (Court 1 (Main), Court 2 (Main),
+                      // Court 3 (Aux)) — don't let the public page's single "venue" field override it.
+                      const venues: VenueConfig[] = [{ name: "Main", courts: 2 }, { name: "Aux", courts: 1 }];
                       const divisions: WizDiv[] = tc.divisions?.length > 0
                         ? tc.divisions.map(name => ({ name, pools: 2, teams: ["","","","","","","",""] }))
                         : [{ name: "", pools: 2, teams: ["","","","","","","",""] }];

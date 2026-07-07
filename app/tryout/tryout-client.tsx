@@ -236,7 +236,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   }
 
   // ── Thank you ─────────────────────────────────────────
-if (step === "done") {
+  if (step === "done") {
     return (
       <div className="min-h-screen flex items-center justify-center pt-24 px-4">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}

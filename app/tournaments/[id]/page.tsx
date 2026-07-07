@@ -363,40 +363,40 @@ export default function TournamentDetailPage({ params }: Params) {
             {/* About the Event */}
             <div className="glass rounded-2xl border border-white/10 p-6">
               <h2 className="text-white font-bold text-lg mb-4">About the Event</h2>
-              {t.description && <p className="text-gray-300 leading-relaxed mb-4">{t.description}</p>}
+              {t.description && <p className="text-gray-300 leading-relaxed mb-4 whitespace-pre-line">{t.description}</p>}
 
               <AnimatePresence>
                 {showMore && (
                   <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:"auto" }} exit={{ opacity:0, height:0 }} className="overflow-hidden">
-                    <div className="space-y-4 pt-2">
+                    <div className="space-y-5 pt-2">
                       {t.isStateQualifier && t.stateQualifierText && (
                         <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-xl p-4">
                           <div className="text-yellow-400 font-bold text-sm mb-1 flex items-center gap-1.5"><Star className="w-3.5 h-3.5 fill-current" /> State Qualifier Info</div>
-                          <p className="text-gray-300 text-sm leading-relaxed">{t.stateQualifierText}</p>
+                          <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">{t.stateQualifierText}</p>
                         </div>
                       )}
                       {t.accommodationsNote && (
                         <div>
                           <div className="text-white font-semibold text-sm mb-1">Accommodations</div>
-                          <p className="text-gray-400 text-sm leading-relaxed">{t.accommodationsNote}</p>
+                          <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">{t.accommodationsNote}</p>
                         </div>
                       )}
                       {t.refundPolicy && (
                         <div>
                           <div className="text-white font-semibold text-sm mb-1">Refund Policy</div>
-                          <p className="text-gray-400 text-sm leading-relaxed">{t.refundPolicy}</p>
+                          <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">{t.refundPolicy}</p>
                         </div>
                       )}
                       {t.rules && (
                         <div>
                           <div className="text-white font-semibold text-sm mb-1">Rules</div>
-                          <p className="text-gray-400 text-sm leading-relaxed">{t.rules}</p>
+                          <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">{t.rules}</p>
                         </div>
                       )}
                       {t.notes && (
                         <div>
                           <div className="text-white font-semibold text-sm mb-1">Additional Notes</div>
-                          <p className="text-gray-400 text-sm leading-relaxed">{t.notes}</p>
+                          <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">{t.notes}</p>
                         </div>
                       )}
                     </div>

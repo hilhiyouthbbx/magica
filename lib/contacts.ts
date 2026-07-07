@@ -72,6 +72,16 @@ export interface Contact {
   noPlayAfter?:  string; // "HH:MM" — team cannot be scheduled after this time
   /** Name of another team this team can't be scheduled at the same time as (e.g. shared players, same coach under a different registration name). */
   noOverlapWithTeam?: string;
+
+  // Tryout fields
+  /** School the player will attend for the upcoming season (may differ from their current school). */
+  nextSeasonSchool?: string;
+  /** Home address entered at tryout registration — used for the Hillsboro HS attendance-boundary check. */
+  address?: string;
+  /** Human-readable result of the automated attendance-boundary lookup (e.g. "Hillsboro HS" or "Not found"). */
+  boundarySchool?: string;
+  /** "yes" | "no" | "unknown" — whether the address falls inside the Hillsboro HS attendance boundary. */
+  inHillsboroBoundary?: string;
 }
 
 // ── Read all contacts ──────────────────────────────────────────────────────

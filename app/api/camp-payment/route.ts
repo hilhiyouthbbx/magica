@@ -5,6 +5,21 @@ import { campConfirmationHtml, campAdminNotificationHtml } from "@/lib/email";
 import { validateVoucher, redeemVoucher, calcDiscount } from "@/lib/vouchers";
 import { getContent } from "@/lib/content";
 
+/** Flags obvious bot-generated gibberish: a single token with no spaces that randomly
+ *  switches upper/lower case several times — real names/words don't look like this. */
+function looksLikeGibberish(str: string): boolean {
+  const s = (str || "").trim();
+  if (!s || s.includes(" ")) return false; // real names/words with spaces pass through
+  if (s.length < 10) return false;
+  let switches = 0;
+  for (let i = 1; i < s.length; i++) {
+    const prevUpper = s[i - 1] === s[i - 1].toUpperCase() && /[a-zA-Z]/.test(s[i - 1]);
+    const curUpper  = s[i] === s[i].toUpperCase() && /[a-zA-Z]/.test(s[i]);
+    if (/[a-zA-Z]/.test(s[i - 1]) && /[a-zA-Z]/.test(s[i]) && prevUpper !== curUpper) switches++;
+  }
+  return switches >= 3;
+}
+
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
     ? "https://connect.squareup.com/v2"
@@ -64,7 +79,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, paymentId: "SKIPPED" }); // pretend success, don't let bots learn it was blocked
     }
 
-    // ── Server-side voucher validation ──────────────────────────────
+    // — Anti-spam: a real camp order always has at least one camper and a non-fake guardian
+    //   name/phone. Bots were exploiting a $0 (0-camper) order to skip payment entirely and
+    //   land straight in contacts — close that off and reject obvious gibberish too.
+    if (!quantity || quantity < 1 || !Array.isArray(campers) || campers.length < 1) {
+      return NextResponse.json({ success: false, error: "Please add at least one camper." }, { status: 400 });
+    }
+    if (parentInfo?.phone && parentInfo.phone.trim() && !/\d/.test(parentInfo.phone)) {
+      return NextResponse.json({ success: false, error: "Please enter a valid phone number." }, { status: 400 });
+    }
+    if (
+      looksLikeGibberish(parentInfo?.guardianName) ||
+      (campers || []).some((c: Camper) => looksLikeGibberish(c.firstName) || looksLikeGibberish(c.lastName))
+    ) {
+      return NextResponse.json({ success: false, error: "Please enter valid names." }, { status: 400 });
+    }
+
+    // ── Server-side voucher validation ──────────────────────────────────────
     // Vouchers apply to BASE price only; fee is waived when a voucher is used
     const CAMP_BASE  = 150;
     const CAMP_FEE   = Math.round(CAMP_BASE * 0.03 * 100) / 100;
@@ -85,7 +116,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 
-    // ── Charge via Square (skip when free) ──────────────────────────────
+    // ── Charge via Square (skip when free) ───────────────────────────────────
     let paymentId: string | undefined;
     if (sourceId !== "FREE" && total > 0) {
       const sqRes = await fetch(`${SQ_BASE}/payments`, {
@@ -115,12 +146,12 @@ export async function POST(req: NextRequest) {
       paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
     }
 
-    // ── Redeem voucher ────────────────────────────────────────────
+    // ── Redeem voucher ───────────────────────────────────────────────────────
     if (voucherCode && voucherApplied) {
       try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
     }
 
-    // ── Save contact ────────────────────────────────────────────────────
+    // ── Save contact ─────────────────────────────────────────────────────────
     try {
       await saveContact({
         name:   parentInfo.guardianName,
@@ -139,7 +170,7 @@ export async function POST(req: NextRequest) {
       });
     } catch { /* non-fatal */ }
 
-    // ── Send emails ───────────────────────────────────────────────
+    // ── Send emails ───────────────────────────────────────────────────────────
     try {
       await sendEmails(parentInfo, campers, total, paymentId, medical);
     } catch (e) {

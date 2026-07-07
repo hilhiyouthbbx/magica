@@ -1226,6 +1226,48 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     onUpdate(t);
   }
 
+  const [teamSlotDragOver, setTeamSlotDragOver] = useState<string|null>(null);
+
+  /** Remove a team from a game slot, leaving it empty ("TBD") so a different team can be dragged in. */
+  function clearGameTeamSlot(divIdx: number, gameIdx: number, slot: "team1Id"|"team2Id") {
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const g = t.divisions[divIdx].games[gameIdx];
+    g[slot] = "";
+    g.excludedTeamIds = (g.excludedTeamIds ?? []).filter(id => id !== (entryTeamId(g, slot)));
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+  function entryTeamId(g: PoolGame, slot: "team1Id"|"team2Id") { return g[slot]; }
+
+  /** Drop a team (dragged from the roster, or from another game's slot) into an empty/occupied game slot. */
+  function dropTeamIntoSlot(divIdx: number, gameIdx: number, slot: "team1Id"|"team2Id", e: React.DragEvent) {
+    e.preventDefault(); e.stopPropagation();
+    setTeamSlotDragOver(null);
+    let data: { teamId: string; fromDivId?: string; fromGame?: { divIdx: number; gameIdx: number; slot: "team1Id"|"team2Id" } };
+    try { data = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
+    if (!data.teamId) return;
+
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const div = t.divisions[divIdx];
+    // Only allow teams that belong to THIS division's roster — keeps pools/standings coherent.
+    if (!div.teams.some(tm => tm.id === data.teamId)) { alert("That team isn't in this category — move it to this category first (Teams tab) before scheduling it here."); return; }
+
+    const g = t.divisions[divIdx].games[gameIdx];
+    const otherSlot = slot === "team1Id" ? "team2Id" : "team1Id";
+    if (g[otherSlot] === data.teamId) { alert("A team can't play itself."); return; }
+
+    // If dragging from another game's slot, clear that original slot (this is a move, not a copy).
+    if (data.fromGame) {
+      const src = t.divisions[data.fromGame.divIdx].games[data.fromGame.gameIdx];
+      if (!(data.fromGame.divIdx === divIdx && data.fromGame.gameIdx === gameIdx && data.fromGame.slot === slot)) {
+        src[data.fromGame.slot] = "";
+      }
+    }
+    g[slot] = data.teamId;
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
   function GameCard({ entry, conflicted, isOver }: { entry: typeof allEntries[number]; conflicted: boolean; isOver: boolean }) {
     const { game, divIdx, gameIdx, divName } = entry;
     const t1 = getTeamName(tournament, game.team1Id);
@@ -1235,6 +1277,7 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     const timeViolated = timeViolationKeys.has(conflictKey(divIdx, gameIdx));
     const excluded = new Set(game.excludedTeamIds ?? []);
     const anyExcluded = excluded.size > 0;
+    const slotKey = (slot: "team1Id"|"team2Id") => `${divIdx}-${gameIdx}-${slot}`;
     return (
       <div
         draggable
@@ -1252,20 +1295,43 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
             <Trash2 className="w-3 h-3"/>
           </button>
         </div>
-        <div className="flex items-center justify-between gap-1">
-          <label className="flex items-center gap-1 flex-1 min-w-0 cursor-pointer" title="Doesn't count toward this team's standings (e.g. an extra game beyond their guarantee)">
-            <input type="checkbox" checked={excluded.has(game.team1Id)} onChange={()=>toggleExcludeTeam(divIdx,gameIdx,game.team1Id)} className="w-3 h-3 accent-yellow-500 flex-shrink-0"/>
-            <span className={`font-bold text-xs truncate ${excluded.has(game.team1Id) ? "text-yellow-500/70 line-through" : done&&game.score1!>game.score2! ? "text-white" : "text-gray-300"}`}>{t1}</span>
-          </label>
-          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score1}</span>}
-        </div>
-        <div className="flex items-center justify-between gap-1">
-          <label className="flex items-center gap-1 flex-1 min-w-0 cursor-pointer" title="Doesn't count toward this team's standings (e.g. an extra game beyond their guarantee)">
-            <input type="checkbox" checked={excluded.has(game.team2Id)} onChange={()=>toggleExcludeTeam(divIdx,gameIdx,game.team2Id)} className="w-3 h-3 accent-yellow-500 flex-shrink-0"/>
-            <span className={`font-bold text-xs truncate ${excluded.has(game.team2Id) ? "text-yellow-500/70 line-through" : done&&game.score2!>game.score1! ? "text-white" : "text-gray-300"}`}>{t2}</span>
-          </label>
-          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score2}</span>}
-        </div>
+        {(["team1Id","team2Id"] as const).map(slot => {
+          const teamId = game[slot];
+          const name = slot === "team1Id" ? t1 : t2;
+          const score = slot === "team1Id" ? game.score1 : game.score2;
+          const winning = done && (slot === "team1Id" ? game.score1! > game.score2! : game.score2! > game.score1!);
+          const isDragOver = teamSlotDragOver === slotKey(slot);
+          return (
+            <div key={slot}
+              onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setTeamSlotDragOver(slotKey(slot)); }}
+              onDragLeave={()=>setTeamSlotDragOver(k=>k===slotKey(slot)?null:k)}
+              onDrop={e=>dropTeamIntoSlot(divIdx, gameIdx, slot, e)}
+              className={`flex items-center justify-between gap-1 rounded-lg px-1 -mx-1 transition-colors ${isDragOver ? "bg-blue-500/20 ring-1 ring-blue-500/60" : ""}`}
+              title="Drop a team here (drag from the Teams tab, or drag a team from another game slot) to assign or swap it in."
+            >
+              <label className="flex items-center gap-1 flex-1 min-w-0 cursor-pointer">
+                <input type="checkbox" checked={excluded.has(teamId)} disabled={!teamId} onChange={()=>toggleExcludeTeam(divIdx,gameIdx,teamId)} className="w-3 h-3 accent-yellow-500 flex-shrink-0"
+                  title="Doesn't count toward this team's standings (e.g. an extra game beyond their guarantee)" />
+                {teamId && (
+                  <span draggable
+                    onDragStart={e=>{ e.stopPropagation(); e.dataTransfer.setData("text/plain", JSON.stringify({ teamId, fromGame: { divIdx, gameIdx, slot } })); }}
+                    className={`font-bold text-xs truncate cursor-grab active:cursor-grabbing ${excluded.has(teamId) ? "text-yellow-500/70 line-through" : winning ? "text-white" : "text-gray-300"}`}
+                    title="Drag this team onto another game's slot to move/swap it there.">
+                    {name}
+                  </span>
+                )}
+                {!teamId && <span className="font-bold text-xs truncate text-gray-700 italic">— drop a team here —</span>}
+              </label>
+              {done && teamId && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{score}</span>}
+              {teamId && (
+                <button onClick={()=>clearGameTeamSlot(divIdx,gameIdx,slot)} title="Remove this team from the game so you can drag a different one in"
+                  className="text-gray-700 hover:text-red-400 transition-colors flex-shrink-0">
+                  <X className="w-3 h-3"/>
+                </button>
+              )}
+            </div>
+          );
+        })}
         <button onClick={()=>setScoring({divIdx,gameIdx})}
           className={`mt-1.5 w-full text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${done?"bg-white/5 text-gray-500 hover:text-blue-400":"bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"}`}>
           {done?"Edit Score":"Score →"}

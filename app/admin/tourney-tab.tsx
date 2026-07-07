@@ -1815,12 +1815,17 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     onUpdate(t);
   }
 
+  // Builds this category's matchups ONLY — leaves every game UNSCHEDULED (no date/time/court).
+  // Scheduling is now a separate, explicit step (the "Auto-Schedule" buttons) so fixing the
+  // tournament's dates/venues afterward never means re-running this and second-guessing whether
+  // it "added games again" — building matchups always fully replaces this category's game list,
+  // it never appends to it.
   function generatePoolGames(divId: string) {
     const div = tournament.divisions.find(d => d.id === divId);
     if (!div) return;
     if (div.teams.length < 2) { alert("Add at least 2 teams to this category first."); return; }
     if (div.games.length > 0) {
-      if (!confirm(`${div.name} already has ${div.games.length} game(s). Generating fresh pool games will replace them (including any scores). Continue?`)) return;
+      if (!confirm(`${div.name} already has ${div.games.length} game(s). Building fresh matchups will replace them (including any scores). Continue?`)) return;
     }
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
     const d = t.divisions.find(x => x.id === divId)!;
@@ -1830,51 +1835,78 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     d.teams.forEach(team => { if (!assignedIds.has(team.id)) d.pools[0].teamIds.push(team.id); });
     // Build games so most teams get exactly the guaranteed count (odd team counts mean
     // usually just one team gets an extra game, rather than everyone playing everyone).
-    const built = buildUnscheduledPoolGames(d.pools, divId, t.gamesGuaranteed || 3);
-    // Games already scheduled in OTHER divisions occupy courts too — seed those so this
-    // division's auto-placement doesn't double-book the same court/time as another division.
-    const otherScheduledGames = t.divisions
-      .filter(x => x.id !== divId)
-      .flatMap(x => x.games)
-      .filter(g => g.time && g.court);
-    // Auto-place each game onto a day/time/court slot right away — avoiding team, coach,
-    // and scheduling-request conflicts. Anything that can't find a slot stays unscheduled.
-    const preferredCourtByDivision = buildPreferredCourtMap(t);
-    d.games = autoScheduleGames(
-      built, d.teams, t.venues ?? [], t.gameDuration, t.breakBetweenGames, t.startTime,
-      t.startDate, t.endDate, t.dayWindows, otherScheduledGames, preferredCourtByDivision,
-    );
+    d.games = buildUnscheduledPoolGames(d.pools, divId, t.gamesGuaranteed || 3);
     d.bracket = []; d.bracketGenerated = false;
     t.updatedAt = new Date().toISOString();
     onUpdate(t);
   }
 
+  // Builds fresh matchups for EVERY eligible category (replacing each one's game list), but does
+  // NOT place them on the day/court board — use "Auto-Schedule All" afterward once your dates,
+  // venues, and courts are all correct.
   function generateAllDivisions() {
     const eligible = tournament.divisions.filter(d => d.teams.length >= 2);
     if (eligible.length === 0) { alert("Add at least 2 teams to a category first."); return; }
     const alreadyScored = eligible.some(d => d.games.some(g => g.status === "completed"));
-    if (alreadyScored && !confirm("Some categories already have completed games. Generating fresh games for ALL categories will replace every category's schedule (including any scores). Continue?")) return;
+    if (alreadyScored && !confirm("Some categories already have completed games. Building fresh matchups for ALL categories will replace every category's games (including any scores). Continue?")) return;
 
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
-
-    // Build every eligible division's pools + unscheduled games FIRST, then hand the whole
-    // tournament's games to the scheduler in one combined pass. Scheduling division-by-division
-    // let an earlier category claim every court/time slot before a later category ever got a
-    // turn, which is why only one category ended up scheduled and the 2-games/1-day split wasn't
-    // applied consistently — a single combined pass shares the same days/courts fairly across
-    // every category at once, just like a real tournament weekend.
-    let combinedGames: PoolGame[] = [];
-    let combinedTeams: { id: string; coachName: string; noPlayBefore?: string; noPlayAfter?: string }[] = [];
-
     eligible.forEach(div => {
       const d = t.divisions.find(x => x.id === div.id)!;
       if (d.pools.length === 0) d.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
       const assignedIds = new Set(d.pools.flatMap(p => p.teamIds));
       d.teams.forEach(team => { if (!assignedIds.has(team.id)) d.pools[0].teamIds.push(team.id); });
-      const built = buildUnscheduledPoolGames(d.pools, d.id, t.gamesGuaranteed || 3);
-      d.games = built;
+      d.games = buildUnscheduledPoolGames(d.pools, d.id, t.gamesGuaranteed || 3);
       d.bracket = []; d.bracketGenerated = false;
-      combinedGames = combinedGames.concat(built);
+    });
+
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  // Places THIS category's currently-unscheduled games onto the day/court board. Already-scheduled
+  // games (and any completed scores) are left untouched — this can be re-run any time after fixing
+  // dates/venues without rebuilding or duplicating the matchups themselves.
+  function autoScheduleDivision(divId: string) {
+    const div = tournament.divisions.find(d => d.id === divId);
+    if (!div) return;
+    if (div.games.length === 0) { alert("Build this category's matchups first (\"Generate Games\")."); return; }
+    if (!tournament.startDate || !tournament.endDate) {
+      if (!confirm("This tournament doesn't have a Start Date/End Date set (Edit → Start Date/End Date). Without it, games can only be scheduled onto a single unlabeled day. Continue anyway?")) return;
+    }
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const d = t.divisions.find(x => x.id === divId)!;
+    const otherScheduledGames = t.divisions
+      .filter(x => x.id !== divId)
+      .flatMap(x => x.games)
+      .filter(g => g.time && g.court);
+    const preferredCourtByDivision = buildPreferredCourtMap(t);
+    d.games = autoScheduleGames(
+      d.games, d.teams, t.venues ?? [], t.gameDuration, t.breakBetweenGames, t.startTime,
+      t.startDate, t.endDate, t.dayWindows, otherScheduledGames, preferredCourtByDivision,
+    );
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  // Places EVERY category's currently-unscheduled games onto the board in one combined pass, so
+  // court/day capacity is shared fairly across all categories at once. Run this whenever you want
+  // to (re)apply scheduling — e.g. right after fixing the tournament's Start/End Date — without
+  // touching matchups or already-scheduled games.
+  function autoScheduleAllDivisions() {
+    const eligible = tournament.divisions.filter(d => d.games.length > 0);
+    if (eligible.length === 0) { alert("Build matchups for at least one category first (\"Generate Games\")."); return; }
+    if (!tournament.startDate || !tournament.endDate) {
+      if (!confirm("This tournament doesn't have a Start Date/End Date set (Edit → Start Date/End Date). Without it, games can only be scheduled onto a single unlabeled day. Continue anyway?")) return;
+    }
+
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    let combinedGames: PoolGame[] = [];
+    let combinedTeams: { id: string; coachName: string; noPlayBefore?: string; noPlayAfter?: string }[] = [];
+
+    eligible.forEach(div => {
+      const d = t.divisions.find(x => x.id === div.id)!;
+      combinedGames = combinedGames.concat(d.games);
       combinedTeams = combinedTeams.concat(d.teams);
     });
 
@@ -1884,7 +1916,6 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
       t.startDate, t.endDate, t.dayWindows, [], preferredCourtByDivision,
     );
 
-    // Split the combined, now-scheduled games back out to their own division.
     t.divisions.forEach(d => {
       const mine = scheduled.filter(g => g.divisionId === d.id);
       if (mine.length > 0) d.games = mine;
@@ -1924,10 +1955,18 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-gray-600 flex-1 min-w-[240px]">Drag a team card onto another category to move it there. Drag one team onto another <em>within the same category</em> to create a matchup between them — it'll show up in the Scheduler tab&apos;s Unscheduled Games queue, ready to drag onto the board.</p>
-        <button onClick={generateAllDivisions}
-          className="text-xs font-bold px-3 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all whitespace-nowrap flex-shrink-0">
-          🎲 Generate Games — All Categories
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={generateAllDivisions}
+            title="Builds fresh matchups for every category. Does NOT place them on the board yet."
+            className="text-xs font-bold px-3 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all whitespace-nowrap">
+            🎲 Build Matchups — All Categories
+          </button>
+          <button onClick={autoScheduleAllDivisions}
+            title="Places every category's already-built matchups onto the day/court board. Run this after confirming Start Date/End Date/venues are correct."
+            className="text-xs font-bold px-3 py-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition-all whitespace-nowrap">
+            📅 Auto-Schedule All
+          </button>
+        </div>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {tournament.divisions.map(div => {
@@ -1976,10 +2015,18 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
 
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">{div.teams.length} team{div.teams.length!==1?"s":""} · {div.games.length} game{div.games.length!==1?"s":""}</div>
-                <button onClick={()=>generatePoolGames(div.id)} disabled={div.teams.length<2}
-                  className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all whitespace-nowrap">
-                  🎲 Generate Games
-                </button>
+                <div className="flex items-center gap-1">
+                  <button onClick={()=>generatePoolGames(div.id)} disabled={div.teams.length<2}
+                    title="Builds fresh matchups for this category only. Does NOT place them on the board yet."
+                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all whitespace-nowrap">
+                    🎲 Generate
+                  </button>
+                  <button onClick={()=>autoScheduleDivision(div.id)} disabled={div.games.length===0}
+                    title="Places this category's built matchups onto the day/court board."
+                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all whitespace-nowrap">
+                    📅 Schedule
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1.5 min-h-[40px]">

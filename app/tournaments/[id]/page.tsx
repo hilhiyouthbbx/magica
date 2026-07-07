@@ -10,7 +10,7 @@ import { Footer } from "@/components/footer";
 import type { TournamentConfig } from "@/lib/tournament";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
-// ─── Square config ────────────────────────────────────────────────────────────
+// ─── Square config ─────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
 const SQ_LOC_ID = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? "";
 const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
@@ -60,16 +60,17 @@ export default function TournamentDetailPage({ params }: Params) {
   const [teamType,    setTeamType]    = useState("");
   const division = [gradeGender, teamType].filter(Boolean).join(" ");
   const [players,    setPlayers]    = useState("");
-  const [scheduleConstraint, setScheduleConstraint] = useState(""); // "" | "before" | "after" | "both"
+  const [scheduleConstraint, setScheduleConstraint] = useState(""); // "" | "before" | "after" | "both" | "same_team"
   const [noPlayBefore, setNoPlayBefore] = useState("");
   const [noPlayAfter,  setNoPlayAfter]  = useState("");
+  const [noOverlapWithTeam, setNoOverlapWithTeam] = useState("");
   const [schedulingRequests, setSchedulingRequests] = useState("");
   const [regNotes,   setRegNotes]   = useState("");
 
   // Multi-step: "form" | "pay"
   const [regStep, setRegStep] = useState<"form" | "pay">("form");
 
-  // ── Square state ──────────────────────────────────────────────────────────
+  // ── Square state ─────────────────────────────────────────────────────
   const sqCardRef                  = useRef<any>(null);
   const [cardLoading,  setCardLoading]  = useState(false);
   const [squareError,  setSquareError]  = useState("");
@@ -85,7 +86,7 @@ export default function TournamentDetailPage({ params }: Params) {
       .catch(() => { setNotFound(true); setLoading(false); });
   }, [id]);
 
-  // ── Init Square card when payment step is active ─────────────────────────
+  // ── Init Square card when payment step is active ─────────────────────────────────
   useEffect(() => {
     if (regStep !== "pay" || !showForm) return;
     if ((appliedVoucher?.finalTotal ?? Infinity) === 0) return; // free — no card needed
@@ -163,7 +164,7 @@ export default function TournamentDetailPage({ params }: Params) {
     };
   }, [regStep, showForm, retryCount, appliedVoucher]);
 
-  // ── Advance to payment step ───────────────────────────────────────────────
+  // ── Advance to payment step ──────────────────────────────────────────
   function handleFormNext(e: React.FormEvent) {
     e.preventDefault();
     setPaymentError("");
@@ -171,7 +172,7 @@ export default function TournamentDetailPage({ params }: Params) {
     setRegStep("pay");
   }
 
-  // ── Square payment + registration ─────────────────────────────────────────
+  // ── Square payment + registration ──────────────────────────────────────────────
   async function handlePay() {
     if (!t) return;
     const isFreeReg = chargeTotal === 0;
@@ -207,6 +208,7 @@ export default function TournamentDetailPage({ params }: Params) {
           players,
           noPlayBefore: (scheduleConstraint === "before" || scheduleConstraint === "both") ? noPlayBefore : "",
           noPlayAfter:  (scheduleConstraint === "after"  || scheduleConstraint === "both") ? noPlayAfter  : "",
+          noOverlapWithTeam: scheduleConstraint === "same_team" ? noOverlapWithTeam : "",
           schedulingRequests,
           notes: regNotes,
           voucherCode:    appliedVoucher?.code ?? null,
@@ -509,6 +511,7 @@ export default function TournamentDetailPage({ params }: Params) {
                               <option value="before" className="bg-gray-900">Can't play before a certain time</option>
                               <option value="after" className="bg-gray-900">Can't play after a certain time</option>
                               <option value="both" className="bg-gray-900">Can't play before AND after certain times</option>
+                              <option value="same_team" className="bg-gray-900">Can't play at the same time as another team</option>
                             </select>
                             {(scheduleConstraint === "before" || scheduleConstraint === "both") && (
                               <div className="mt-2">
@@ -520,6 +523,13 @@ export default function TournamentDetailPage({ params }: Params) {
                               <div className="mt-2">
                                 <label className="block text-gray-500 text-xs mb-1">Latest we can play</label>
                                 <input type="time" required value={noPlayAfter} onChange={e => setNoPlayAfter(e.target.value)} className={inputCls} />
+                              </div>
+                            )}
+                            {scheduleConstraint === "same_team" && (
+                              <div className="mt-2">
+                                <label className="block text-gray-500 text-xs mb-1">Team name we can't play at the same time as</label>
+                                <input type="text" required value={noOverlapWithTeam} onChange={e => setNoOverlapWithTeam(e.target.value)} placeholder="Enter the other team's name"
+                                  className={inputCls} />
                               </div>
                             )}
                             <p className="text-gray-600 text-[11px] mt-1">If your coach is also coaching another team in this tournament, we automatically avoid scheduling both teams at the same time — no need to request that separately.</p>

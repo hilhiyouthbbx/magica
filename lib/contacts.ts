@@ -23,7 +23,7 @@ async function kvSet(key: string, value: unknown): Promise<void> {
   await redis.set(key, value);
 }
 
-// ── Contact interface — all Wix CSV fields included ──────────────────
+// ── Contact interface — all Wix CSV fields included ───────────────────────
 export interface Contact {
   id:    string;
   date:  string;
@@ -70,9 +70,11 @@ export interface Contact {
   /** Structured scheduling constraints — enforced automatically by the Scheduler's conflict checker. */
   noPlayBefore?: string; // "HH:MM" — team cannot be scheduled before this time
   noPlayAfter?:  string; // "HH:MM" — team cannot be scheduled after this time
+  /** Name of another team this team can't be scheduled at the same time as (e.g. shared players, same coach under a different registration name). */
+  noOverlapWithTeam?: string;
 }
 
-// ── Read all contacts ────────────────────────────────────────
+// ── Read all contacts ──────────────────────────────────────────────────────
 export async function getContacts(): Promise<Contact[]> {
   if (hasKV()) {
     try {
@@ -95,7 +97,7 @@ async function persistContacts(contacts: Contact[]): Promise<void> {
   fs.writeFileSync(CONTACTS_FILE, JSON.stringify(contacts, null, 2));
 }
 
-// ── Save / upsert a single contact ────────────────────────────────
+// ── Save / upsert a single contact ────────────────────────────────────────
 export async function saveContact(
   contact: Omit<Contact, "id" | "date">
 ): Promise<void> {
@@ -129,7 +131,7 @@ export async function saveContact(
   await persistContacts(contacts);
 }
 
-// ── Create a brand-new contact (always inserts, never upserts) ───────────────
+// ── Create a brand-new contact (always inserts, never upserts) ──────────────
 export async function createContact(
   contact: Omit<Contact, "id" | "date">
 ): Promise<Contact> {
@@ -145,7 +147,7 @@ export async function createContact(
   return newContact;
 }
 
-// ── Update a contact ───────────────────────────────────────────
+// ── Update a contact ───────────────────────────────────────────────────────
 export async function updateContact(id: string, patch: Partial<Omit<Contact, "id" | "date">>): Promise<boolean> {
   // Normalize shirt size if being updated
   if (patch.shirtSize) patch = { ...patch, shirtSize: normalizeShirtSize(patch.shirtSize) };
@@ -157,7 +159,7 @@ export async function updateContact(id: string, patch: Partial<Omit<Contact, "id
   return true;
 }
 
-// ── Delete a contact ────────────────────────────────────────────
+// ── Delete a contact ───────────────────────────────────────────────────────
 export async function deleteContact(id: string): Promise<void> {
   const contacts = (await getContacts()).filter(c => c.id !== id);
   await persistContacts(contacts);
@@ -297,7 +299,7 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
   return imported;
 }
 
-// ── Public CSV import — auto-detects Wix TSV or simple CSV ────────────
+// ── Public CSV import — auto-detects Wix TSV or simple CSV ────────────────
 export async function importContactsCSV(csv: string, source = "import"): Promise<number> {
   // Detect Wix tab-separated export
   const isWixTSV = csv.includes("\t") &&

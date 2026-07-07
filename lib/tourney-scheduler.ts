@@ -88,14 +88,24 @@ function buildGuaranteedGamesForPool(pool: Pool, divisionId: string, guarantee: 
   const count = new Map<string, number>(pool.teamIds.map(id => [id, 0]));
   const chosen: [string, string][] = [];
 
-  for (const [a, b] of flatPairs) {
-    if ([...count.values()].every(c => c >= guarantee)) break;
-    const ca = count.get(a) ?? 0, cb = count.get(b) ?? 0;
-    if (ca < guarantee || cb < guarantee) {
-      chosen.push([a, b]);
-      count.set(a, ca + 1);
-      count.set(b, cb + 1);
+  // A single pass through flatPairs only covers ONE full round-robin cycle — every team plays
+  // every other team once. For small pools (e.g. only 2 or 3 teams), that caps out at just 1–2
+  // games per team, well short of a 3-game guarantee. Keep re-cycling through the same pairing
+  // order (rematches are expected/fine for small pools) until every team has hit the guarantee,
+  // with a generous safety cap so this can never spin forever.
+  const maxPasses = Math.max(guarantee * 2, 10);
+  let pass = 0;
+  while (flatPairs.length > 0 && [...count.values()].some(c => c < guarantee) && pass < maxPasses) {
+    for (const [a, b] of flatPairs) {
+      if ([...count.values()].every(c => c >= guarantee)) break;
+      const ca = count.get(a) ?? 0, cb = count.get(b) ?? 0;
+      if (ca < guarantee || cb < guarantee) {
+        chosen.push([a, b]);
+        count.set(a, ca + 1);
+        count.set(b, cb + 1);
+      }
     }
+    pass++;
   }
 
   return chosen.map(([a, b], i) => ({

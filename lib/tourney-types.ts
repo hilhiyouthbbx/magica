@@ -15,6 +15,8 @@ export interface Team {
   /** Structured scheduling constraints — enforced automatically by the Scheduler's conflict checker. */
   noPlayBefore?: string; // "HH:MM"
   noPlayAfter?:  string; // "HH:MM"
+  /** Name of another team this team can't be scheduled at the same time as. */
+  noOverlapWithTeam?: string;
 }
 
 export interface Pool {

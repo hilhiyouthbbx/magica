@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
 import { campConfirmationHtml, campAdminNotificationHtml } from "@/lib/email";
 import { validateVoucher, redeemVoucher, calcDiscount } from "@/lib/vouchers";
+import { getContent } from "@/lib/content";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -39,7 +40,15 @@ interface MedicalInfo {
 
 export async function POST(req: NextRequest) {
   try {
-    const { sourceId, total: clientTotal, quantity, campers, parentInfo, medical, voucherCode } = await req.json() as {
+    // — Hard server-side gate — closing registration in the admin blocks the API directly,
+    // not just the visible form, so bots that POST here without loading the page are stopped too.
+    const siteContent = await getContent();
+    if (!siteContent.camps.registrationOpen) {
+      return NextResponse.json({ success: false, error: "Camp registration is currently closed." }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { sourceId, total: clientTotal, quantity, campers, parentInfo, medical, voucherCode, website } = body as {
       sourceId: string;
       total: number;
       quantity: number;
@@ -47,9 +56,15 @@ export async function POST(req: NextRequest) {
       parentInfo: ParentInfo;
       medical: MedicalInfo;
       voucherCode?: string | null;
+      website?: string; // honeypot — real users never fill this hidden field
     };
 
-    // ── Server-side voucher validation ──────────────────────────────────────
+    // — Honeypot check — bots that blindly fill every field trip this hidden field.
+    if (website && website.trim().length > 0) {
+      return NextResponse.json({ success: true, paymentId: "SKIPPED" }); // pretend success, don't let bots learn it was blocked
+    }
+
+    // ── Server-side voucher validation ──────────────────────────────
     // Vouchers apply to BASE price only; fee is waived when a voucher is used
     const CAMP_BASE  = 150;
     const CAMP_FEE   = Math.round(CAMP_BASE * 0.03 * 100) / 100;
@@ -70,7 +85,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 
-    // ── Charge via Square (skip when free) ───────────────────────────────────
+    // ── Charge via Square (skip when free) ──────────────────────────────
     let paymentId: string | undefined;
     if (sourceId !== "FREE" && total > 0) {
       const sqRes = await fetch(`${SQ_BASE}/payments`, {
@@ -100,12 +115,12 @@ export async function POST(req: NextRequest) {
       paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
     }
 
-    // ── Redeem voucher ───────────────────────────────────────────────────────
+    // ── Redeem voucher ────────────────────────────────────────────
     if (voucherCode && voucherApplied) {
       try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
     }
 
-    // ── Save contact ─────────────────────────────────────────────────────────
+    // ── Save contact ────────────────────────────────────────────────────
     try {
       await saveContact({
         name:   parentInfo.guardianName,
@@ -124,7 +139,7 @@ export async function POST(req: NextRequest) {
       });
     } catch { /* non-fatal */ }
 
-    // ── Send emails ───────────────────────────────────────────────────────────
+    // ── Send emails ───────────────────────────────────────────────
     try {
       await sendEmails(parentInfo, campers, total, paymentId, medical);
     } catch (e) {

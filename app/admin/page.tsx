@@ -166,10 +166,15 @@ function formatDateRange(start: string, end: string): string {
   if (!sd) return "";
   if (!ed || start === end) return sd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const sameMonth = sd.getMonth() === ed.getMonth() && sd.getFullYear() === ed.getFullYear();
+  // Built manually (rather than asking Intl for a day+year-only format) — some JS engines render
+  // a partial {day, year} Intl.DateTimeFormat as a garbled fallback like "2027 (day: 10)" instead
+  // of the expected "10, 2027", which was showing up as "Jan 9–2027 (day: 10)" on the public page.
+  if (sameMonth) {
+    const monthName = sd.toLocaleDateString("en-US", { month: "short" });
+    return `${monthName} ${sd.getDate()}\u2013${ed.getDate()}, ${ed.getFullYear()}`;
+  }
   const startStr = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const endStr = sameMonth
-    ? ed.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })
-    : ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const endStr = ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return `${startStr}\u2013${endStr}`;
 }
 
@@ -184,13 +189,20 @@ function TournamentForm({ initial, onSave, onCancel, adminKey }: {
 
   async function handleSave() {
     setSaving(true);
+    // Always recompute the display strings from the raw date pickers right before saving — this
+    // self-heals any tournament whose "dates" text was saved with the old, buggy formatter.
+    const fixed: TournamentConfig = {
+      ...t,
+      dates: t.startDate ? formatDateRange(t.startDate, t.endDate || t.startDate) : t.dates,
+      registrationDeadline: t.registrationDeadlineDate ? formatSingleDate(t.registrationDeadlineDate) : t.registrationDeadline,
+    };
     const method = t.id ? "PUT" : "POST";
     const res = await fetch(`/api/tournament?key=${adminKey}`, {
-      method, headers: {"Content-Type":"application/json"}, body: JSON.stringify(t),
+      method, headers: {"Content-Type":"application/json"}, body: JSON.stringify(fixed),
     });
     const data = await res.json();
     setSaving(false);
-    if (data.success) onSave(data.tournament ?? t);
+    if (data.success) onSave(data.tournament ?? fixed);
   }
 
   return (

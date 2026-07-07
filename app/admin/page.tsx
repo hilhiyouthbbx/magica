@@ -1972,15 +1972,17 @@ export default function AdminPage() {
 
 
   async function importCSV(file: File) {
+    const source = prompt("Label this import as (shown as the Source in Contacts) — e.g. \"2025-2026 Youth Registration\":", "import");
+    if (source === null) return; // cancelled
     const text = await file.text();
-    const res = await fetch(`/api/admin/contacts?key=${adminKey}&action=import`, {
+    const res = await fetch(`/api/admin/contacts?key=${adminKey}&action=import&source=${encodeURIComponent(source || "import")}`, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: text,
     });
     const data = await res.json();
     if (data.imported !== undefined) {
-      alert(`Successfully imported ${data.imported} contacts!`);
+      alert(`Successfully imported ${data.imported} contacts as "${source || "import"}"!`);
       fetch(`/api/admin/contacts?key=${adminKey}`).then(r=>r.json()).then(d => { setContacts(Array.isArray(d) ? d : (d.contacts ?? [])); setContactsLoaded(true); });
     } else {
       alert(data.error || "Import failed");

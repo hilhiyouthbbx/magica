@@ -14,18 +14,49 @@ interface JoinBody {
   phone?: string;
   players: Player[];
   howHeard?: string;
+  website?: string; // honeypot — should always be empty from real users
+}
+
+/** Flags obvious bot-generated gibberish: a single token with no spaces that randomly
+ *  switches upper/lower case several times — real names/words don't look like this. */
+function looksLikeGibberish(str: string): boolean {
+  const s = str.trim();
+  if (!s || s.includes(" ")) return false; // real names/words with spaces pass through
+  if (s.length < 10) return false;
+  let switches = 0;
+  for (let i = 1; i < s.length; i++) {
+    const prevUpper = s[i - 1] === s[i - 1].toUpperCase() && /[a-zA-Z]/.test(s[i - 1]);
+    const curUpper  = s[i] === s[i].toUpperCase() && /[a-zA-Z]/.test(s[i]);
+    if (/[a-zA-Z]/.test(s[i - 1]) && /[a-zA-Z]/.test(s[i]) && prevUpper !== curUpper) switches++;
+  }
+  return switches >= 3;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body: JoinBody = await req.json();
-    const { guardianName, email, phone, players, howHeard } = body;
+    const { guardianName, email, phone, players, howHeard, website } = body;
+
+    // ── Anti-spam: honeypot field must stay empty ──────────────────────────
+    if (website && website.trim()) {
+      // Silently accept without saving/emailing — don't tip off the bot.
+      return NextResponse.json({ ok: true });
+    }
 
     if (!guardianName || !email || !players?.length) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // ── Save to contacts DB ──────────────────────────────────────────────────
+    // ── Anti-spam: reject obvious bot-generated gibberish ───────────────────────
+    // Real phone numbers always contain at least a few digits; bot-filled ones here were pure letters.
+    if (phone && phone.trim() && !/\d/.test(phone)) {
+      return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
+    }
+    if (looksLikeGibberish(guardianName) || players.some(p => looksLikeGibberish(p.firstName) || looksLikeGibberish(p.lastName))) {
+      return NextResponse.json({ error: "Please enter valid names." }, { status: 400 });
+    }
+
+    // ── Save to contacts DB ────────────────────────────────────────────────
     const playerSummary = players
       .map((p) => `${p.firstName} ${p.lastName} (${p.grade})`)
       .join(", ");
@@ -42,7 +73,7 @@ export async function POST(req: NextRequest) {
       console.error("Contact save error:", err);
     }
 
-    // ── Build player rows for email ──────────────────────────────────────────
+    // ── Build player rows for email ──────────────────────────────────────────────
     const playerRows = players
       .map(
         (p) => `
@@ -53,7 +84,7 @@ export async function POST(req: NextRequest) {
       )
       .join("");
 
-    // ── Admin notification email ─────────────────────────────────────────────
+    // ── Admin notification email ────────────────────────────────────────────────
     const adminHtml = `
 <!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">
@@ -87,7 +118,7 @@ export async function POST(req: NextRequest) {
   </div>
 </body></html>`;
 
-    // ── Welcome email to registrant ──────────────────────────────────────────
+    // ── Welcome email to registrant ────────────────────────────────────────────────
     const welcomeHtml = `
 <!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">

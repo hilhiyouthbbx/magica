@@ -10,6 +10,8 @@ export interface VenueConfig {
 
 export interface Team {
   id: string; name: string; coachName: string;
+  /** Scheduling requests the team submitted at registration (e.g. "can't play before 10am Sat"). Shown in the Teams tab so it's not lost after import. */
+  schedulingRequests?: string;
 }
 
 export interface Pool {

@@ -175,6 +175,16 @@ export async function deleteContact(id: string): Promise<void> {
   await persistContacts(contacts);
 }
 
+// ── Delete every contact tagged with a given source (e.g. cleaning up a bad import) ──
+export async function deleteContactsBySource(source: string): Promise<number> {
+  const sourceLc = source.toLowerCase().trim();
+  const all = await getContacts();
+  const remaining = all.filter(c => c.source.toLowerCase().trim() !== sourceLc);
+  const removedCount = all.length - remaining.length;
+  await persistContacts(remaining);
+  return removedCount;
+}
+
 // ── Shirt-size normalizer — converts full names to abbreviations ─────────────
 function normalizeShirtSize(raw: string): string {
   const s = raw.trim().toLowerCase().replace(/[\s\-_./]+/g, "");

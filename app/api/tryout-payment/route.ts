@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
       sourceId, total: clientTotal, basePrice: clientBase, quantity,
       parentName, email, phone,
       playerName, grade, session,
+      nextSeasonSchool, address, boundarySchool, inHillsboroBoundary,
       voucherCode,
     } = await req.json();
 
@@ -70,7 +71,13 @@ export async function POST(req: NextRequest) {
       email,
       phone,
       source: "tryout" as any,
-      notes:  `Player: ${playerName} | Grade: ${grade} | Session: ${session} | Qty: ${quantity}`,
+      camperName: playerName,
+      grade,
+      nextSeasonSchool: nextSeasonSchool || "",
+      address: address || "",
+      boundarySchool: boundarySchool || "",
+      inHillsboroBoundary: inHillsboroBoundary || "unknown",
+      notes:  `Player: ${playerName} | Grade: ${grade} | Session: ${session} | Qty: ${quantity} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"})`,
     });
 
     return NextResponse.json({ success: true, paymentId });

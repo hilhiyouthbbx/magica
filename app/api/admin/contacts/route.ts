@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getContacts, deleteContact, updateContact, importContactsCSV, createContact, deleteContactsBySource } from "@/lib/contacts";
+import { getContacts, deleteContact, updateContact, importContactsCSV, createContact, deleteContactsBySource, renameContactsSource } from "@/lib/contacts";
 import { Redis } from "@upstash/redis";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +44,11 @@ export async function POST(req: NextRequest) {
   if (body.action === "deleteBySource" && body.source) {
     const removed = await deleteContactsBySource(body.source);
     return NextResponse.json({ ok: true, removed });
+  }
+
+  if (body.action === "renameSource" && body.oldSource && body.newSource) {
+    const renamed = await renameContactsSource(body.oldSource, body.newSource);
+    return NextResponse.json({ ok: true, renamed });
   }
 
   if (body.action === "update" && body.id && body.patch) {

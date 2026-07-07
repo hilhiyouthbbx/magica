@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import {
   MapPin, Clock, Calendar, Users, ChevronRight,
   CheckCircle, Loader2, Share2, Facebook, Twitter, Linkedin,
-  AlertCircle, Lock,
+  AlertCircle, Lock, Check, FileText,
 } from "lucide-react";
 import type { SiteContent } from "@/lib/content";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
@@ -57,6 +57,8 @@ function SF({ label, value, onChange, options, req = false }: {
   );
 }
 
+const UNIFORM_SIZES = ["YS (Youth Small)","YM (Youth Medium)","YL (Youth Large)","AS (Adult Small)","AM (Adult Medium)","AL (Adult Large)","AXL (Adult XL)"];
+
 // ────────────────────────────────────────────────────────
 // Main client component
 // ────────────────────────────────────────────────────────
@@ -81,7 +83,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [session,     setSession]    = useState("");
   const [nextSeasonSchool, setNextSeasonSchool] = useState("");
   const [address,     setAddress]    = useState("");
+  const [uniformSize, setUniformSize] = useState("");
   const [qty,         setQty]        = useState(1);
+
+  // ── Waiver — 2026-2027 Winter Season ──────────────────────────────────
+  const [waiverSigned, setWaiverSigned] = useState(false);
+  const [waiverName,   setWaiverName]   = useState("");
 
   // ── Attendance-boundary check ─────────────────────────────────────────
   const [boundaryChecking, setBoundaryChecking] = useState(false);
@@ -195,7 +202,8 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
           quantity:    qty,
           parentName, email, phone,
           playerName, grade, session,
-          nextSeasonSchool, address,
+          nextSeasonSchool, address, uniformSize,
+          waiverSigned, waiverName,
           boundarySchool: boundaryResult?.schoolName ?? "",
           inHillsboroBoundary: boundaryResult ? (boundaryResult.inHillsboro ? "yes" : "no") : "unknown",
           voucherCode: appliedVoucher?.code ?? null,
@@ -382,7 +390,11 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                 </div>
               ) : step === "info" ? (
                 /* Info form */
-                <form onSubmit={(e) => { e.preventDefault(); setStep("pay"); }} className="p-6 space-y-4">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!waiverSigned || !waiverName.trim()) { alert("Please read and agree to the Liability Waiver, then type your name to sign it before continuing."); return; }
+                  setStep("pay");
+                }} className="p-6 space-y-4">
                   {/* Price */}
                   <div className="p-3 bg-white/5 rounded-xl border border-white/10 mb-2 space-y-1.5">
                     <div className="flex justify-between items-center">
@@ -403,6 +415,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   <IF label="Player Full Name"       value={playerName} onChange={setPlayerName} ph="Player's name" req />
                   <SF label="Grade (2026-27 Season)" value={grade}      onChange={setGrade}      options={grades} req />
                   <IF label="School Attending Next Season" value={nextSeasonSchool} onChange={setNextSeasonSchool} ph="e.g. Hillsboro High School" req />
+                  <SF label="Jersey / Uniform Size" value={uniformSize} onChange={setUniformSize} options={UNIFORM_SIZES} req />
                   <SF label="Preferred Tryout Session" value={session}  onChange={setSession}    options={sessionLabels} req />
 
                   {/* Home address + Hillsboro HS attendance-boundary check */}
@@ -432,6 +445,34 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                         {boundaryResult.message}
                       </div>
                     )}
+                  </div>
+
+                  {/* Liability Waiver — 2026-2027 Winter Season Tryouts */}
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <h3 className="font-black text-white mb-3 flex items-center gap-2 text-sm">
+                      <FileText className="w-4 h-4 text-blue-400" /> Liability Waiver &amp; Release
+                      <span className="text-red-400 text-sm ml-1">*</span>
+                    </h3>
+                    <div className="bg-black/20 border border-white/10 rounded-xl p-3 mb-4 text-xs text-gray-400 leading-relaxed h-32 overflow-y-auto">
+                      <p className="mb-2"><strong className="text-white">WAIVER AND RELEASE OF LIABILITY</strong></p>
+                      <p className="mb-2">In consideration for my child being allowed to try out for the Hilhi Youth Basketball <strong className="text-gray-300">2026-2027 Winter Season</strong>, I, the undersigned parent or legal guardian, agree to the following:</p>
+                      <p className="mb-2"><strong className="text-gray-300">1. ASSUMPTION OF RISK:</strong> I acknowledge that participation in basketball tryouts and the 2026-2027 Winter Season involves inherent risks of injury, including but not limited to sprains, fractures, and other physical injuries. I voluntarily accept these risks.</p>
+                      <p className="mb-2"><strong className="text-gray-300">2. RELEASE OF LIABILITY:</strong> I hereby release Hilhi Youth Basketball, Hillsboro High School, their coaches, staff, volunteers, and affiliates from any and all claims, demands, and causes of action arising from my child&apos;s participation in tryouts and the 2026-2027 Winter Season.</p>
+                      <p className="mb-2"><strong className="text-gray-300">3. MEDICAL AUTHORIZATION:</strong> In case of emergency, I authorize staff to obtain medical treatment for my child if I cannot be reached. I accept financial responsibility for any medical costs incurred.</p>
+                      <p><strong className="text-gray-300">4. CODE OF CONDUCT:</strong> I agree that my child will follow all program rules and that disruptive behavior may result in dismissal from tryouts or the season without refund.</p>
+                    </div>
+
+                    <label className="flex items-start gap-3 cursor-pointer group mb-4">
+                      <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${waiverSigned ? "bg-blue-600 border-blue-600" : "border-white/30 group-hover:border-blue-500"}`}
+                        onClick={() => setWaiverSigned(v => !v)}>
+                        {waiverSigned && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      <div className="font-semibold text-white text-sm">
+                        I have read and agree to the Waiver and Release of Liability above for the 2026-2027 Winter Season <span className="text-red-400">*</span>
+                      </div>
+                    </label>
+
+                    <IF label="Type your full name to sign" value={waiverName} onChange={setWaiverName} ph="Full legal name as electronic signature" req={waiverSigned} />
                   </div>
 
                   {/* Quantity */}

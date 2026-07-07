@@ -185,6 +185,18 @@ export async function deleteContactsBySource(source: string): Promise<number> {
   return removedCount;
 }
 
+// ── Rename every contact's source from oldSource to newSource (e.g. relabeling a generic "import" batch) ──
+export async function renameContactsSource(oldSource: string, newSource: string): Promise<number> {
+  const oldLc = oldSource.toLowerCase().trim();
+  const all = await getContacts();
+  let renamed = 0;
+  for (const c of all) {
+    if (c.source.toLowerCase().trim() === oldLc) { c.source = newSource; renamed++; }
+  }
+  await persistContacts(all);
+  return renamed;
+}
+
 // ── Shirt-size normalizer — converts full names to abbreviations ─────────────
 function normalizeShirtSize(raw: string): string {
   const s = raw.trim().toLowerCase().replace(/[\s\-_./]+/g, "");

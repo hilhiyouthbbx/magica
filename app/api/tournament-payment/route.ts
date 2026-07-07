@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       sourceId, total: clientTotal, basePrice: clientBase, quantity,
       tournamentId, tournamentName,
       orgName, coachName, coachEmail, coachPhone,
-      division, players, notes,
+      division, players, notes, schedulingRequests,
       voucherCode,
     } = await req.json();
 
@@ -89,19 +89,20 @@ export async function POST(req: NextRequest) {
     // dropping the redundant self-fetch call entirely.)
     try {
       await saveContact({
-        name:           coachName || orgName,
-        email:          coachEmail || "noemail@noemail.com",
-        phone:          coachPhone || "",
-        source:         "tournament",
-        tournamentName: tournamentName || "",
-        teamName:       orgName || "",
-        division:       division || "",
-        notes:          `Tournament: ${tournamentName} | Team: ${orgName} | Division: ${division} | ${quantity} team(s) | $${total.toFixed(2)} | Square: ${paymentId ?? "n/a"}`,
+        name:               coachName || orgName,
+        email:              coachEmail || "noemail@noemail.com",
+        phone:              coachPhone || "",
+        source:             "tournament",
+        tournamentName:     tournamentName || "",
+        teamName:           orgName || "",
+        division:           division || "",
+        schedulingRequests: schedulingRequests || "",
+        notes:              `Tournament: ${tournamentName} | Team: ${orgName} | Division: ${division} | ${quantity} team(s) | $${total.toFixed(2)} | Square: ${paymentId ?? "n/a"}`,
       });
     } catch { /* non-fatal */ }
 
     // ── Send emails ───────────────────────────────────────────────
-    try { await sendEmails({ tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, quantity, total, paymentId }); } catch (e) {
+    try { await sendEmails({ tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, schedulingRequests, quantity, total, paymentId }); } catch (e) {
       console.error("Tournament email send failed:", e);
     }
 
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
 async function sendEmails(data: {
   tournamentName: string; orgName: string; coachName: string; coachEmail: string;
   coachPhone: string; division: string; players: string; notes: string;
+  schedulingRequests?: string;
   quantity: number; total: number; paymentId?: string;
 }) {
   const transporter = nodemailer.createTransport({
@@ -124,7 +126,7 @@ async function sendEmails(data: {
     auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
 
-  const { tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, quantity, total, paymentId } = data;
+  const { tournamentName, orgName, coachName, coachEmail, coachPhone, division, players, notes, schedulingRequests, quantity, total, paymentId } = data;
 
   await Promise.allSettled([
     // Admin notification
@@ -147,6 +149,7 @@ async function sendEmails(data: {
           <p><strong>Email:</strong> ${coachEmail}</p>
           <p><strong>Phone:</strong> ${coachPhone || "—"}</p>
           ${players ? `<p><strong>Roster:</strong><br/>${players.replace(/\n/g, "<br/>")}</p>` : ""}
+          ${schedulingRequests ? `<p><strong>⚠️ Scheduling Requests:</strong> ${schedulingRequests}</p>` : ""}
           ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ""}
         </div>`,
     }),

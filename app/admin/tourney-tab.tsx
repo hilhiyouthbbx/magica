@@ -1816,6 +1816,50 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     onUpdate(t);
   }
 
+  function generateAllDivisions() {
+    const eligible = tournament.divisions.filter(d => d.teams.length >= 2);
+    if (eligible.length === 0) { alert("Add at least 2 teams to a category first."); return; }
+    const alreadyScored = eligible.some(d => d.games.some(g => g.status === "completed"));
+    if (alreadyScored && !confirm("Some categories already have completed games. Generating fresh games for ALL categories will replace every category's schedule (including any scores). Continue?")) return;
+
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+
+    // Build every eligible division's pools + unscheduled games FIRST, then hand the whole
+    // tournament's games to the scheduler in one combined pass. Scheduling division-by-division
+    // let an earlier category claim every court/time slot before a later category ever got a
+    // turn, which is why only one category ended up scheduled and the 2-games/1-day split wasn't
+    // applied consistently — a single combined pass shares the same days/courts fairly across
+    // every category at once, just like a real tournament weekend.
+    let combinedGames: PoolGame[] = [];
+    let combinedTeams: { id: string; coachName: string; noPlayBefore?: string; noPlayAfter?: string }[] = [];
+
+    eligible.forEach(div => {
+      const d = t.divisions.find(x => x.id === div.id)!;
+      if (d.pools.length === 0) d.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
+      const assignedIds = new Set(d.pools.flatMap(p => p.teamIds));
+      d.teams.forEach(team => { if (!assignedIds.has(team.id)) d.pools[0].teamIds.push(team.id); });
+      const built = buildUnscheduledPoolGames(d.pools, d.id, t.gamesGuaranteed || 3);
+      d.games = built;
+      d.bracket = []; d.bracketGenerated = false;
+      combinedGames = combinedGames.concat(built);
+      combinedTeams = combinedTeams.concat(d.teams);
+    });
+
+    const scheduled = autoScheduleGames(
+      combinedGames, combinedTeams, t.venues ?? [], t.gameDuration, t.breakBetweenGames, t.startTime,
+      t.startDate, t.endDate, t.dayWindows, [],
+    );
+
+    // Split the combined, now-scheduled games back out to their own division.
+    t.divisions.forEach(d => {
+      const mine = scheduled.filter(g => g.divisionId === d.id);
+      if (mine.length > 0) d.games = mine;
+    });
+
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
   function addDivision() {
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
     t.divisions.push({ id: makeId(), name: "New Category", teams: [], pools: [], games: [], bracket: [], losersBracket: [], bracketGenerated: false });
@@ -1844,7 +1888,13 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-600">Drag a team card onto another category to move it there. Drag one team onto another <em>within the same category</em> to create a matchup between them — it'll show up in the Scheduler tab&apos;s Unscheduled Games queue, ready to drag onto the board.</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs text-gray-600 flex-1 min-w-[240px]">Drag a team card onto another category to move it there. Drag one team onto another <em>within the same category</em> to create a matchup between them — it'll show up in the Scheduler tab&apos;s Unscheduled Games queue, ready to drag onto the board.</p>
+        <button onClick={generateAllDivisions}
+          className="text-xs font-bold px-3 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all whitespace-nowrap flex-shrink-0">
+          🎲 Generate Games — All Categories
+        </button>
+      </div>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {tournament.divisions.map(div => {
           const isOver = dragOverDiv === div.id;

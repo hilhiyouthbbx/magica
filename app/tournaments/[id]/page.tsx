@@ -27,6 +27,17 @@ const SQ_STYLE = {
   ".message-icon":             { color: "#ef4444" },
 };
 
+// Division names may already be stored with a trailing team-type qualifier
+// (e.g. "7th Grade Boys Competitive"). Strip it so the Grade & Gender dropdown
+// only shows the base combos, with Team Type picked separately.
+const TEAM_TYPES = ["Competitive", "Development", "AAU"];
+function stripTeamType(d: string): string {
+  for (const t of TEAM_TYPES) {
+    if (d.toLowerCase().endsWith(t.toLowerCase())) return d.slice(0, d.length - t.length).trim();
+  }
+  return d;
+}
+
 interface Params { params: Promise<{ id: string }>; }
 
 export default function TournamentDetailPage({ params }: Params) {
@@ -45,8 +56,11 @@ export default function TournamentDetailPage({ params }: Params) {
   const [coachName,  setCoachName]  = useState("");
   const [coachEmail, setCoachEmail] = useState("");
   const [coachPhone, setCoachPhone] = useState("");
-  const [division,   setDivision]   = useState("");
+  const [gradeGender, setGradeGender] = useState("");
+  const [teamType,    setTeamType]    = useState("");
+  const division = [gradeGender, teamType].filter(Boolean).join(" ");
   const [players,    setPlayers]    = useState("");
+  const [schedulingRequests, setSchedulingRequests] = useState("");
   const [regNotes,   setRegNotes]   = useState("");
 
   // Multi-step: "form" | "pay"
@@ -188,6 +202,7 @@ export default function TournamentDetailPage({ params }: Params) {
           coachPhone,
           division,
           players,
+          schedulingRequests,
           notes: regNotes,
           voucherCode:    appliedVoucher?.code ?? null,
         }),
@@ -460,18 +475,33 @@ export default function TournamentDetailPage({ params }: Params) {
                             </div>
                           ))}
 
-                          <div>
-                            <label className="block text-gray-400 text-xs font-semibold mb-1">Division <span className="text-red-400">*</span></label>
-                            <select required value={division} onChange={e => setDivision(e.target.value)} className={inputCls}>
-                              <option value="" className="bg-gray-900">Select division…</option>
-                              {t.divisions.map(d => <option key={d} value={d} className="bg-gray-900">{d}</option>)}
-                            </select>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-gray-400 text-xs font-semibold mb-1">Grade &amp; Gender <span className="text-red-400">*</span></label>
+                              <select required value={gradeGender} onChange={e => setGradeGender(e.target.value)} className={inputCls}>
+                                <option value="" className="bg-gray-900">Select…</option>
+                                {[...new Set(t.divisions.map(stripTeamType))].map(d => <option key={d} value={d} className="bg-gray-900">{d}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-gray-400 text-xs font-semibold mb-1">Team Type <span className="text-red-400">*</span></label>
+                              <select required value={teamType} onChange={e => setTeamType(e.target.value)} className={inputCls}>
+                                <option value="" className="bg-gray-900">Select…</option>
+                                {TEAM_TYPES.map(ty => <option key={ty} value={ty} className="bg-gray-900">{ty}</option>)}
+                              </select>
+                            </div>
                           </div>
 
                           <div>
                             <label className="block text-gray-400 text-xs font-semibold mb-1">Roster (optional)</label>
                             <textarea rows={3} value={players} onChange={e => setPlayers(e.target.value)} placeholder="Player names, numbers…"
                               className={inputCls + " resize-none"} />
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 text-xs font-semibold mb-1">Scheduling Requests (optional)</label>
+                            <textarea rows={3} value={schedulingRequests} onChange={e => setSchedulingRequests(e.target.value)} placeholder="e.g. Can't play before 10am Saturday, no games after 6pm Sunday, can't play same time as Portland Hawks…"
+                              className={inputCls + " resize-none"} />
+                            <p className="text-gray-600 text-[11px] mt-1">We'll do our best to honor scheduling requests, but they can't always be guaranteed.</p>
                           </div>
                           <div>
                             <label className="block text-gray-400 text-xs font-semibold mb-1">Notes</label>

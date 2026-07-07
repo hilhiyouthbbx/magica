@@ -23,6 +23,7 @@ interface Contact {
   id: string; name: string; email: string; phone: string;
   source: string; notes?: string;
   tournamentName?: string; teamName?: string; division?: string;
+  schedulingRequests?: string;
   date: string;
   // Camper info
   camperName?: string; grade?: string; gender?: string;
@@ -2163,6 +2164,16 @@ export default function AdminPage() {
                         {ef("Tournament Name", "tournamentName", "e.g. Hilhi Spring Invitational")}
                         {ef("Team Name", "teamName", "e.g. Portland Hawks")}
                         {ef("Division", "division", "e.g. 5th Grade Boys Competitive")}
+                      </div>
+                      <div className="mt-3">
+                        <label className="block text-gray-400 text-xs font-semibold mb-1">Scheduling Requests</label>
+                        <textarea
+                          rows={2}
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600 resize-none"
+                          placeholder="e.g. Can't play before 10am Sat, no games same time as Portland Hawks"
+                          value={(editPatch.schedulingRequests ?? editingContact.schedulingRequests ?? "") as string}
+                          onChange={e => setEditPatch(p => ({ ...p, schedulingRequests: e.target.value }))}
+                        />
                       </div>
                     </div>
                   )}

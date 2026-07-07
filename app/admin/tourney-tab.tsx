@@ -6,7 +6,7 @@ import type {
   BracketFormat, TiebreakerMethod, VenueConfig
 } from "@/lib/tourney-types";
 import { getAllTournaments, saveTournament, deleteTournament as deleteT } from "@/lib/tourney-storage";
-import { generateDivisionSchedule, courtToVenueName } from "@/lib/tourney-scheduler";
+import { generateDivisionSchedule, courtToVenueName, buildUnscheduledPoolGames, buildTournamentDates, buildDayTimeSlots } from "@/lib/tourney-scheduler";
 import { calculateStandings } from "@/lib/tourney-standings";
 import { generateBracket, advanceBracketWinner } from "@/lib/tourney-bracket";
 import { Plus, Trash2, ArrowLeft, Trophy, Calendar, MapPin, Users, Clock, Edit, X, Download, ChevronDown } from "lucide-react";
@@ -18,6 +18,7 @@ export interface RegistrationContact {
   id: string; name: string; email: string; phone: string;
   source: string;
   tournamentName?: string; teamName?: string; division?: string;
+  schedulingRequests?: string;
   date: string;
 }
 
@@ -178,6 +179,40 @@ function TiebreakerPicker({ value, onChange }: { value: TiebreakerMethod; onChan
 
 // ── Bracket format picker ─────────────────────────────────────────────────────
 
+function DayWindowsEditor({ startDate, endDate, value, onChange, defaultStart }: {
+  startDate: string; endDate: string;
+  value: Record<string, { start: string; end: string }>;
+  onChange: (v: Record<string, { start: string; end: string }>) => void;
+  defaultStart: string;
+}) {
+  const dates = buildTournamentDates(startDate, endDate);
+  if (dates.length === 0) {
+    return <p className="text-gray-600 text-xs">Set Start Date &amp; End Date above to configure each day's first-game and last-game times.</p>;
+  }
+  function setWindow(date: string, field: "start"|"end", v: string) {
+    const cur = value[date] ?? { start: defaultStart, end: "20:00" };
+    onChange({ ...value, [date]: { ...cur, [field]: v } });
+  }
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">First Game / Last Game — Per Day</label>
+      {dates.map(date => {
+        const w = value[date] ?? { start: defaultStart, end: "20:00" };
+        return (
+          <div key={date} className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs w-24 flex-shrink-0">{new Date(date + "T00:00:00").toLocaleDateString("en-US",{ month:"short", day:"numeric" })}</span>
+            <input type="time" value={w.start} onChange={e=>setWindow(date, "start", e.target.value)}
+              className="flex-1 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-blue-500" />
+            <span className="text-gray-600 text-xs">to</span>
+            <input type="time" value={w.end} onChange={e=>setWindow(date, "end", e.target.value)}
+              className="flex-1 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-blue-500" />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function BracketFormatPicker({ value, onChange }: { value: BracketFormat; onChange: (v: BracketFormat) => void }) {
   const opts: { value: BracketFormat; label: string; desc: string }[] = [
     { value: "single", label: "Single Elimination", desc: "One loss and you're out" },
@@ -302,7 +337,7 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
         t.divisions.push(div);
       }
       if (div.teams.some(team => team.name.toLowerCase() === c.teamName!.toLowerCase().trim())) return;
-      const team = { id: makeId(), name: c.teamName!.trim(), coachName: c.name };
+      const team = { id: makeId(), name: c.teamName!.trim(), coachName: c.name, schedulingRequests: c.schedulingRequests || undefined };
       div.teams.push(team);
       // Auto-place the team into its category's pool so it's ready for pool-game generation immediately.
       if (div.pools.length === 0) div.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
@@ -372,6 +407,12 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
                               {alreadyIn && <span className="text-[10px] text-gray-600 bg-white/5 px-1.5 py-0.5 rounded font-bold">already added</span>}
                             </div>
                             <div className="text-xs text-gray-500">Coach: {c.name}{c.email && <span className="ml-2 text-gray-600">{c.email}</span>}</div>
+                            {c.schedulingRequests && (
+                              <div className="text-xs text-yellow-400/90 mt-1 flex items-start gap-1">
+                                <span className="flex-shrink-0">⚠️</span>
+                                <span>{c.schedulingRequests}</span>
+                              </div>
+                            )}
                           </div>
                         </label>
                       );
@@ -507,6 +548,7 @@ interface EditFields {
   gameDuration: number; breakBetweenGames: number;
   startTime: string; bracketFormat: BracketFormat;
   gamesGuaranteed: number; tiebreaker: TiebreakerMethod;
+  dayWindows: Record<string, { start: string; end: string }>;
 }
 
 function EditTournamentModal({ tournament, onSave, onClose }: {
@@ -524,6 +566,7 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
     bracketFormat:    tournament.bracketFormat ?? "single",
     gamesGuaranteed:  tournament.gamesGuaranteed ?? 3,
     tiebreaker:       tournament.tiebreaker ?? "point_diff",
+    dayWindows:       tournament.dayWindows ?? {},
   });
 
   function save() {
@@ -540,6 +583,7 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
       bracketFormat:    f.bracketFormat,
       gamesGuaranteed:  f.gamesGuaranteed,
       tiebreaker:       f.tiebreaker,
+      dayWindows:       f.dayWindows,
       updatedAt:        new Date().toISOString(),
     };
     onSave(updated);
@@ -561,6 +605,7 @@ function EditTournamentModal({ tournament, onSave, onClose }: {
             })} />
             <IF label="End Date" type="date" value={f.endDate} onChange={v => setF(p=>({...p, endDate:v, date: formatDateRange(p.startDate||v, v)}))} />
           </div>
+          <DayWindowsEditor startDate={f.startDate} endDate={f.endDate} value={f.dayWindows} onChange={v=>setF(p=>({...p, dayWindows:v}))} defaultStart={f.startTime}/>
           <VenueEditor venues={f.venues} onChange={v => setF(p=>({...p,venues:v}))} />
           <div className="grid grid-cols-2 gap-3">
             <IF label="Games Guaranteed" type="number" min="1" value={f.gamesGuaranteed} onChange={v => setF(p=>({...p,gamesGuaranteed:+v}))} />
@@ -592,6 +637,7 @@ interface WizState {
   gameDuration: number; breakBetweenGames: number; startTime: string;
   bracketFormat: BracketFormat; gamesGuaranteed: number; tiebreaker: TiebreakerMethod;
   divisions: WizDiv[];
+  dayWindows: Record<string, { start: string; end: string }>;
 }
 
 function snakePools(teams: string[], poolCount: number): string[][] {
@@ -615,6 +661,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
     gameDuration: 24, breakBetweenGames: 6, startTime: "08:00",
     bracketFormat: "single", gamesGuaranteed: 3, tiebreaker: "point_diff",
     divisions: [{ name: "", pools: 2, teams: ["","","","","","","",""] }],
+    dayWindows: {},
   });
 
   const regMatches = matchingRegs(contacts, w.name);
@@ -654,9 +701,8 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
         const teamIds = names.map(() => allTeams[tIdx++].id);
         return { id: poolId, name: `Pool ${String.fromCharCode(65+pi)}`, teamIds };
       });
-      const games: PoolGame[] = generateDivisionSchedule(
-        pools, divId, safeVenues, w.gameDuration, w.breakBetweenGames, w.startTime
-      );
+      // Games start UNSCHEDULED — drag them onto the day/court grid in the Scheduler tab to assign a slot.
+      const games: PoolGame[] = buildUnscheduledPoolGames(pools, divId);
       return { id: divId, name: d.name, teams: allTeams, pools, games, bracket: [], losersBracket: [], bracketGenerated: false, format: d.format };
     });
     const t: Tournament = {
@@ -665,6 +711,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
       startTime: w.startTime, bracketFormat: w.bracketFormat,
       gamesGuaranteed: w.gamesGuaranteed, tiebreaker: w.tiebreaker,
       status: "pool_play", divisions, createdAt: now, updatedAt: now,
+      dayWindows: w.dayWindows,
     };
     saveTournament(t); onCreated(t);
   }
@@ -759,6 +806,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
               })} />
               <IF label="End Date" type="date" value={w.endDate} onChange={v=>setW(p=>({...p, endDate:v, date: formatDateRange(p.startDate||v, v)}))} />
             </div>
+            <DayWindowsEditor startDate={w.startDate} endDate={w.endDate} value={w.dayWindows} onChange={v=>setW(p=>({...p, dayWindows:v}))} defaultStart={w.startTime}/>
             <VenueEditor venues={w.venues} onChange={v=>setW(p=>({...p,venues:v}))} />
             <div className="grid grid-cols-2 gap-3">
               <IF label="Games Guaranteed" type="number" min="1" value={w.gamesGuaranteed} onChange={v=>setW(p=>({...p,gamesGuaranteed:+v}))} />
@@ -928,19 +976,21 @@ function ScoreDialog({ game, teamA, teamB, onSave, onClose }: {
 
 function conflictKey(divIdx: number, gameIdx: number) { return `${divIdx}-${gameIdx}`; }
 
-/** Find which games (by divIdx/gameIdx) have a team double-booked at the same time slot. */
+/** Find which games (by divIdx/gameIdx) have a team double-booked at the same day+time slot. */
 function computeScheduleConflicts(tournament: Tournament): Set<string> {
-  const byTime = new Map<string, { divIdx: number; gameIdx: number; teamIds: string[] }[]>();
+  const byDayTime = new Map<string, { divIdx: number; gameIdx: number; teamIds: string[] }[]>();
   tournament.divisions.forEach((d, divIdx) => {
     d.games.forEach((g, gameIdx) => {
-      const arr = byTime.get(g.time) ?? [];
+      if (!g.time) return; // unscheduled — can't conflict
+      const key = `${g.date || ""}|${g.time}`;
+      const arr = byDayTime.get(key) ?? [];
       arr.push({ divIdx, gameIdx, teamIds: [g.team1Id, g.team2Id] });
-      byTime.set(g.time, arr);
+      byDayTime.set(key, arr);
     });
   });
   const conflicts = new Set<string>();
-  for (const entries of byTime.values()) {
-    const seen = new Map<string, string>(); // teamId -> conflictKey of first game seen
+  for (const entries of byDayTime.values()) {
+    const seen = new Map<string, string>();
     for (const e of entries) {
       const k = conflictKey(e.divIdx, e.gameIdx);
       for (const teamId of e.teamIds) {
@@ -956,21 +1006,56 @@ function computeScheduleConflicts(tournament: Tournament): Set<string> {
   return conflicts;
 }
 
+/** Teams playing more games than the tournament's guarantee — surfaced as a warning. */
+function computeGameOverage(tournament: Tournament): { divName: string; teamName: string; count: number }[] {
+  const guarantee = tournament.gamesGuaranteed || 3;
+  const overage: { divName: string; teamName: string; count: number }[] = [];
+  tournament.divisions.forEach(div => {
+    const counts = new Map<string, number>();
+    div.games.forEach(g => {
+      counts.set(g.team1Id, (counts.get(g.team1Id) ?? 0) + 1);
+      counts.set(g.team2Id, (counts.get(g.team2Id) ?? 0) + 1);
+    });
+    div.teams.forEach(team => {
+      const count = counts.get(team.id) ?? 0;
+      if (count > guarantee) overage.push({ divName: div.name, teamName: team.name, count });
+    });
+  });
+  return overage;
+}
+
 function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpdate: (t: Tournament) => void }) {
   const [scoring, setScoring] = useState<{ divIdx: number; gameIdx: number }|null>(null);
   const [dragOverKey, setDragOverKey] = useState<string|null>(null);
+  const [selectedDiv, setSelectedDiv] = useState<string>("all");
 
-  const allGames = tournament.divisions.flatMap((d,di) =>
-    d.games.map((g,gi) => ({ game: g, divIdx: di, gameIdx: gi, divName: d.name }))
-  );
-  const slots = [...new Set(allGames.map(g=>g.game.time))].sort();
+  const guarantee = tournament.gamesGuaranteed || 3;
+  const overage = computeGameOverage(tournament);
+  const conflicts = computeScheduleConflicts(tournament);
   const courts = totalCourts(tournament.venues ?? []);
   const courtNums = Array.from({length: Math.max(courts,1)}, (_,i)=>i+1);
-  const conflicts = computeScheduleConflicts(tournament);
   const multiVenue = (tournament.venues?.length ?? 0) > 1;
 
-  const gameAt = (time: string, court: number) =>
-    allGames.find(g => g.game.time === time && g.game.court === court);
+  const allEntries = tournament.divisions.flatMap((d,di) =>
+    d.games.map((g,gi) => ({ game: g, divIdx: di, gameIdx: gi, divName: d.name }))
+  ).filter(e => selectedDiv === "all" || e.divIdx === Number(selectedDiv));
+
+  const unscheduled = allEntries.filter(e => !e.game.time);
+  const scheduled    = allEntries.filter(e => !!e.game.time);
+
+  // Days: use the tournament's date range if set; otherwise fall back to a single unlabeled day.
+  const days = buildTournamentDates(tournament.startDate, tournament.endDate);
+  const dayKeys = days.length > 0 ? days : [""];
+
+  function slotsForDay(day: string): string[] {
+    const win = tournament.dayWindows?.[day];
+    if (win) return buildDayTimeSlots(win.start, win.end, tournament.gameDuration, tournament.breakBetweenGames);
+    // No window configured for this day — fall back to a reasonable default range from the tournament start time.
+    return buildDayTimeSlots(tournament.startTime || "08:00", "20:00", tournament.gameDuration, tournament.breakBetweenGames);
+  }
+
+  const gameAt = (day: string, time: string, court: number) =>
+    scheduled.find(g => (g.game.date || "") === day && g.game.time === time && g.game.court === court);
 
   function handleScore(s1: number, s2: number) {
     if (!scoring) return;
@@ -981,12 +1066,20 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     onUpdate(t); setScoring(null);
   }
 
-  function handleDrop(e: React.DragEvent, time: string, court: number) {
+  function toggleExclude(divIdx: number, gameIdx: number) {
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const g = t.divisions[divIdx].games[gameIdx];
+    g.excludeFromStandings = !g.excludeFromStandings;
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  function handleDrop(e: React.DragEvent, day: string, time: string, court: number) {
     e.preventDefault();
     setDragOverKey(null);
     let src: { divIdx: number; gameIdx: number };
     try { src = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
-    const dest = gameAt(time, court);
+    const dest = gameAt(day, time, court);
     if (dest && dest.divIdx === src.divIdx && dest.gameIdx === src.gameIdx) return; // dropped on itself
 
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
@@ -996,104 +1089,181 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     if (dest) {
       // Swap the two games' slots
       const destGame = t.divisions[dest.divIdx].games[dest.gameIdx];
-      const srcSlot = { time: srcGame.time, court: srcGame.court, venue: srcGame.venue, timeSlot: srcGame.timeSlot };
-      srcGame.time = destGame.time; srcGame.court = destGame.court; srcGame.venue = destGame.venue; srcGame.timeSlot = destGame.timeSlot;
-      destGame.time = srcSlot.time; destGame.court = srcSlot.court; destGame.venue = srcSlot.venue; destGame.timeSlot = srcSlot.timeSlot;
+      const srcSlot = { time: srcGame.time, court: srcGame.court, venue: srcGame.venue, timeSlot: srcGame.timeSlot, date: srcGame.date };
+      srcGame.time = destGame.time; srcGame.court = destGame.court; srcGame.venue = destGame.venue; srcGame.timeSlot = destGame.timeSlot; srcGame.date = destGame.date;
+      destGame.time = srcSlot.time; destGame.court = srcSlot.court; destGame.venue = srcSlot.venue; destGame.timeSlot = srcSlot.timeSlot; destGame.date = srcSlot.date;
     } else {
-      // Move into an empty slot
-      srcGame.time = time; srcGame.court = court; srcGame.venue = venue;
+      // Move into an empty slot (also handles placing an unscheduled game for the first time)
+      srcGame.time = time; srcGame.court = court; srcGame.venue = venue; srcGame.date = day;
     }
     t.updatedAt = new Date().toISOString();
     onUpdate(t);
   }
 
-  if (allGames.length === 0) return <div className="text-center py-12 text-gray-500">No games scheduled.</div>;
+  function handleDropToUnscheduled(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOverKey(null);
+    let src: { divIdx: number; gameIdx: number };
+    try { src = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const g = t.divisions[src.divIdx].games[src.gameIdx];
+    g.time = ""; g.court = 0; g.venue = ""; g.date = ""; g.timeSlot = -1;
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  function GameCard({ entry, conflicted, isOver }: { entry: typeof allEntries[number]; conflicted: boolean; isOver: boolean }) {
+    const { game, divIdx, gameIdx, divName } = entry;
+    const t1 = getTeamName(tournament, game.team1Id);
+    const t2 = getTeamName(tournament, game.team2Id);
+    const done = game.status==="completed";
+    const poolName = tournament.divisions[divIdx].pools.find(p=>p.id===game.poolId)?.name ?? "";
+    return (
+      <div
+        draggable
+        onDragStart={e=>e.dataTransfer.setData("text/plain", JSON.stringify({divIdx,gameIdx}))}
+        className={`glass border rounded-xl p-3 cursor-grab active:cursor-grabbing transition-colors ${
+          conflicted ? "border-red-500/60 bg-red-500/5" : isOver ? "border-blue-500/60" : game.excludeFromStandings ? "border-yellow-500/30 opacity-70" : "border-white/10 hover:border-white/20"
+        }`}
+      >
+        <div className="flex items-center gap-2 text-[11px] text-gray-600 mb-1 truncate">
+          <span>{divName}</span>{poolName&&<><span>·</span><span>{poolName}</span></>}
+          {game.excludeFromStandings && <span className="text-yellow-500 font-bold">· doesn't count</span>}
+        </div>
+        <div className="flex items-center justify-between gap-1">
+          <span className={`font-bold text-xs truncate ${done&&game.score1!>game.score2!?"text-white":"text-gray-300"}`}>{t1}</span>
+          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score1}</span>}
+        </div>
+        <div className="flex items-center justify-between gap-1">
+          <span className={`font-bold text-xs truncate ${done&&game.score2!>game.score1!?"text-white":"text-gray-300"}`}>{t2}</span>
+          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score2}</span>}
+        </div>
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <button onClick={()=>setScoring({divIdx,gameIdx})}
+            className={`flex-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${done?"bg-white/5 text-gray-500 hover:text-blue-400":"bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"}`}>
+            {done?"Edit Score":"Score →"}
+          </button>
+          <label className="flex items-center gap-1 text-[9px] text-gray-500 cursor-pointer flex-shrink-0" title="Exclude this game from standings (e.g. an extra game beyond the guarantee)">
+            <input type="checkbox" checked={!!game.excludeFromStandings} onChange={()=>toggleExclude(divIdx,gameIdx)} className="w-3 h-3 accent-yellow-500"/>
+            doesn't count
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  if (allEntries.length === 0) return <div className="text-center py-12 text-gray-500">No games yet — generate pool games for a division first.</div>;
 
   return (
     <div className="space-y-4">
+      {tournament.divisions.length > 1 && (
+        <select value={selectedDiv} onChange={e=>setSelectedDiv(e.target.value)}
+          className="bg-white/5 border border-white/10 text-white text-sm px-3 py-2 rounded-lg focus:outline-none">
+          <option value="all" className="bg-slate-900">All Divisions</option>
+          {tournament.divisions.map((d,i) => <option key={d.id} value={i} className="bg-slate-900">{d.name}</option>)}
+        </select>
+      )}
+
       <div className={`rounded-xl px-4 py-3 text-sm font-bold border ${conflicts.size>0?"bg-red-500/10 border-red-500/30 text-red-300":"bg-green-500/10 border-green-500/30 text-green-300"}`}>
         {conflicts.size>0
           ? `⚠️ ${conflicts.size} game${conflicts.size!==1?"s":""} have a team double-booked at the same time. Drag a game to an open slot to fix it.`
           : "✓ Schedule looks good — no team is double-booked."}
       </div>
-      <p className="text-xs text-gray-600">Drag any game card onto another slot to reschedule it. Dropping onto an occupied slot swaps the two games.</p>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-separate" style={{ borderSpacing: "8px" }}>
-          <thead>
-            <tr>
-              <th className="text-left text-xs text-gray-600 font-bold w-20"></th>
-              {courtNums.map(c => (
-                <th key={c} className="text-left text-xs font-bold text-gray-400 px-2 py-1 min-w-[220px]">
-                  Court {c}{multiVenue && <span className="block text-[10px] text-gray-600 font-normal">{courtToVenueName(c, tournament.venues ?? [])}</span>}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {slots.map(slot => (
-              <tr key={slot}>
-                <td className="align-top text-xs text-gray-500 font-bold pt-3 whitespace-nowrap">
-                  <Clock className="w-3.5 h-3.5 inline mr-1 text-gray-600"/>{slot}
-                </td>
-                {courtNums.map(court => {
-                  const entry = gameAt(slot, court);
-                  const key = `${slot}|${court}`;
-                  const isOver = dragOverKey === key;
-                  if (!entry) {
-                    return (
-                      <td key={court}
-                        onDragOver={e=>{e.preventDefault(); setDragOverKey(key);}}
-                        onDragLeave={()=>setDragOverKey(k=>k===key?null:k)}
-                        onDrop={e=>handleDrop(e, slot, court)}
-                        className={`align-top rounded-xl border-2 border-dashed ${isOver?"border-blue-500 bg-blue-500/10":"border-white/5"} h-20`}
-                      />
-                    );
-                  }
-                  const { game, divIdx, gameIdx, divName } = entry;
-                  const t1 = getTeamName(tournament, game.team1Id);
-                  const t2 = getTeamName(tournament, game.team2Id);
-                  const done = game.status==="completed";
-                  const poolName = tournament.divisions[divIdx].pools.find(p=>p.id===game.poolId)?.name ?? "";
-                  const conflicted = conflicts.has(conflictKey(divIdx, gameIdx));
-                  return (
-                    <td key={court}
-                      onDragOver={e=>{e.preventDefault(); setDragOverKey(key);}}
-                      onDragLeave={()=>setDragOverKey(k=>k===key?null:k)}
-                      onDrop={e=>handleDrop(e, slot, court)}
-                      className="align-top"
-                    >
-                      <div
-                        draggable
-                        onDragStart={e=>e.dataTransfer.setData("text/plain", JSON.stringify({divIdx,gameIdx}))}
-                        className={`glass border rounded-xl p-3 cursor-grab active:cursor-grabbing transition-colors ${
-                          conflicted ? "border-red-500/60 bg-red-500/5" : isOver ? "border-blue-500/60" : "border-white/10 hover:border-white/20"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 text-[11px] text-gray-600 mb-1 truncate">
-                          <span>{divName}</span>{poolName&&<><span>·</span><span>{poolName}</span></>}
-                        </div>
-                        <div className="flex items-center justify-between gap-1">
-                          <span className={`font-bold text-xs truncate ${done&&game.score1!>game.score2!?"text-white":"text-gray-300"}`}>{t1}</span>
-                          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score1}</span>}
-                        </div>
-                        <div className="flex items-center justify-between gap-1">
-                          <span className={`font-bold text-xs truncate ${done&&game.score2!>game.score1!?"text-white":"text-gray-300"}`}>{t2}</span>
-                          {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score2}</span>}
-                        </div>
-                        <button onClick={()=>setScoring({divIdx,gameIdx})}
-                          className={`mt-1.5 w-full text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${done?"bg-white/5 text-gray-500 hover:text-blue-400":"bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"}`}>
-                          {done?"Edit Score":"Score →"}
-                        </button>
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
+      {overage.length > 0 && (
+        <div className="rounded-xl px-4 py-3 text-sm border bg-yellow-500/10 border-yellow-500/30 text-yellow-300">
+          <p className="font-bold mb-1">⚠️ {overage.length} team{overage.length!==1?"s are":" is"} playing more than {guarantee} guaranteed games:</p>
+          <ul className="text-xs space-y-0.5">
+            {overage.map((o,i) => <li key={i}>· {o.teamName} ({o.divName}) — {o.count} games</li>)}
+          </ul>
+          <p className="text-xs mt-1.5 text-yellow-400/70">Check "doesn't count" on the extra game(s) below if they shouldn't affect standings.</p>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-600">Drag any game card onto another slot to reschedule it — swaps if the slot is occupied, or drop it back into "Unscheduled Games" to pull it off the board.</p>
+
+      {/* Unscheduled games queue */}
+      <div
+        onDragOver={e=>{e.preventDefault(); setDragOverKey("unscheduled");}}
+        onDragLeave={()=>setDragOverKey(k=>k==="unscheduled"?null:k)}
+        onDrop={handleDropToUnscheduled}
+        className={`rounded-xl border-2 border-dashed p-3 transition-colors ${dragOverKey==="unscheduled"?"border-blue-500 bg-blue-500/10":"border-white/10"}`}
+      >
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Unscheduled Games {unscheduled.length>0 && `(${unscheduled.length})`}</p>
+        {unscheduled.length === 0 ? (
+          <p className="text-gray-700 text-xs">Everything's on the board — or drop a game here to pull it off.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {unscheduled.map(entry => (
+              <GameCard key={entry.game.id} entry={entry} conflicted={false} isOver={false}/>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
+
+      {/* Day-by-day scheduling grids */}
+      {dayKeys.map(day => {
+        const slots = slotsForDay(day);
+        return (
+          <div key={day || "single-day"}>
+            {day && (
+              <div className="text-white font-bold text-sm mb-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-400"/>
+                {new Date(day + "T00:00:00").toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" })}
+              </div>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full border-separate" style={{ borderSpacing: "8px" }}>
+                <thead>
+                  <tr>
+                    <th className="text-left text-xs text-gray-600 font-bold w-20"></th>
+                    {courtNums.map(c => (
+                      <th key={c} className="text-left text-xs font-bold text-gray-400 px-2 py-1 min-w-[220px]">
+                        Court {c}{multiVenue && <span className="block text-[10px] text-gray-600 font-normal">{courtToVenueName(c, tournament.venues ?? [])}</span>}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {slots.map(slot => (
+                    <tr key={slot}>
+                      <td className="align-top text-xs text-gray-500 font-bold pt-3 whitespace-nowrap">
+                        <Clock className="w-3.5 h-3.5 inline mr-1 text-gray-600"/>{slot}
+                      </td>
+                      {courtNums.map(court => {
+                        const entry = gameAt(day, slot, court);
+                        const key = `${day}|${slot}|${court}`;
+                        const isOver = dragOverKey === key;
+                        if (!entry) {
+                          return (
+                            <td key={court}
+                              onDragOver={e=>{e.preventDefault(); setDragOverKey(key);}}
+                              onDragLeave={()=>setDragOverKey(k=>k===key?null:k)}
+                              onDrop={e=>handleDrop(e, day, slot, court)}
+                              className={`align-top rounded-xl border-2 border-dashed ${isOver?"border-blue-500 bg-blue-500/10":"border-white/5"} h-20`}
+                            />
+                          );
+                        }
+                        const conflicted = conflicts.has(conflictKey(entry.divIdx, entry.gameIdx));
+                        return (
+                          <td key={court}
+                            onDragOver={e=>{e.preventDefault(); setDragOverKey(key);}}
+                            onDragLeave={()=>setDragOverKey(k=>k===key?null:k)}
+                            onDrop={e=>handleDrop(e, day, slot, court)}
+                            className="align-top"
+                          >
+                            <GameCard entry={entry} conflicted={conflicted} isOver={isOver}/>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
 
       {scoring && (()=>{
         const g = tournament.divisions[scoring.divIdx].games[scoring.gameIdx];
@@ -1308,6 +1478,22 @@ function BracketView({ tournament, onUpdate }: { tournament: Tournament; onUpdat
 function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate: (t: Tournament) => void }) {
   const [dragOverDiv, setDragOverDiv] = useState<string|null>(null);
 
+  function createMatchup(divId: string, teamAId: string, teamBId: string) {
+    if (teamAId === teamBId) return;
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    const div = t.divisions.find(d => d.id === divId);
+    if (!div) return;
+    const pool = div.pools.find(p => p.teamIds.includes(teamAId)) ?? div.pools.find(p => p.teamIds.includes(teamBId)) ?? div.pools[0];
+    const poolId = pool?.id ?? "";
+    div.games.push({
+      id: makeId(), poolId, divisionId: divId,
+      court: 0, venue: "", timeSlot: -1, time: "", date: "",
+      team1Id: teamAId, team2Id: teamBId, status: "scheduled",
+    });
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
   function moveTeam(teamId: string, fromDivId: string, toDivId: string) {
     if (fromDivId === toDivId) return;
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
@@ -1378,7 +1564,7 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-600">Drag a team card onto another category to move it there — handy when a category doesn&apos;t have enough teams yet.</p>
+      <p className="text-xs text-gray-600">Drag a team card onto another category to move it there. Drag one team onto another <em>within the same category</em> to create a matchup between them — it'll show up in the Scheduler tab&apos;s Unscheduled Games queue, ready to drag onto the board.</p>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {tournament.divisions.map(div => {
           const isOver = dragOverDiv === div.id;
@@ -1419,11 +1605,26 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
                 {div.teams.map(team => (
                   <div key={team.id}
                     draggable
-                    onDragStart={e=>e.dataTransfer.setData("text/plain", JSON.stringify({ teamId: team.id, fromDivId: div.id }))}
-                    className="glass border border-white/10 hover:border-white/25 rounded-lg px-2.5 py-2 cursor-grab active:cursor-grabbing"
+                    onDragStart={e=>{ e.stopPropagation(); e.dataTransfer.setData("text/plain", JSON.stringify({ teamId: team.id, fromDivId: div.id })); }}
+                    onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={e=>{
+                      e.preventDefault(); e.stopPropagation(); setDragOverDiv(null);
+                      let data: { teamId: string; fromDivId: string };
+                      try { data = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
+                      if (data.fromDivId === div.id) createMatchup(div.id, data.teamId, team.id);
+                      else moveTeam(data.teamId, data.fromDivId, div.id);
+                    }}
+                    title="Drag another team from this category onto this card to create a matchup between them."
+                    className="glass border border-white/10 hover:border-blue-500/40 rounded-lg px-2.5 py-2 cursor-grab active:cursor-grabbing"
                   >
                     <div className="text-white font-bold text-xs truncate">{team.name}</div>
                     {team.coachName && <div className="text-gray-600 text-[10px] truncate">Coach {team.coachName}</div>}
+                    {team.schedulingRequests && (
+                      <div className="text-yellow-400/90 text-[10px] mt-1 flex items-start gap-1">
+                        <span className="flex-shrink-0">⚠️</span>
+                        <span className="line-clamp-2">{team.schedulingRequests}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

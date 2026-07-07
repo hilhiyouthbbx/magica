@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
       parentName, email, phone,
       playerName, grade, session,
       nextSeasonSchool, address, boundarySchool, inHillsboroBoundary,
+      uniformSize, waiverSigned, waiverName,
       voucherCode,
     } = await req.json();
 
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
 
     if (!sourceId || !parentName || !email) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    }
+    if (!waiverSigned || !waiverName) {
+      return NextResponse.json({ error: "The Liability Waiver must be signed before registering." }, { status: 400 });
     }
 
     // Free registration — skip Square
@@ -77,7 +81,8 @@ export async function POST(req: NextRequest) {
       address: address || "",
       boundarySchool: boundarySchool || "",
       inHillsboroBoundary: inHillsboroBoundary || "unknown",
-      notes:  `Player: ${playerName} | Grade: ${grade} | Session: ${session} | Qty: ${quantity} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"})`,
+      shirtSize: uniformSize || "",
+      notes:  `Player: ${playerName} | Grade: ${grade} | Session: ${session} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
     });
 
     return NextResponse.json({ success: true, paymentId });

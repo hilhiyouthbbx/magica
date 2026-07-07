@@ -80,7 +80,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [phone,       setPhone]      = useState("");
   const [playerName,  setPlayerName] = useState("");
   const [grade,       setGrade]      = useState("");
-  const [session,     setSession]    = useState("");
   const [nextSeasonSchool, setNextSeasonSchool] = useState("");
   const [address,     setAddress]    = useState("");
   const [uniformSize, setUniformSize] = useState("");
@@ -127,7 +126,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const sqRef     = useRef<any>(null);
 
   const grades = ["3rd Grade","4th Grade","5th Grade","6th Grade","7th Grade","8th Grade"];
-  const sessionLabels = t.sessions.map(s => `${s.label} · ${s.time}`);
 
   // Init Square when on pay step
   useEffect(() => {
@@ -201,7 +199,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
           basePrice:   t.price * qty,
           quantity:    qty,
           parentName, email, phone,
-          playerName, grade, session,
+          playerName, grade,
           nextSeasonSchool, address, uniformSize,
           waiverSigned, waiverName,
           boundarySchool: boundaryResult?.schoolName ?? "",
@@ -238,7 +236,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   }
 
   // ── Thank you ─────────────────────────────────────────
-  if (step === "done") {
+if (step === "done") {
     return (
       <div className="min-h-screen flex items-center justify-center pt-24 px-4">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
@@ -416,7 +414,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   <SF label="Grade (2026-27 Season)" value={grade}      onChange={setGrade}      options={grades} req />
                   <IF label="School Attending Next Season" value={nextSeasonSchool} onChange={setNextSeasonSchool} ph="e.g. Hillsboro High School" req />
                   <SF label="Jersey / Uniform Size" value={uniformSize} onChange={setUniformSize} options={UNIFORM_SIZES} req />
-                  <SF label="Preferred Tryout Session" value={session}  onChange={setSession}    options={sessionLabels} req />
 
                   {/* Home address + Hillsboro HS attendance-boundary check */}
                   <div>

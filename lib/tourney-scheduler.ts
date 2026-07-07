@@ -138,6 +138,10 @@ export function autoScheduleGames(
    *  slots must be treated as occupied so this division's new games don't get double-booked onto
    *  the same court at the same time. */
   otherScheduledGames: { date?: string; time: string; court: number }[] = [],
+  /** 1-based preferred court number per divisionId (e.g. always try Court 3/Aux first for 7th/8th
+   *  Grade). If that court is already taken at a given time slot, falls back to the normal
+   *  first-available-court search so games still get scheduled. */
+  preferredCourtByDivision?: Record<string, number>,
 ): PoolGame[] {
   const safeVenues = venues.length > 0 ? venues : [{ name: "Main Gym", courts: 2 }];
   const totalCourts = safeVenues.reduce((s, v) => s + (v.courts || 1), 0);
@@ -167,7 +171,7 @@ export function autoScheduleGames(
     courtsByDayTime.set(key, used);
   });
 
-  // ── Spread each team's games evenly across the tournament's days ─────────────────────────────────────
+  // ── Spread each team's games evenly across the tournament's days ──────────────────
   // e.g. a 3-game guarantee over a Sat/Sun weekend should land as 1 game Saturday + 2
   // Sunday, or 2 Saturday + 1 Sunday — never all 3 crammed onto a single day. We cap how
   // many games of THIS division's set a team may play on any one day at
@@ -225,7 +229,12 @@ export function autoScheduleGames(
 
       const usedCourts = courtsByDayTime.get(key) ?? new Set<number>();
       let court = -1;
-      for (let c = 1; c <= totalCourts; c++) { if (!usedCourts.has(c)) { court = c; break; } }
+      const preferred = preferredCourtByDivision?.[g.divisionId];
+      if (preferred && preferred >= 1 && preferred <= totalCourts && !usedCourts.has(preferred)) {
+        court = preferred;
+      } else {
+        for (let c = 1; c <= totalCourts; c++) { if (!usedCourts.has(c)) { court = c; break; } }
+      }
       if (court === -1) continue;
 
       busy.add(g.team1Id); busy.add(g.team2Id);

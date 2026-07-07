@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!sourceId || typeof clientTotal !== "number" || !coachEmail || !orgName) {
+    if (!sourceId || typeof clientTotal !== "number" || !coachEmail || !orgName || !coachPhone) {
       return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 

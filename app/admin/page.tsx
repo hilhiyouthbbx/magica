@@ -1253,7 +1253,13 @@ function PagesTab({ adminKey }: { adminKey: string }) {
       </Section>
 
       {/* ── Camps & Clinics ──────────────────────────────────────────────── */}
-      <Section openId={section} setOpenId={setSection} id="camps" title="⚡ Events & Camps Page">
+      <Section openId={section} setOpenId={setSection} id="camps" title="⚡ Events & Camps Page" badge={content.camps.registrationOpen ? "Registration Open" : "Registration Closed"}>
+        <Toggle
+          label="Camp Registration Open"
+          desc="When OFF, /register shows a closed message and the payment API rejects new signups server-side — this is what actually stops spam/bot registrations, not just hiding the form."
+          checked={content.camps.registrationOpen}
+          onChange={v => { setContent(p => p ? {...p, camps:{...p.camps, registrationOpen: v}} : p); save("camps", { camps: { ...content.camps, registrationOpen: v } }); }}
+        />
         <div className="grid sm:grid-cols-2 gap-3 mb-4">
           <IF label="Page Title"    value={content.camps.pageTitle}    onChange={v => setContent(p => p ? {...p, camps:{...p.camps,pageTitle:v}} : p)} />
           <IF label="Page Subtitle" value={content.camps.pageSubtitle} onChange={v => setContent(p => p ? {...p, camps:{...p.camps,pageSubtitle:v}} : p)} />

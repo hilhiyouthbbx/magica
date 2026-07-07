@@ -148,6 +148,16 @@ export default function RegisterPage() {
   const [campers, setCampers]   = useState<Camper[]>([defaultCamper()]);
   const [parentInfo, setParent] = useState<ParentInfo>(defaultParent());
   const [medical, setMedical]   = useState<MedicalInfo>(defaultMedical());
+  const [website, setWebsite]   = useState(""); // honeypot — hidden from real users, bots often fill every field
+  const [regOpen, setRegOpen]   = useState(true);
+  const [regChecked, setRegChecked] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(d => { setRegOpen(d?.camps?.registrationOpen !== false); setRegChecked(true); })
+      .catch(() => setRegChecked(true));
+  }, []);
 
   // ── Square state ──────────────────────────────────────────────────────────
   const sqCardRef               = useRef<any>(null);
@@ -287,6 +297,7 @@ export default function RegisterPage() {
           parentInfo,
           medical,
           voucherCode: appliedVoucher?.code ?? null,
+          website,
         }),
       });
       const data = await res.json();
@@ -341,6 +352,23 @@ export default function RegisterPage() {
     );
   }
 
+  if (regChecked && !regOpen) {
+    return (
+      <div className="min-h-screen bg-[#080D1A]">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 pt-40 pb-24 text-center">
+          <div className="text-5xl mb-4">🏀</div>
+          <h1 className="text-3xl font-black text-white mb-3">Registration Closed</h1>
+          <p className="text-gray-400 mb-8">Camp registration is not currently open. Check back soon, or follow us for updates on the next camp.</p>
+          <a href="/events" className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all">
+            View Upcoming Events
+          </a>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#080D1A]">
       {/* Square Web Payments SDK */}
@@ -363,6 +391,18 @@ export default function RegisterPage() {
           <p className="text-gray-400">2026 Hilhi Youth Basketball Camp · June 22–25</p>
         </div>
       </div>
+
+      {/* Honeypot — hidden from real users via CSS, off-form for screen readers; bots that fill every input trip this */}
+      <input
+        type="text"
+        name="website"
+        value={website}
+        onChange={e => setWebsite(e.target.value)}
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", opacity: 0 }}
+      />
 
       {/* Step Progress Bar (mobile) */}
       <div className="max-w-7xl mx-auto px-4 mb-6 md:hidden">

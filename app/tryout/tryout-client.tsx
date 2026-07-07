@@ -21,9 +21,9 @@ const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
   ? "https://sandbox.web.squarecdn.com/v1/square.js"
   : "https://web.squarecdn.com/v1/square.js";
 
-// ─────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────
 // Field helpers
-// ─────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────
 function IF({ label, value, onChange, ph = "", type = "text", req = false }: {
   label: string; value: string; onChange: (v: string) => void;
   ph?: string; type?: string; req?: boolean;
@@ -57,9 +57,9 @@ function SF({ label, value, onChange, options, req = false }: {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────
 // Main client component
-// ─────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────
 export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; contact: ContactData }) {
   const isFree     = t.price === 0;
   const fee        = isFree ? 0 : Math.round(t.price * 0.03 * 100) / 100;
@@ -79,7 +79,37 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [playerName,  setPlayerName] = useState("");
   const [grade,       setGrade]      = useState("");
   const [session,     setSession]    = useState("");
+  const [nextSeasonSchool, setNextSeasonSchool] = useState("");
+  const [address,     setAddress]    = useState("");
   const [qty,         setQty]        = useState(1);
+
+  // ── Attendance-boundary check ─────────────────────────────────────────
+  const [boundaryChecking, setBoundaryChecking] = useState(false);
+  const [boundaryResult, setBoundaryResult] = useState<{ schoolName: string | null; inHillsboro: boolean; message: string; formattedAddress: string } | null>(null);
+  const [boundaryError, setBoundaryError] = useState("");
+
+  async function checkBoundary() {
+    if (!address.trim()) { setBoundaryError("Enter your home address first."); return; }
+    setBoundaryChecking(true);
+    setBoundaryError("");
+    setBoundaryResult(null);
+    try {
+      const res = await fetch("/api/check-boundary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBoundaryResult({ schoolName: data.schoolName, inHillsboro: data.inHillsboro, message: data.message, formattedAddress: data.formattedAddress });
+      } else {
+        setBoundaryError(data.error || "Couldn't check that address. Please try again.");
+      }
+    } catch {
+      setBoundaryError("Network error checking that address. Please try again.");
+    }
+    setBoundaryChecking(false);
+  }
   const [payError,    setPayError]   = useState("");
   const [loading,     setLoading]    = useState(false);
   const [paymentId,   setPaymentId]  = useState("");
@@ -165,6 +195,9 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
           quantity:    qty,
           parentName, email, phone,
           playerName, grade, session,
+          nextSeasonSchool, address,
+          boundarySchool: boundaryResult?.schoolName ?? "",
+          inHillsboroBoundary: boundaryResult ? (boundaryResult.inHillsboro ? "yes" : "no") : "unknown",
           voucherCode: appliedVoucher?.code ?? null,
         }),
       });
@@ -177,7 +210,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
     setLoading(false);
   }
 
-  // ── Page disabled ────────────────────────────────────────────
+  // ── Page disabled ──────────────────────────────────
   if (!t.enabled) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-24 px-4">
@@ -196,7 +229,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
     );
   }
 
-  // ── Thank you ────────────────────────────────────────────────
+  // ── Thank you ─────────────────────────────────────────
   if (step === "done") {
     return (
       <div className="min-h-screen flex items-center justify-center pt-24 px-4">
@@ -369,7 +402,37 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   <IF label="Phone Number"           value={phone}      onChange={setPhone}      ph="(503) 555-0000" type="tel" req />
                   <IF label="Player Full Name"       value={playerName} onChange={setPlayerName} ph="Player's name" req />
                   <SF label="Grade (2026-27 Season)" value={grade}      onChange={setGrade}      options={grades} req />
+                  <IF label="School Attending Next Season" value={nextSeasonSchool} onChange={setNextSeasonSchool} ph="e.g. Hillsboro High School" req />
                   <SF label="Preferred Tryout Session" value={session}  onChange={setSession}    options={sessionLabels} req />
+
+                  {/* Home address + Hillsboro HS attendance-boundary check */}
+                  <div>
+                    <label className="block text-gray-300 text-sm font-semibold mb-1.5">
+                      Home Address<span className="text-red-400"> *</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input type="text" required value={address}
+                        onChange={e => { setAddress(e.target.value); setBoundaryResult(null); setBoundaryError(""); }}
+                        placeholder="123 SE Example St, Hillsboro, OR 97123"
+                        className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors" />
+                      <button type="button" onClick={checkBoundary} disabled={boundaryChecking}
+                        className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5">
+                        {boundaryChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Check Boundary
+                      </button>
+                    </div>
+                    <p className="text-gray-600 text-[11px] mt-1">We'll check if your address is inside the Hillsboro HS attendance boundary using the school district's own map data.</p>
+                    {boundaryError && (
+                      <div className="mt-2 flex items-start gap-2 p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-red-300 text-xs">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /><span>{boundaryError}</span>
+                      </div>
+                    )}
+                    {boundaryResult && (
+                      <div className={`mt-2 p-2.5 rounded-lg border text-xs ${boundaryResult.inHillsboro ? "bg-green-500/10 border-green-500/30 text-green-300" : "bg-yellow-500/10 border-yellow-500/30 text-yellow-200"}`}>
+                        {boundaryResult.message}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Quantity */}
                   <div>

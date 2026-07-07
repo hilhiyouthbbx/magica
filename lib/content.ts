@@ -173,6 +173,8 @@ export interface SiteContent {
     pageTitle:    string;
     pageSubtitle: string;
     items:        CampItem[];
+    /** Master switch for the /register camp signup flow. Closing this blocks new registrations server-side (stops spam bots hitting the API directly, not just hiding the form). */
+    registrationOpen: boolean;
   };
   /* ── Tryout page ── */
   tryout: {
@@ -294,6 +296,7 @@ export const DEFAULTS: SiteContent = {
   camps: {
     pageTitle:    "Camps & Clinics",
     pageSubtitle: "Skill development opportunities for all ages and levels.",
+    registrationOpen: false,
     items: [
       {
         id:          "camp-2026",

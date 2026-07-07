@@ -23,65 +23,22 @@ export interface RegistrationContact {
 
 // ── Division presets ──────────────────────────────────────────────────────────
 
+// Team type qualifiers offered alongside grade + gender when building division presets.
+const TEAM_TYPES = ["", "Competitive", "Development", "AAU"];
+
+function buildGradePresets(grade: string): string[] {
+  const presets: string[] = [];
+  for (const gender of ["Boys", "Girls"]) {
+    for (const type of TEAM_TYPES) {
+      presets.push(type ? `${grade} ${gender} ${type}` : `${grade} ${gender}`);
+    }
+  }
+  return presets;
+}
+
 const GRADE_PRESETS: { grade: string; presets: string[] }[] = [
-  {
-    grade: "4th Grade",
-    presets: [
-      "4th Grade Competitive",
-      "4th Grade Development",
-      "4th Grade Boys",
-      "4th Grade Girls",
-      "4th Grade Boys Competitive",
-      "4th Grade Boys Development",
-      "4th Grade Girls Competitive",
-      "4th Grade Girls Development",
-    ],
-  },
-  {
-    grade: "5th Grade",
-    presets: [
-      "5th Grade Boys",
-      "5th Grade Boys Competitive",
-      "5th Grade Boys Development",
-      "5th Grade Girls",
-      "5th Grade Girls Competitive",
-      "5th Grade Girls Development",
-    ],
-  },
-  {
-    grade: "6th Grade",
-    presets: [
-      "6th Grade Boys",
-      "6th Grade Boys Competitive",
-      "6th Grade Boys Development",
-      "6th Grade Girls",
-      "6th Grade Girls Competitive",
-      "6th Grade Girls Development",
-    ],
-  },
-  {
-    grade: "7th Grade",
-    presets: [
-      "7th Grade Boys",
-      "7th Grade Boys Competitive",
-      "7th Grade Boys Development",
-      "7th Grade Girls",
-      "7th Grade Girls Competitive",
-      "7th Grade Girls Development",
-    ],
-  },
-  {
-    grade: "8th Grade",
-    presets: [
-      "8th Grade Boys",
-      "8th Grade Boys Competitive",
-      "8th Grade Boys Development",
-      "8th Grade Girls",
-      "8th Grade Girls Competitive",
-      "8th Grade Girls Development",
-    ],
-  },
-];
+  "4th Grade", "5th Grade", "6th Grade", "7th Grade", "8th Grade",
+].map(grade => ({ grade, presets: buildGradePresets(grade) }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

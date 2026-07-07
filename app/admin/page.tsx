@@ -1988,6 +1988,25 @@ export default function AdminPage() {
     }
   }
 
+  async function renameSource(oldSource: string) {
+    const count = contacts.filter(c => c.source === oldSource).length;
+    if (count === 0) return;
+    const newSource = prompt(`Rename the source for all ${count} contact(s) currently labeled "${SOURCE_LABELS[oldSource] || oldSource}" to:`, oldSource);
+    if (!newSource || !newSource.trim() || newSource.trim() === oldSource) return;
+    const res = await fetch(`/api/admin/contacts?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "renameSource", oldSource, newSource: newSource.trim() }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alert(`Renamed ${data.renamed} contact(s) to "${newSource.trim()}".`);
+      setSourceFilter(newSource.trim());
+      fetch(`/api/admin/contacts?key=${adminKey}`).then(r=>r.json()).then(d => { setContacts(Array.isArray(d) ? d : (d.contacts ?? [])); setContactsLoaded(true); });
+    } else {
+      alert(data.error || "Rename failed");
+    }
+  }
+
   const stats = {
     total:      contacts.length,
     reg:        contacts.filter(c=>c.source==="registration"||c.source.includes("Camp")||c.source.includes("Summer")).length,
@@ -2407,11 +2426,18 @@ export default function AdminPage() {
                 </select>
 
                 {sourceFilter !== "all" && (
-                  <button onClick={() => deleteAllInSource(sourceFilter)}
-                    title="Delete every contact currently matching this Source filter"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600/10 border border-red-500/30 text-red-300 hover:bg-red-600/20 text-xs font-semibold transition-all">
-                    <Trash2 className="w-3.5 h-3.5" /> Delete All in Source
-                  </button>
+                  <>
+                    <button onClick={() => renameSource(sourceFilter)}
+                      title="Rename this Source label for every contact currently matching it"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/10 border border-blue-500/30 text-blue-300 hover:bg-blue-600/20 text-xs font-semibold transition-all">
+                      <Edit2 className="w-3.5 h-3.5" /> Rename Source
+                    </button>
+                    <button onClick={() => deleteAllInSource(sourceFilter)}
+                      title="Delete every contact currently matching this Source filter"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600/10 border border-red-500/30 text-red-300 hover:bg-red-600/20 text-xs font-semibold transition-all">
+                      <Trash2 className="w-3.5 h-3.5" /> Delete All in Source
+                    </button>
+                  </>
                 )}
 
                 {tournamentNames.length > 0 && (

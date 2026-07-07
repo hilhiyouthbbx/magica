@@ -75,6 +75,7 @@ export function roundRobinPairs(ids: string[]): [string, string][][] {
   return rounds;
 }
 
+/** Build round-robin pool games with NO date/time/court assigned yet — ready to drag onto the Scheduler grid. */
 /**
  * Build pool games so that most teams get exactly `guarantee` games — NOT a full round-robin
  * (everyone-plays-everyone). With an odd number of teams a perfectly even split isn't possible,
@@ -133,6 +134,10 @@ export function autoScheduleGames(
   startDate?: string,
   endDate?: string,
   dayWindows?: Record<string, { start: string; end: string }>,
+  /** Games already scheduled elsewhere in the tournament (e.g. other divisions) whose court/time
+   *  slots must be treated as occupied so this division's new games don't get double-booked onto
+   *  the same court at the same time. */
+  otherScheduledGames: { date?: string; time: string; court: number }[] = [],
 ): PoolGame[] {
   const safeVenues = venues.length > 0 ? venues : [{ name: "Main Gym", courts: 2 }];
   const totalCourts = safeVenues.reduce((s, v) => s + (v.courts || 1), 0);
@@ -151,6 +156,16 @@ export function autoScheduleGames(
   const teamById = new Map(teams.map(t => [t.id, t]));
   const busyByDayTime = new Map<string, Set<string>>(); // "day|time" -> set of teamIds/coach:name busy
   const courtsByDayTime = new Map<string, Set<number>>(); // "day|time" -> set of courts used
+
+  // Seed court usage with games already scheduled elsewhere in the tournament so this division's
+  // auto-placement doesn't double-book a court another division is already using at that time.
+  otherScheduledGames.forEach(og => {
+    if (!og.time || !og.court) return;
+    const key = `${og.date || ""}|${og.time}`;
+    const used = courtsByDayTime.get(key) ?? new Set<number>();
+    used.add(og.court);
+    courtsByDayTime.set(key, used);
+  });
 
   return games.map(g => {
     if (g.time) return g; // already scheduled — leave as-is

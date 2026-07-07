@@ -473,7 +473,7 @@ export default function TournamentDetailPage({ params }: Params) {
                             { label:"Organization / Team Name", value:orgName,    set:setOrgName,    ph:"Hillsboro Hawks",  required:true  },
                             { label:"Head Coach Name",          value:coachName,  set:setCoachName,  ph:"Coach Smith",     required:true  },
                             { label:"Coach Email",              value:coachEmail, set:setCoachEmail, ph:"coach@email.com", required:true, type:"email" },
-                            { label:"Coach Phone",              value:coachPhone, set:setCoachPhone, ph:"503-555-0100",    required:false },
+                            { label:"Coach Phone",              value:coachPhone, set:setCoachPhone, ph:"503-555-0100",    required:true  },
                           ].map(f => (
                             <div key={f.label}>
                               <label className="block text-gray-400 text-xs font-semibold mb-1">{f.label}{f.required && <span className="text-red-400"> *</span>}</label>

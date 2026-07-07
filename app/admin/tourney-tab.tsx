@@ -973,6 +973,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
                   </div>
                 );
               })}
+              <p className="text-gray-600 text-xs">This creates the tournament and each category's matchups — games won't be placed on the day/court board yet. Once created, double-check dates/venues in the Teams tab, then click "Auto-Schedule All" to build the schedule.</p>
             </div>
           )}
         </div>
@@ -984,7 +985,7 @@ function CreateWizard({ onCreated, onClose, contacts, tournaments }: {
           <div className="flex gap-1.5">{[1,2,3].map(n=><div key={n} className={`w-2 h-2 rounded-full ${step===n?"bg-blue-500":"bg-white/15"}`}/>)}</div>
           {step < 3
             ? <Btn onClick={()=>setStep(s=>s+1)} disabled={step===1?!canNext1:!canNext2} className="bg-blue-600 hover:bg-blue-500 text-white">Next →</Btn>
-            : <Btn onClick={generate} className="bg-green-600 hover:bg-green-500 text-white">🚀 Generate Schedule</Btn>
+            : <Btn onClick={generate} className="bg-green-600 hover:bg-green-500 text-white">✅ Create Tournament</Btn>
           }
         </div>
       </div>

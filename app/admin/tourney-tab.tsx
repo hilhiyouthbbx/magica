@@ -18,7 +18,7 @@ export interface RegistrationContact {
   id: string; name: string; email: string; phone: string;
   source: string;
   tournamentName?: string; teamName?: string; division?: string;
-  schedulingRequests?: string; noPlayBefore?: string; noPlayAfter?: string;
+  schedulingRequests?: string; noPlayBefore?: string; noPlayAfter?: string; noOverlapWithTeam?: string;
   date: string;
 }
 
@@ -342,6 +342,7 @@ function ImportPanel({ tournament, contacts, onImport, onClose }: {
         schedulingRequests: c.schedulingRequests || undefined,
         noPlayBefore: c.noPlayBefore || undefined,
         noPlayAfter:  c.noPlayAfter || undefined,
+        noOverlapWithTeam: c.noOverlapWithTeam || undefined,
       };
       div.teams.push(team);
       // Auto-place the team into its category's pool so it's ready for pool-game generation immediately.
@@ -999,7 +1000,10 @@ function fmtConflictDay(day: string): string {
  * list of exactly which games/teams/times collide, so it's visible even when filtered to one division.
  */
 function computeScheduleConflicts(tournament: Tournament): { keys: Set<string>; details: string[] } {
-  type Entry = { divIdx: number; gameIdx: number; divName: string; team1: string; team2: string; teamIds: string[]; coachNames: string[] };
+  type Entry = {
+    divIdx: number; gameIdx: number; divName: string; team1: string; team2: string;
+    teamIds: string[]; coachNames: string[]; teamNames: string[]; noOverlapRequests: string[];
+  };
   const byDayTime = new Map<string, Entry[]>();
   tournament.divisions.forEach((d, divIdx) => {
     const teamById = new Map(d.teams.map(t => [t.id, t]));
@@ -1010,10 +1014,14 @@ function computeScheduleConflicts(tournament: Tournament): { keys: Set<string>; 
       const coachNames = [g.team1Id, g.team2Id]
         .map(id => teamById.get(id)?.coachName?.trim().toLowerCase())
         .filter((c): c is string => !!c);
+      const teamNames = [g.team1Id, g.team2Id].map(id => teamById.get(id)?.name ?? "?");
+      const noOverlapRequests = [g.team1Id, g.team2Id]
+        .map(id => teamById.get(id)?.noOverlapWithTeam?.trim().toLowerCase())
+        .filter((r): r is string => !!r);
       arr.push({
         divIdx, gameIdx, divName: d.name,
         team1: teamById.get(g.team1Id)?.name ?? "?", team2: teamById.get(g.team2Id)?.name ?? "?",
-        teamIds: [g.team1Id, g.team2Id], coachNames,
+        teamIds: [g.team1Id, g.team2Id], coachNames, teamNames, noOverlapRequests,
       });
       byDayTime.set(key, arr);
     });
@@ -1046,6 +1054,19 @@ function computeScheduleConflicts(tournament: Tournament): { keys: Set<string>; 
           details.push(`⏰ ${whenLabel} — coach is double-booked across divisions: ${prior.divName} (${prior.team1} vs ${prior.team2}) and ${e.divName} (${e.team1} vs ${e.team2})`);
         } else {
           seenCoach.set(coach, e);
+        }
+      }
+    }
+
+    // "Can't play at the same time as another team" requests — check every pair of entries in this slot.
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i]; const b = entries[j];
+        const aWantsB = a.noOverlapRequests.some(r => b.teamNames.some(n => n.toLowerCase() === r));
+        const bWantsA = b.noOverlapRequests.some(r => a.teamNames.some(n => n.toLowerCase() === r));
+        if (aWantsB || bWantsA) {
+          keys.add(conflictKey(a.divIdx, a.gameIdx)); keys.add(conflictKey(b.divIdx, b.gameIdx));
+          details.push(`⏰ ${whenLabel} — requested no-overlap conflict: ${a.divName} (${a.team1} vs ${a.team2}) and ${b.divName} (${b.team1} vs ${b.team2})`);
         }
       }
     }
@@ -1778,6 +1799,12 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
                       <div className="text-blue-300/90 text-[10px] mt-1 flex items-center gap-1">
                         <span className="flex-shrink-0">⏰</span>
                         <span>{team.noPlayBefore && `Not before ${formatTime12(team.noPlayBefore)}`}{team.noPlayBefore && team.noPlayAfter && " · "}{team.noPlayAfter && `Not after ${formatTime12(team.noPlayAfter)}`}</span>
+                      </div>
+                    )}
+                    {team.noOverlapWithTeam && (
+                      <div className="text-purple-300/90 text-[10px] mt-1 flex items-center gap-1">
+                        <span className="flex-shrink-0">🚫</span>
+                        <span className="truncate">Not same time as {team.noOverlapWithTeam}</span>
                       </div>
                     )}
                     {team.schedulingRequests && (

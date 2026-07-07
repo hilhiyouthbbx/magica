@@ -23,7 +23,7 @@ interface Contact {
   id: string; name: string; email: string; phone: string;
   source: string; notes?: string;
   tournamentName?: string; teamName?: string; division?: string;
-  schedulingRequests?: string; noPlayBefore?: string; noPlayAfter?: string;
+  schedulingRequests?: string; noPlayBefore?: string; noPlayAfter?: string; noOverlapWithTeam?: string;
   date: string;
   // Camper info
   camperName?: string; grade?: string; gender?: string;
@@ -2182,6 +2182,15 @@ export default function AdminPage() {
                             onChange={e => setEditPatch(p => ({ ...p, noPlayAfter: e.target.value }))}
                           />
                         </div>
+                      </div>
+                      <div className="mt-3">
+                        <label className="block text-gray-400 text-xs font-semibold mb-1">Can&apos;t Play Same Time As Team</label>
+                        <input type="text"
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-600"
+                          placeholder="e.g. Portland Hawks"
+                          value={(editPatch.noOverlapWithTeam ?? editingContact.noOverlapWithTeam ?? "") as string}
+                          onChange={e => setEditPatch(p => ({ ...p, noOverlapWithTeam: e.target.value }))}
+                        />
                       </div>
                       <div className="mt-3">
                         <label className="block text-gray-400 text-xs font-semibold mb-1">Other Scheduling Notes</label>

@@ -51,6 +51,10 @@ export interface Division {
   bracketGenerated: boolean;
   /** Overrides the tournament-wide bracketFormat for just this division (e.g. one division is pool-play-only while another plays a bracket). */
   format?: BracketFormat;
+  /** 1-based court number the scheduler should try FIRST for this division's games (e.g. always
+   *  put 7th/8th Grade on Court 3/Aux). Falls back to normal first-available-court search if that
+   *  court is already taken at a given time slot. */
+  preferredCourt?: number;
 }
 
 export interface Tournament {

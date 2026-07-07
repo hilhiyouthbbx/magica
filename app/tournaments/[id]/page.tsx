@@ -38,6 +38,30 @@ function stripTeamType(d: string): string {
   return d;
 }
 
+// Compute the displayed date range live from startDate/endDate (YYYY-MM-DD) rather than trusting
+// whatever text happens to be saved in the "dates" field — some older tournaments have a stale/
+// garbled "dates" string (e.g. "Jan 9–2027 (day: 10)") from a previous formatting bug. Recomputing
+// here self-heals the display immediately without needing to re-save the tournament in admin.
+function parseLocalDate(s: string): Date | null {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+function formatDateRangeLive(start: string, end: string, fallback: string): string {
+  const sd = parseLocalDate(start), ed = parseLocalDate(end);
+  if (!sd) return fallback;
+  if (!ed || start === end) return sd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const sameMonth = sd.getMonth() === ed.getMonth() && sd.getFullYear() === ed.getFullYear();
+  if (sameMonth) {
+    const monthName = sd.toLocaleDateString("en-US", { month: "short" });
+    return `${monthName} ${sd.getDate()}–${ed.getDate()}, ${ed.getFullYear()}`;
+  }
+  const startStr = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const endStr = ed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return `${startStr}–${endStr}`;
+}
+
 interface Params { params: Promise<{ id: string }>; }
 
 export default function TournamentDetailPage({ params }: Params) {
@@ -300,7 +324,7 @@ export default function TournamentDetailPage({ params }: Params) {
                 <div className="flex items-start gap-3">
                   <Calendar className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <div className="text-white font-semibold">{t.dates}</div>
+                    <div className="text-white font-semibold">{formatDateRangeLive(t.startDate, t.endDate, t.dates)}</div>
                     {t.dayTime && <div className="text-gray-400 text-sm">{t.dayTime}</div>}
                     {t.registrationDeadline && <div className="text-yellow-400 text-sm mt-1">Registration deadline: {t.registrationDeadline}</div>}
                   </div>

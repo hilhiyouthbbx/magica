@@ -6,7 +6,7 @@ import type {
   BracketFormat, TiebreakerMethod, VenueConfig
 } from "@/lib/tourney-types";
 import { getAllTournaments, saveTournament, deleteTournament as deleteT } from "@/lib/tourney-storage";
-import { generateDivisionSchedule, courtToVenueName, buildUnscheduledPoolGames, buildTournamentDates, buildDayTimeSlots } from "@/lib/tourney-scheduler";
+import { generateDivisionSchedule, courtToVenueName, buildUnscheduledPoolGames, buildTournamentDates, buildDayTimeSlots, autoScheduleGames, formatTime12 } from "@/lib/tourney-scheduler";
 import { calculateStandings } from "@/lib/tourney-standings";
 import { generateBracket, advanceBracketWinner } from "@/lib/tourney-bracket";
 import { Plus, Trash2, ArrowLeft, Trophy, Calendar, MapPin, Users, Clock, Edit, X, Download, ChevronDown } from "lucide-react";
@@ -1033,10 +1033,10 @@ function computeTimeViolations(tournament: Tournament): { divIdx: number; gameId
         const team = teamById.get(teamId);
         if (!team) return;
         if (team.noPlayBefore && g.time < team.noPlayBefore) {
-          violations.push({ divIdx, gameIdx, message: `${team.name} can't play before ${team.noPlayBefore} (scheduled ${g.time})` });
+          violations.push({ divIdx, gameIdx, message: `${team.name} can't play before ${formatTime12(team.noPlayBefore)} (scheduled ${formatTime12(g.time)})` });
         }
         if (team.noPlayAfter && g.time > team.noPlayAfter) {
-          violations.push({ divIdx, gameIdx, message: `${team.name} can't play after ${team.noPlayAfter} (scheduled ${g.time})` });
+          violations.push({ divIdx, gameIdx, message: `${team.name} can't play after ${formatTime12(team.noPlayAfter)} (scheduled ${formatTime12(g.time)})` });
         }
       });
     });
@@ -1106,10 +1106,20 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     onUpdate(t); setScoring(null);
   }
 
-  function toggleExclude(divIdx: number, gameIdx: number) {
+  function toggleExcludeTeam(divIdx: number, gameIdx: number, teamId: string) {
     const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
     const g = t.divisions[divIdx].games[gameIdx];
-    g.excludeFromStandings = !g.excludeFromStandings;
+    const excluded = new Set(g.excludedTeamIds ?? []);
+    if (excluded.has(teamId)) excluded.delete(teamId); else excluded.add(teamId);
+    g.excludedTeamIds = [...excluded];
+    t.updatedAt = new Date().toISOString();
+    onUpdate(t);
+  }
+
+  function deleteGame(divIdx: number, gameIdx: number) {
+    if (!confirm("Delete this game? This can't be undone.")) return;
+    const t = JSON.parse(JSON.stringify(tournament)) as Tournament;
+    t.divisions[divIdx].games.splice(gameIdx, 1);
     t.updatedAt = new Date().toISOString();
     onUpdate(t);
   }
@@ -1159,37 +1169,43 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
     const done = game.status==="completed";
     const poolName = tournament.divisions[divIdx].pools.find(p=>p.id===game.poolId)?.name ?? "";
     const timeViolated = timeViolationKeys.has(conflictKey(divIdx, gameIdx));
+    const excluded = new Set(game.excludedTeamIds ?? []);
+    const anyExcluded = excluded.size > 0;
     return (
       <div
         draggable
         onDragStart={e=>e.dataTransfer.setData("text/plain", JSON.stringify({divIdx,gameIdx}))}
         className={`glass border rounded-xl p-3 cursor-grab active:cursor-grabbing transition-colors ${
-          conflicted ? "border-red-500/60 bg-red-500/5" : timeViolated ? "border-orange-500/60 bg-orange-500/5" : isOver ? "border-blue-500/60" : game.excludeFromStandings ? "border-yellow-500/30 opacity-70" : "border-white/10 hover:border-white/20"
+          conflicted ? "border-red-500/60 bg-red-500/5" : timeViolated ? "border-orange-500/60 bg-orange-500/5" : isOver ? "border-blue-500/60" : anyExcluded ? "border-yellow-500/30" : "border-white/10 hover:border-white/20"
         }`}
       >
-        <div className="flex items-center gap-2 text-[11px] text-gray-600 mb-1 truncate">
-          <span>{divName}</span>{poolName&&<><span>·</span><span>{poolName}</span></>}
-          {game.excludeFromStandings && <span className="text-yellow-500 font-bold">· doesn't count</span>}
-          {timeViolated && <span className="text-orange-400 font-bold">· ⏰ time conflict</span>}
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <div className="flex items-center gap-2 text-[11px] text-gray-600 truncate">
+            <span>{divName}</span>{poolName&&<><span>·</span><span>{poolName}</span></>}
+            {timeViolated && <span className="text-orange-400 font-bold">· ⏰</span>}
+          </div>
+          <button onClick={()=>deleteGame(divIdx,gameIdx)} title="Delete this game" className="text-gray-700 hover:text-red-400 transition-colors flex-shrink-0">
+            <Trash2 className="w-3 h-3"/>
+          </button>
         </div>
         <div className="flex items-center justify-between gap-1">
-          <span className={`font-bold text-xs truncate ${done&&game.score1!>game.score2!?"text-white":"text-gray-300"}`}>{t1}</span>
+          <label className="flex items-center gap-1 flex-1 min-w-0 cursor-pointer" title="Doesn't count toward this team's standings (e.g. an extra game beyond their guarantee)">
+            <input type="checkbox" checked={excluded.has(game.team1Id)} onChange={()=>toggleExcludeTeam(divIdx,gameIdx,game.team1Id)} className="w-3 h-3 accent-yellow-500 flex-shrink-0"/>
+            <span className={`font-bold text-xs truncate ${excluded.has(game.team1Id) ? "text-yellow-500/70 line-through" : done&&game.score1!>game.score2! ? "text-white" : "text-gray-300"}`}>{t1}</span>
+          </label>
           {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score1}</span>}
         </div>
         <div className="flex items-center justify-between gap-1">
-          <span className={`font-bold text-xs truncate ${done&&game.score2!>game.score1!?"text-white":"text-gray-300"}`}>{t2}</span>
+          <label className="flex items-center gap-1 flex-1 min-w-0 cursor-pointer" title="Doesn't count toward this team's standings (e.g. an extra game beyond their guarantee)">
+            <input type="checkbox" checked={excluded.has(game.team2Id)} onChange={()=>toggleExcludeTeam(divIdx,gameIdx,game.team2Id)} className="w-3 h-3 accent-yellow-500 flex-shrink-0"/>
+            <span className={`font-bold text-xs truncate ${excluded.has(game.team2Id) ? "text-yellow-500/70 line-through" : done&&game.score2!>game.score1! ? "text-white" : "text-gray-300"}`}>{t2}</span>
+          </label>
           {done && <span className="text-gray-500 font-black text-[10px] bg-white/5 px-1.5 py-0.5 rounded shrink-0">{game.score2}</span>}
         </div>
-        <div className="flex items-center gap-1.5 mt-1.5">
-          <button onClick={()=>setScoring({divIdx,gameIdx})}
-            className={`flex-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${done?"bg-white/5 text-gray-500 hover:text-blue-400":"bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"}`}>
-            {done?"Edit Score":"Score →"}
-          </button>
-          <label className="flex items-center gap-1 text-[9px] text-gray-500 cursor-pointer flex-shrink-0" title="Exclude this game from standings (e.g. an extra game beyond the guarantee)">
-            <input type="checkbox" checked={!!game.excludeFromStandings} onChange={()=>toggleExclude(divIdx,gameIdx)} className="w-3 h-3 accent-yellow-500"/>
-            doesn't count
-          </label>
-        </div>
+        <button onClick={()=>setScoring({divIdx,gameIdx})}
+          className={`mt-1.5 w-full text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${done?"bg-white/5 text-gray-500 hover:text-blue-400":"bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"}`}>
+          {done?"Edit Score":"Score →"}
+        </button>
       </div>
     );
   }
@@ -1279,7 +1295,7 @@ function ScheduleView({ tournament, onUpdate }: { tournament: Tournament; onUpda
                   {slots.map(slot => (
                     <tr key={slot}>
                       <td className="align-top text-xs text-gray-500 font-bold pt-3 whitespace-nowrap">
-                        <Clock className="w-3.5 h-3.5 inline mr-1 text-gray-600"/>{slot}
+                        <Clock className="w-3.5 h-3.5 inline mr-1 text-gray-600"/>{formatTime12(slot)}
                       </td>
                       {courtNums.map(court => {
                         const entry = gameAt(day, slot, court);
@@ -1600,7 +1616,15 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
     if (d.pools.length === 0) d.pools.push({ id: makeId(), name: "Pool A", teamIds: [] });
     const assignedIds = new Set(d.pools.flatMap(p => p.teamIds));
     d.teams.forEach(team => { if (!assignedIds.has(team.id)) d.pools[0].teamIds.push(team.id); });
-    d.games = buildUnscheduledPoolGames(d.pools, divId);
+    // Build games so most teams get exactly the guaranteed count (odd team counts mean
+    // usually just one team gets an extra game, rather than everyone playing everyone).
+    const built = buildUnscheduledPoolGames(d.pools, divId, t.gamesGuaranteed || 3);
+    // Auto-place each game onto a day/time/court slot right away — avoiding team, coach,
+    // and scheduling-request conflicts. Anything that can't find a slot stays unscheduled.
+    d.games = autoScheduleGames(
+      built, d.teams, t.venues ?? [], t.gameDuration, t.breakBetweenGames, t.startTime,
+      t.startDate, t.endDate, t.dayWindows,
+    );
     d.bracket = []; d.bracketGenerated = false;
     t.updatedAt = new Date().toISOString();
     onUpdate(t);
@@ -1698,7 +1722,7 @@ function TeamsView({ tournament, onUpdate }: { tournament: Tournament; onUpdate:
                     {(team.noPlayBefore || team.noPlayAfter) && (
                       <div className="text-blue-300/90 text-[10px] mt-1 flex items-center gap-1">
                         <span className="flex-shrink-0">⏰</span>
-                        <span>{team.noPlayBefore && `Not before ${team.noPlayBefore}`}{team.noPlayBefore && team.noPlayAfter && " · "}{team.noPlayAfter && `Not after ${team.noPlayAfter}`}</span>
+                        <span>{team.noPlayBefore && `Not before ${formatTime12(team.noPlayBefore)}`}{team.noPlayBefore && team.noPlayAfter && " · "}{team.noPlayAfter && `Not after ${formatTime12(team.noPlayAfter)}`}</span>
                       </div>
                     )}
                     {team.schedulingRequests && (

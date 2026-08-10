@@ -138,7 +138,7 @@ async function sendEmails(
     // Admin notification
     transporter.sendMail({
       from:    process.env.SMTP_USER,
-      to:      "info@hilhiyouthbbx.com",
+      to:      "order@hilhiyouthbbx.com",
       subject: `✅ New Merch Order — ${contact.name} — $${total.toFixed(2)}`,
       html: `
         <div style="font-family:sans-serif;max-width:600px">

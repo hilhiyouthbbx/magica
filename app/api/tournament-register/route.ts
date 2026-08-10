@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     });
 
     await Promise.allSettled([
-      transport.sendMail({ from: `"Hilhi Youth Basketball" <${process.env.SMTP_USER}>`, to: "info@hilhiyouthbbx.com", replyTo: coachEmail, subject: `Tournament Registration — ${orgName} (${division})`, html: adminHtml }),
+      transport.sendMail({ from: `"Hilhi Youth Basketball" <${process.env.SMTP_USER}>`, to: "order@hilhiyouthbbx.com", replyTo: coachEmail, subject: `Tournament Registration — ${orgName} (${division})`, html: adminHtml }),
       transport.sendMail({ from: `"Hilhi Youth Basketball" <${process.env.SMTP_USER}>`, to: coachEmail, subject: `Tournament Registration Confirmed — ${tournament.name}`, html: confirmHtml }),
     ]);
 

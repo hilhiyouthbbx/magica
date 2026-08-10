@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
     await transporter.sendMail({
       from:    `"Hilhi Youth BBX Store" <${process.env.SMTP_USER}>`,
-      to:      "info@hilhiyouthbbx.com",
+      to:      "order@hilhiyouthbbx.com",
       replyTo: email,
       subject: `New Merch Order – ${name} ($${total})`,
       html,

@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
     await Promise.allSettled([
       transporter.sendMail({
         from:    `"Hilhi Youth Basketball" <${process.env.SMTP_USER}>`,
-        to:      "info@hilhiyouthbbx.com",
+        to:      "order@hilhiyouthbbx.com",
         replyTo: email,
         subject: `New Member Sign-Up — ${guardianName} (${players.length} player${players.length > 1 ? "s" : ""})`,
         html:    adminHtml,

@@ -1,8 +1,7 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-import { useState, useEffect, useRef } from "react";
-import Script from "next/script";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   MapPin, Clock, Calendar, Users, ChevronRight,
@@ -15,12 +14,7 @@ import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 type TryoutData  = SiteContent["tryout"];
 type ContactData = SiteContent["contact"];
 
-const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
-const SQ_LOC_ID = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? "";
-const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
-  ? "https://sandbox.web.squarecdn.com/v1/square.js"
-  : "https://web.squarecdn.com/v1/square.js";
-
+// Card/Square payment removed from this form — PayPal and Venmo only.
 const PAYPAL_LINK    = "https://www.paypal.com/ncp/payment/4TKZ7WGKJFMG8";
 const VENMO_HANDLE    = "@hilhiyouthbbx";
 
@@ -122,65 +116,11 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [payError,    setPayError]   = useState("");
   const [loading,     setLoading]    = useState(false);
   const [paymentId,   setPaymentId]  = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "paypal" | "venmo">("card");
+  const [paymentMethod, setPaymentMethod] = useState<"paypal" | "venmo">("paypal"); // Card/Square removed from this form
   const [altPaymentConfirmed, setAltPaymentConfirmed] = useState(false);
-  const [sqReady,     setSqReady]    = useState(false);
-  const [retryCount,  setRetryCount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
-  const sqCardRef = useRef<any>(null);
-  const sqRef     = useRef<any>(null);
 
   const grades = ["3rd Grade","4th Grade","5th Grade","6th Grade","7th Grade","8th Grade"];
-
-  // Init Square when on pay step AND the Card method is selected (the #sq-tryout-card element
-  // only exists in the DOM when paymentMethod === "card" — switching to/from PayPal/Venmo mounts
-  // and unmounts it, so this must re-run whenever paymentMethod changes too).
-  useEffect(() => {
-    if (step !== "pay" || paymentMethod !== "card") return;
-    let cancelled = false;
-    let card: any = null;
-
-    async function init() {
-      const w = window as any;
-      let attempts = 0;
-      while (!w.Square && attempts < 40) {
-        await new Promise(r => setTimeout(r, 200));
-        attempts++;
-      }
-      if (cancelled || !w.Square) { setPayError("Payment system failed to load. Please refresh."); return; }
-      try {
-        const payments = w.Square.payments(SQ_APP_ID, SQ_LOC_ID);
-        card = await payments.card({
-          style: {
-            ".input-container": { borderColor: "rgba(255,255,255,0.15)", borderRadius: "12px" },
-            ".input-container.is-focus": { borderColor: "#3b82f6" },
-            ".message-text": { color: "#f87171" },
-            input: { color: "#ffffff", backgroundColor: "rgba(255,255,255,0.05)" },
-            "input::placeholder": { color: "#4b5563" },
-          }
-        });
-        const container = document.getElementById("sq-tryout-card");
-        if (!container || cancelled) return;
-        container.innerHTML = "";
-        await card.attach("#sq-tryout-card");
-        sqCardRef.current = card;
-        sqRef.current     = payments;
-        if (!cancelled) setSqReady(true);
-      } catch (err: any) {
-        if (!cancelled) setPayError(err?.message || "Card setup failed.");
-      }
-    }
-    init();
-    return () => {
-      cancelled = true;
-      sqCardRef.current?.destroy?.().catch(() => {});
-      sqCardRef.current = null;
-      sqRef.current     = null;
-      setSqReady(false);
-      const el = document.getElementById("sq-tryout-card");
-      if (el) el.innerHTML = "";
-    };
-  }, [step, retryCount, paymentMethod]);
 
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
@@ -188,22 +128,9 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
     try {
       const chargeTotal = appliedVoucher?.finalTotal ?? (total * qty);
 
-      // PayPal/Venmo — no card tokenization; payment happens off-site and gets confirmed
-      // manually later, so we just need to know which method they used.
-      let sourceId: string | null = "FREE";
-      if (chargeTotal > 0 && paymentMethod === "card") {
-        sourceId = await (async () => {
-          const result = await sqCardRef.current.tokenize();
-          if (result.status !== "OK") {
-            setPayError(result.errors?.[0]?.message || "Card tokenization failed.");
-            setLoading(false); return null;
-          }
-          return result.token;
-        })();
-      } else if (chargeTotal > 0) {
-        sourceId = paymentMethod === "paypal" ? "PAYPAL_PENDING" : "VENMO_PENDING";
-      }
-      if (!sourceId) return;
+      // No card option on this form anymore — PayPal/Venmo happen off-site and get confirmed
+      // manually later, so we just need to know which method was used (and "FREE" if $0).
+      const sourceId = chargeTotal > 0 ? (paymentMethod === "paypal" ? "PAYPAL_PENDING" : "VENMO_PENDING") : "FREE";
 
       const res = await fetch("/api/tryout-payment", {
         method: "POST",
@@ -213,7 +140,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
           total:       chargeTotal,
           basePrice:   t.price * qty,
           quantity:    qty,
-          paymentMethod: chargeTotal > 0 ? paymentMethod : "card",
+          paymentMethod,
           parentName, email, phone,
           playerName, grade,
           nextSeasonSchool, address, uniformSize,
@@ -284,7 +211,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
 
   return (
     <>
-      <Script src={SQ_SCRIPT} strategy="afterInteractive" />
 
       {/* ── Hero ── */}
       <section className="relative pt-24 pb-0 overflow-hidden">
@@ -553,10 +479,10 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     applied={appliedVoucher}
                   />
 
-                  {/* Payment method picker — hidden when free */}
+                  {/* Payment method picker — hidden when free (Card/Square removed — PayPal/Venmo only) */}
                   {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && (
                     <div className="flex gap-2">
-                      {([["card","💳 Card"],["paypal","🅿️ PayPal"],["venmo","💸 Venmo"]] as const).map(([val, label]) => (
+                      {([["paypal","🅿️ PayPal"],["venmo","💸 Venmo"]] as const).map(([val, label]) => (
                         <button key={val} type="button"
                           onClick={() => { setPaymentMethod(val); setAltPaymentConfirmed(false); setPayError(""); }}
                           className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
@@ -568,19 +494,6 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                         </button>
                       ))}
                     </div>
-                  )}
-
-                  {/* Square card — only when Card selected and not free */}
-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && paymentMethod === "card" && (
-                  <div>
-                    <label className="block text-gray-300 text-sm font-semibold mb-2">Card Details</label>
-                    <div id="sq-tryout-card" className="min-h-[120px] bg-white/5 rounded-xl border border-white/15 p-4" />
-                    {!sqReady && !payError && (
-                      <div className="flex items-center gap-2 mt-2 text-gray-500 text-xs">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Loading payment form…
-                      </div>
-                    )}
-                  </div>
                   )}
 
                   {/* PayPal — off-site payment, confirmed manually by the admin afterward */}
@@ -631,17 +544,14 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   <button type="submit"
                     disabled={
                       loading ||
-                      (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && paymentMethod === "card" && !sqReady) ||
-                      (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && paymentMethod !== "card" && !altPaymentConfirmed)
+                      (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && !altPaymentConfirmed)
                     }
                     className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
                     {loading
                       ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</>
                       : (appliedVoucher?.finalTotal ?? (total * qty)) === 0
                         ? <><CheckCircle className="w-5 h-5" /> Complete Free Registration</>
-                        : paymentMethod === "card"
-                          ? <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</>
-                          : <><CheckCircle className="w-5 h-5" /> Finish Registration</>
+                        : <><CheckCircle className="w-5 h-5" /> Finish Registration</>
                     }
                   </button>
 

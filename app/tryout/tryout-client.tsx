@@ -21,6 +21,9 @@ const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
   ? "https://sandbox.web.squarecdn.com/v1/square.js"
   : "https://web.squarecdn.com/v1/square.js";
 
+const PAYPAL_LINK    = "https://www.paypal.com/ncp/payment/4TKZ7WGKJFMG8";
+const VENMO_HANDLE    = "@hilhiyouthbbx";
+
 // ────────────────────────────────────────────────────────
 // Field helpers
 // ────────────────────────────────────────────────────────
@@ -119,6 +122,8 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [payError,    setPayError]   = useState("");
   const [loading,     setLoading]    = useState(false);
   const [paymentId,   setPaymentId]  = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "paypal" | "venmo">("card");
+  const [altPaymentConfirmed, setAltPaymentConfirmed] = useState(false);
   const [sqReady,     setSqReady]    = useState(false);
   const [retryCount,  setRetryCount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
@@ -127,9 +132,11 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
 
   const grades = ["3rd Grade","4th Grade","5th Grade","6th Grade","7th Grade","8th Grade"];
 
-  // Init Square when on pay step
+  // Init Square when on pay step AND the Card method is selected (the #sq-tryout-card element
+  // only exists in the DOM when paymentMethod === "card" — switching to/from PayPal/Venmo mounts
+  // and unmounts it, so this must re-run whenever paymentMethod changes too).
   useEffect(() => {
-    if (step !== "pay") return;
+    if (step !== "pay" || paymentMethod !== "card") return;
     let cancelled = false;
     let card: any = null;
 
@@ -173,23 +180,31 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
       const el = document.getElementById("sq-tryout-card");
       if (el) el.innerHTML = "";
     };
-  }, [step, retryCount]);
+  }, [step, retryCount, paymentMethod]);
 
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
     setPayError(""); setLoading(true);
     try {
       const chargeTotal = appliedVoucher?.finalTotal ?? (total * qty);
-      // Free registration — skip Square tokenization
-      const sourceId = chargeTotal === 0 ? "FREE" : await (async () => {
-        const result = await sqCardRef.current.tokenize();
-        if (result.status !== "OK") {
-          setPayError(result.errors?.[0]?.message || "Card tokenization failed.");
-          setLoading(false); return null;
-        }
-        return result.token;
-      })();
+
+      // PayPal/Venmo — no card tokenization; payment happens off-site and gets confirmed
+      // manually later, so we just need to know which method they used.
+      let sourceId: string | null = "FREE";
+      if (chargeTotal > 0 && paymentMethod === "card") {
+        sourceId = await (async () => {
+          const result = await sqCardRef.current.tokenize();
+          if (result.status !== "OK") {
+            setPayError(result.errors?.[0]?.message || "Card tokenization failed.");
+            setLoading(false); return null;
+          }
+          return result.token;
+        })();
+      } else if (chargeTotal > 0) {
+        sourceId = paymentMethod === "paypal" ? "PAYPAL_PENDING" : "VENMO_PENDING";
+      }
       if (!sourceId) return;
+
       const res = await fetch("/api/tryout-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -198,6 +213,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
           total:       chargeTotal,
           basePrice:   t.price * qty,
           quantity:    qty,
+          paymentMethod: chargeTotal > 0 ? paymentMethod : "card",
           parentName, email, phone,
           playerName, grade,
           nextSeasonSchool, address, uniformSize,
@@ -537,8 +553,25 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     applied={appliedVoucher}
                   />
 
-                  {/* Square card — hidden when free */}
+                  {/* Payment method picker — hidden when free */}
                   {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && (
+                    <div className="flex gap-2">
+                      {([["card","💳 Card"],["paypal","🅿️ PayPal"],["venmo","💸 Venmo"]] as const).map(([val, label]) => (
+                        <button key={val} type="button"
+                          onClick={() => { setPaymentMethod(val); setAltPaymentConfirmed(false); setPayError(""); }}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                            paymentMethod === val
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-white/5 border-white/15 text-gray-400 hover:border-white/30"
+                          }`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Square card — only when Card selected and not free */}
+                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && paymentMethod === "card" && (
                   <div>
                     <label className="block text-gray-300 text-sm font-semibold mb-2">Card Details</label>
                     <div id="sq-tryout-card" className="min-h-[120px] bg-white/5 rounded-xl border border-white/15 p-4" />
@@ -550,6 +583,44 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   </div>
                   )}
 
+                  {/* PayPal — off-site payment, confirmed manually by the admin afterward */}
+                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && paymentMethod === "paypal" && (
+                    <div className="space-y-3">
+                      <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl p-4 space-y-3">
+                        <p className="text-gray-300 text-sm">
+                          Click below to pay <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via PayPal, then come back here and check the box to finish registering.
+                        </p>
+                        <a href={PAYPAL_LINK} target="_blank" rel="noopener noreferrer"
+                          className="block w-full text-center py-3 bg-[#ffc439] hover:brightness-95 text-[#003087] font-black rounded-xl transition-all">
+                          Pay with PayPal ↗
+                        </a>
+                      </div>
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input type="checkbox" checked={altPaymentConfirmed} onChange={e => setAltPaymentConfirmed(e.target.checked)}
+                          className="w-4 h-4 mt-0.5 rounded accent-blue-600" />
+                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via PayPal.</span>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Venmo — off-site payment, confirmed manually by the admin afterward */}
+                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && paymentMethod === "venmo" && (
+                    <div className="space-y-3">
+                      <div className="bg-[#3D95CE]/10 border border-[#3D95CE]/30 rounded-xl p-4 space-y-2">
+                        <p className="text-gray-300 text-sm">
+                          Send <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via Venmo to:
+                        </p>
+                        <p className="text-2xl font-black text-[#3D95CE]">{VENMO_HANDLE}</p>
+                        <p className="text-gray-500 text-xs">Please include the player's name ({playerName || "your player"}) in the payment note so we can match it up.</p>
+                      </div>
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input type="checkbox" checked={altPaymentConfirmed} onChange={e => setAltPaymentConfirmed(e.target.checked)}
+                          className="w-4 h-4 mt-0.5 rounded accent-blue-600" />
+                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via Venmo to {VENMO_HANDLE}.</span>
+                      </label>
+                    </div>
+                  )}
+
                   {payError && (
                     <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm">
                       <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -557,9 +628,21 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     </div>
                   )}
 
-                  <button type="submit" disabled={loading || (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && !sqReady)}
+                  <button type="submit"
+                    disabled={
+                      loading ||
+                      (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && paymentMethod === "card" && !sqReady) ||
+                      (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && paymentMethod !== "card" && !altPaymentConfirmed)
+                    }
                     className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
-                    {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</> : (appliedVoucher?.finalTotal ?? (total * qty)) === 0 ? <><CheckCircle className="w-5 h-5" /> Complete Free Registration</> : <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</>}
+                    {loading
+                      ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</>
+                      : (appliedVoucher?.finalTotal ?? (total * qty)) === 0
+                        ? <><CheckCircle className="w-5 h-5" /> Complete Free Registration</>
+                        : paymentMethod === "card"
+                          ? <><Lock className="w-5 h-5" /> Pay ${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</>
+                          : <><CheckCircle className="w-5 h-5" /> Finish Registration</>
+                    }
                   </button>
 
                   <button type="button" onClick={() => { setStep("info"); setPayError(""); }}

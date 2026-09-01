@@ -1835,7 +1835,7 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
         body: JSON.stringify({ subject, message, testEmail: testEmail.trim() }),
       });
       const data = await res.json();
-      if (data.ok) setTestResult(`✓ Test email sent to ${testEmail.trim()}`);
+      if (data.ok) setTestResult(`✓ ${data.sent} individual test email${data.sent !== 1 ? "s" : ""} sent (each address gets its own separate email).`);
       else setError(data.error || "Test send failed.");
     } catch {
       setError("Network error sending test.");
@@ -1945,9 +1945,9 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
             {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
 
             <div className="border-t border-white/10 pt-4 space-y-2">
-              <label className="block text-gray-400 text-xs font-semibold">Send yourself a test first</label>
+              <label className="block text-gray-400 text-xs font-semibold">Send yourself a test first (separate multiple emails with a comma)</label>
               <div className="flex gap-2">
-                <input value={testEmail} onChange={e => setTestEmail(e.target.value)} type="email" placeholder="you@email.com"
+                <input value={testEmail} onChange={e => setTestEmail(e.target.value)} type="email" multiple placeholder="you@email.com, coach2@email.com"
                   className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
                 <button onClick={sendTest} disabled={sendingTest || !testEmail.trim() || !subject.trim() || !message.trim()}
                   className="px-4 py-2 bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all whitespace-nowrap">

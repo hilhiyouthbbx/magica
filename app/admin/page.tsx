@@ -1735,6 +1735,142 @@ function PagesTab({ adminKey }: { adminKey: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Email Blast — compose a custom email and send it to whatever contacts are
+// currently on screen (respects the Contacts tab's active filters/search).
+// ─────────────────────────────────────────────────────────────────────────────
+function EmailBlastModal({ adminKey, recipients, onClose }: {
+  adminKey: string; recipients: Contact[]; onClose: () => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [result, setResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
+  const [error, setError] = useState("");
+
+  // Recipients are de-duped by email client-side too, so the count shown matches what's sent.
+  const uniqueRecipients = (() => {
+    const seen = new Set<string>();
+    return recipients.filter(c => {
+      if (!c.email || !c.email.includes("@") || c.email.includes("noemail")) return false;
+      const e = c.email.toLowerCase();
+      if (seen.has(e)) return false;
+      seen.add(e);
+      return true;
+    });
+  })();
+
+  async function sendTest() {
+    if (!testEmail.trim() || !subject.trim() || !message.trim()) return;
+    setSendingTest(true); setTestResult(null); setError("");
+    try {
+      const res = await fetch(`/api/admin/email-blast?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, message, testEmail: testEmail.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) setTestResult(`✓ Test email sent to ${testEmail.trim()}`);
+      else setError(data.error || "Test send failed.");
+    } catch {
+      setError("Network error sending test.");
+    }
+    setSendingTest(false);
+  }
+
+  async function sendBlast() {
+    if (!subject.trim() || !message.trim() || uniqueRecipients.length === 0) return;
+    if (!confirm(`Send this email to ${uniqueRecipients.length} contact${uniqueRecipients.length !== 1 ? "s" : ""}? This can't be undone.`)) return;
+    setSending(true); setError(""); setResult(null);
+    try {
+      const res = await fetch(`/api/admin/email-blast?key=${adminKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, message, contactIds: uniqueRecipients.map(c => c.id) }),
+      });
+      const data = await res.json();
+      if (data.ok) setResult({ sent: data.sent, failed: data.failed, total: data.total });
+      else setError(data.error || "Send failed.");
+    } catch {
+      setError("Network error sending email.");
+    }
+    setSending(false);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="glass border border-white/10 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-white/10">
+          <div>
+            <h2 className="text-white font-bold text-lg flex items-center gap-2">
+              <MailIcon className="w-4 h-4 text-blue-400" /> Email Blast
+            </h2>
+            <p className="text-gray-500 text-xs mt-0.5">
+              Sending to <span className="text-blue-300 font-bold">{uniqueRecipients.length}</span> contact{uniqueRecipients.length !== 1 ? "s" : ""} — whatever's currently filtered in the Contacts list.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5" /></button>
+        </div>
+
+        {result ? (
+          <div className="p-6 text-center space-y-3">
+            <CheckCircle className="w-12 h-12 text-green-400 mx-auto" />
+            <p className="text-white font-bold text-lg">Sent!</p>
+            <p className="text-gray-400 text-sm">
+              {result.sent} of {result.total} email{result.total !== 1 ? "s" : ""} delivered successfully.
+              {result.failed > 0 && <span className="text-red-400"> {result.failed} failed.</span>}
+            </p>
+            <button onClick={onClose} className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all">Done</button>
+          </div>
+        ) : (
+          <div className="p-5 space-y-4">
+            {uniqueRecipients.length === 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-300">
+                No contacts with a valid email match your current filters. Adjust the filters in the Contacts tab, then reopen this.
+              </div>
+            )}
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1">Subject</label>
+              <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. 2026-2027 Boys Tryouts Are Back!"
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1">Message</label>
+              <textarea rows={10} value={message} onChange={e => setMessage(e.target.value)}
+                placeholder={"Hi {{name}},\n\nWrite your message here. Leave a blank line between paragraphs.\n\nSee you on the court,\nCoach Kem"}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 resize-none font-mono" />
+              <p className="text-gray-600 text-[11px] mt-1">Use <code className="text-gray-400">{"{{name}}"}</code> anywhere to auto-insert each contact's first name.</p>
+            </div>
+
+            {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
+
+            <div className="border-t border-white/10 pt-4 space-y-2">
+              <label className="block text-gray-400 text-xs font-semibold">Send yourself a test first</label>
+              <div className="flex gap-2">
+                <input value={testEmail} onChange={e => setTestEmail(e.target.value)} type="email" placeholder="you@email.com"
+                  className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                <button onClick={sendTest} disabled={sendingTest || !testEmail.trim() || !subject.trim() || !message.trim()}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all whitespace-nowrap">
+                  {sendingTest ? "Sending…" : "Send Test"}
+                </button>
+              </div>
+              {testResult && <p className="text-emerald-400 text-xs">{testResult}</p>}
+            </div>
+
+            <button onClick={sendBlast} disabled={sending || !subject.trim() || !message.trim() || uniqueRecipients.length === 0}
+              className="w-full py-3.5 bg-gradient-to-r from-[#006aff] to-[#00aaff] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-all flex items-center justify-center gap-2">
+              {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <>Send to {uniqueRecipients.length} Contact{uniqueRecipients.length !== 1 ? "s" : ""}</>}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main admin page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
@@ -1753,6 +1889,7 @@ export default function AdminPage() {
   const [sortField,     setSortField]     = useState<string>("date");
   const [sortDir,       setSortDir]       = useState<"asc"|"desc">("desc");
   const [showExportPanel, setShowExportPanel] = useState(false);
+  const [showEmailBlast, setShowEmailBlast] = useState(false);
   const dlARef = useRef<HTMLAnchorElement>(null);
   const [contactsLoaded,setContactsLoaded]= useState(false);
   const [expandedContact, setExpandedContact] = useState<string|null>(null);
@@ -2514,6 +2651,12 @@ export default function AdminPage() {
                   <Download className="w-4 h-4" />
                   Export {sorted.length}{sorted.length !== contacts.length ? " Filtered" : ""} CSV
                 </a>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowEmailBlast(true); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-all">
+                  <MailIcon className="w-4 h-4" />
+                  Email {sorted.length}{sorted.length !== contacts.length ? " Filtered" : ""}
+                </button>
               <>
                 <input type="file" accept=".csv" id="csv-import" className="hidden" onChange={e => { if (e.target.files?.[0]) { importCSV(e.target.files[0]); (e.target as HTMLInputElement).value=""; } }} />
                 <label htmlFor="csv-import" className="flex items-center gap-2 px-4 py-2 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white text-sm font-semibold rounded-xl transition-all cursor-pointer">
@@ -2725,6 +2868,14 @@ export default function AdminPage() {
                 : "CSV columns: Name, Email, Phone, Source, Tournament, Team Name, Division, Notes, Date"}
             </p>
           </div>
+        )}
+
+        {showEmailBlast && (
+          <EmailBlastModal
+            adminKey={adminKey}
+            recipients={sorted}
+            onClose={() => setShowEmailBlast(false)}
+          />
         )}
 
         {/* ── TOURNAMENTS TAB ── */}

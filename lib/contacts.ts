@@ -23,7 +23,7 @@ async function kvSet(key: string, value: unknown): Promise<void> {
   await redis.set(key, value);
 }
 
-// ── Contact interface — all Wix CSV fields included ───────────────────────
+// ── Contact interface — all Wix CSV fields included ──────────────────────
 export interface Contact {
   id:    string;
   date:  string;
@@ -84,7 +84,7 @@ export interface Contact {
   inHillsboroBoundary?: string;
 }
 
-// ── Read all contacts ──────────────────────────────────────────────────────
+// ── Read all contacts ──────────────────────────────────────────
 export async function getContacts(): Promise<Contact[]> {
   if (hasKV()) {
     try {
@@ -107,37 +107,27 @@ async function persistContacts(contacts: Contact[]): Promise<void> {
   fs.writeFileSync(CONTACTS_FILE, JSON.stringify(contacts, null, 2));
 }
 
-// ── Save / upsert a single contact ────────────────────────────────────────
+// ── Save a single contact — ALWAYS inserts a new record ─────────────────
+// This used to "upsert" into an existing contact sharing the same email, silently merging in
+// only whichever fields happened to be blank on the old record. That meant a brand-new paid
+// registration (tryout, camp, tournament, checkout, membership sign-up — every one of these
+// calls this function) from someone who'd EVER contacted us before under the same email —
+// a repeat family, a past camper, even just a "Join Us" interest sign-up — could vanish into an
+// old record with its payment status, amount paid, waiver, and notes silently dropped, because
+// the merge logic never overwrote fields that already had a value and didn't even look at
+// paymentStatus/amountPaid/source at all. Since repeat emails across seasons are the NORMAL
+// case (not the exception) for a youth sports program, every registration must always create
+// its own record — never silently merge and lose data. Duplicate-looking rows are easy to spot
+// and clean up manually later; lost registration/payment data is not recoverable.
 export async function saveContact(
   contact: Omit<Contact, "id" | "date">
 ): Promise<void> {
   const contacts = await getContacts();
-  const emailLc  = contact.email.toLowerCase().trim();
-  const existing = contacts.findIndex(c => c.email.toLowerCase() === emailLc);
-
-  if (existing !== -1 && contact.source === "tournament") {
-    // Tournament: always add new entry (different team/event)
-    contacts.push({
-      ...contact,
-      id:   `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      date: new Date().toISOString(),
-    });
-  } else if (existing !== -1) {
-    // Upsert: merge into existing, fill in blanks
-    const c = contacts[existing];
-    if (!c.phone && contact.phone) c.phone = contact.phone;
-    if (!c.camperName && contact.camperName) c.camperName = contact.camperName;
-    if (!c.grade      && contact.grade)      c.grade      = contact.grade;
-    if (!c.shirtSize  && contact.shirtSize)  c.shirtSize  = contact.shirtSize;
-    if (!c.notes      && contact.notes)      c.notes      = contact.notes;
-  } else {
-    contacts.push({
-      ...contact,
-      id:   `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      date: new Date().toISOString(),
-    });
-  }
-
+  contacts.push({
+    ...contact,
+    id:   `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    date: new Date().toISOString(),
+  });
   await persistContacts(contacts);
 }
 
@@ -157,7 +147,7 @@ export async function createContact(
   return newContact;
 }
 
-// ── Update a contact ───────────────────────────────────────────────────────
+// ── Update a contact ─────────────────────────────────────────────
 export async function updateContact(id: string, patch: Partial<Omit<Contact, "id" | "date">>): Promise<boolean> {
   // Normalize shirt size if being updated
   if (patch.shirtSize) patch = { ...patch, shirtSize: normalizeShirtSize(patch.shirtSize) };
@@ -169,7 +159,7 @@ export async function updateContact(id: string, patch: Partial<Omit<Contact, "id
   return true;
 }
 
-// ── Delete a contact ───────────────────────────────────────────────────────
+// ── Delete a contact ───────────────────────────────────────────────
 export async function deleteContact(id: string): Promise<void> {
   const contacts = (await getContacts()).filter(c => c.id !== id);
   await persistContacts(contacts);
@@ -216,7 +206,7 @@ function normalizeShirtSize(raw: string): string {
   return raw.trim();
 }
 
-// ── Wix TSV parser (tab-separated with header row) ────────────────────────
+// ── Wix TSV parser (tab-separated with header row) ──────────────────────
 async function importWixTSV(tsv: string, source: string): Promise<number> {
   const rows = tsv.trim().split(/\r?\n/);
   if (rows.length < 2) return 0;
@@ -340,7 +330,7 @@ async function importWixTSV(tsv: string, source: string): Promise<number> {
   return imported;
 }
 
-// ── Public CSV import — auto-detects Wix TSV or simple CSV ────────────────
+// ── Public CSV import — auto-detects Wix TSV or simple CSV ────────────
 export async function importContactsCSV(csv: string, source = "import"): Promise<number> {
   // Detect Wix tab-separated export
   const isWixTSV = csv.includes("\t") &&

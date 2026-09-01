@@ -10,12 +10,22 @@ function checkAuth(req: NextRequest) {
   return key === expected;
 }
 
-/** Turns plain-text (with blank-line paragraph breaks) into a simple, branded HTML email. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/** Turns plain-text (blank line = new paragraph, single line break = line break within a
+ *  paragraph — e.g. a "Coach Kem / Hilhi Youth Basketball" signature) into a simple, branded
+ *  HTML email. Line breaks are converted to explicit <br/> tags rather than relying on CSS
+ *  white-space, since several email clients (Outlook especially) don't reliably honor that. */
 function blastHtml(subject: string, message: string, firstName?: string): string {
   const greeted = firstName ? message.replace(/\{\{name\}\}/gi, firstName) : message.replace(/\{\{name\}\}/gi, "there");
   const paragraphs = greeted
     .split(/\n\s*\n/)
-    .map(p => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;white-space:pre-line;">${p}</p>`)
+    .map(p => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`)
     .join("");
 
   return `
@@ -127,7 +137,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── Real bulk send ──────────────────────────────────────
+  // ── Real bulk send ──────────────────────
   const allContacts = await getContacts();
   const targets = matchingContacts(allContacts, body);
   if (targets.length === 0) {

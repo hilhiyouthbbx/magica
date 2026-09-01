@@ -38,7 +38,7 @@ function blastHtml(subject: string, message: string, firstName?: string): string
           <td bgcolor="#1e3a8a" style="background-color:#1e3a8a;padding:24px 32px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
               <td style="padding-right:16px;vertical-align:middle;">
-                <img src="https://www.hilhiyouthbbx.com/spartan-head.png" alt="Hilhi Spartans" width="60" height="63" style="display:block;border:0;" />
+                <img src="https://www.hilhiyouthbbx.com/spartan-head-white.png" alt="Hilhi Spartans" width="60" height="63" style="display:block;border:0;" />
               </td>
               <td style="vertical-align:middle;">
                 <span style="display:inline-block;color:#ffffff !important;font-size:28px;font-weight:800;line-height:1.2;font-family:system-ui,sans-serif;">Hilhi Youth Basketball</span>
@@ -139,16 +139,27 @@ export async function POST(req: NextRequest) {
     auth:   { user: smtpUser, pass: smtpPass },
   });
 
-  // ── Test send — one email, to the admin, never touches real contacts ──────
+  // ── Test send — sends its OWN individual email to each address, exactly like the real
+  //   bulk send does — never touches real contacts. Accepts multiple addresses separated by
+  //   commas/semicolons/whitespace so you can test how it looks for more than one person at once,
+  //   without them ending up in the same "To:" line seeing each other.
   if (body.testEmail?.trim()) {
+    const testAddrs = [...new Set(
+      body.testEmail.split(/[,;\s]+/).map(s => s.trim()).filter(s => s.includes("@"))
+    )];
+    if (testAddrs.length === 0) {
+      return NextResponse.json({ error: "Enter at least one valid email address." }, { status: 400 });
+    }
     try {
-      await transporter.sendMail({
-        from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
-        to:      body.testEmail.trim(),
-        subject: `[TEST] ${body.subject}`,
-        html:    blastHtml(body.subject, body.message, "Coach"),
-      });
-      return NextResponse.json({ ok: true, sent: 1, test: true });
+      await Promise.all(testAddrs.map(addr =>
+        transporter.sendMail({
+          from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
+          to:      addr,
+          subject: `[TEST] ${body.subject}`,
+          html:    blastHtml(body.subject, body.message, "Coach"),
+        })
+      ));
+      return NextResponse.json({ ok: true, sent: testAddrs.length, test: true });
     } catch (e) {
       return NextResponse.json({ error: `Test send failed: ${String(e)}` }, { status: 500 });
     }

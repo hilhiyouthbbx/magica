@@ -1746,16 +1746,60 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
   // be active on the Contacts tab behind it. Defaults to whatever was selected there, but you
   // can freely pick ANY combination of sources here (e.g. blast every past season at once)
   // without closing the modal.
-  const emailSources = [...new Set(allContacts.map(c => c.source).filter(Boolean))].sort();
-  const [blastSources, setBlastSources] = useState<string[]>(initialSource !== "all" ? [initialSource] : []);
+  //
+  // Group by DISPLAY LABEL, not raw source value — a few different raw values (e.g. the literal
+  // "registration" used by the camp payment form, and older data that already says
+  // "2026 Youth Summer Camp") can all translate to the same label via SOURCE_LABELS. Showing raw
+  // values would list what looks like the same category twice; grouping by label keeps this
+  // picker consistent with what you actually see in the main Contacts tab, and checking one
+  // checkbox correctly grabs every raw source that displays under that name.
+  const labelToRawSources = new Map<string, string[]>();
+  allContacts.forEach(c => {
+    if (!c.source) return;
+    const label = SOURCE_LABELS[c.source] || c.source;
+    const raws = labelToRawSources.get(label) ?? [];
+    if (!raws.includes(c.source)) raws.push(c.source);
+    labelToRawSources.set(label, raws);
+  });
+  const emailSourceLabels = [...labelToRawSources.keys()].sort();
+  const [blastLabels, setBlastLabels] = useState<string[]>(
+    initialSource !== "all" ? [SOURCE_LABELS[initialSource] || initialSource] : []
+  );
   const [searchQ, setSearchQ] = useState("");
 
-  function toggleSource(src: string) {
-    setBlastSources(prev => prev.includes(src) ? prev.filter(s => s !== src) : [...prev, src]);
+  function toggleSource(label: string) {
+    setBlastLabels(prev => prev.includes(label) ? prev.filter(s => s !== label) : [...prev, label]);
+  }
+  // Every raw source value that falls under a currently-checked label.
+  const blastSources = blastLabels.flatMap(label => labelToRawSources.get(label) ?? []);
+
+  // Draft auto-save — subject/message survive closing the dialog, navigating away, or even
+  // refreshing the whole page, so you never lose what you've written by accident.
+  const DRAFT_KEY = "hilhi_email_blast_draft";
+  const [subject, setSubject] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}").subject || ""; } catch { return ""; }
+  });
+  const [message, setMessage] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}").message || ""; } catch { return ""; }
+  });
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Don't overwrite the saved draft with the initial empty values on first mount.
+    if (!subject.trim() && !message.trim()) return;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, message }));
+    setDraftSavedAt(Date.now());
+  }, [subject, message]);
+
+  function clearDraft() {
+    if (!confirm("Clear the saved draft? This can't be undone.")) return;
+    localStorage.removeItem(DRAFT_KEY);
+    setSubject(""); setMessage(""); setDraftSavedAt(null);
   }
 
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
   const [testEmail, setTestEmail] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
   const [sending, setSending] = useState(false);
@@ -1810,7 +1854,10 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
         body: JSON.stringify({ subject, message, contactIds: uniqueRecipients.map(c => c.id) }),
       });
       const data = await res.json();
-      if (data.ok) setResult({ sent: data.sent, failed: data.failed, total: data.total });
+      if (data.ok) {
+        setResult({ sent: data.sent, failed: data.failed, total: data.total });
+        localStorage.removeItem(DRAFT_KEY);
+      }
       else setError(data.error || "Send failed.");
     } catch {
       setError("Network error sending email.");
@@ -1849,20 +1896,20 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-gray-400 text-xs font-semibold">Send To (Source) — pick one or more</label>
-                {blastSources.length > 0 && (
-                  <button type="button" onClick={() => setBlastSources([])} className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold">Clear (use All Sources)</button>
+                {blastLabels.length > 0 && (
+                  <button type="button" onClick={() => setBlastLabels([])} className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold">Clear (use All Sources)</button>
                 )}
               </div>
               <div className="max-h-40 overflow-y-auto rounded-xl bg-white/5 border border-white/15 p-2 space-y-1">
-                {emailSources.map(s => (
-                  <label key={s} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-sm text-gray-300">
-                    <input type="checkbox" checked={blastSources.includes(s)} onChange={() => toggleSource(s)}
+                {emailSourceLabels.map(label => (
+                  <label key={label} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-sm text-gray-300">
+                    <input type="checkbox" checked={blastLabels.includes(label)} onChange={() => toggleSource(label)}
                       className="w-4 h-4 rounded accent-blue-600" />
-                    {SOURCE_LABELS[s] || s}
+                    {label}
                   </label>
                 ))}
               </div>
-              <p className="text-gray-600 text-[11px]">{blastSources.length === 0 ? "Nothing checked = every Source." : `${blastSources.length} source${blastSources.length !== 1 ? "s" : ""} selected.`}</p>
+              <p className="text-gray-600 text-[11px]">{blastLabels.length === 0 ? "Nothing checked = every Source." : `${blastLabels.length} source${blastLabels.length !== 1 ? "s" : ""} selected.`}</p>
               <div>
                 <label className="block text-gray-400 text-xs font-semibold mb-1">Search (optional)</label>
                 <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Name or email…"
@@ -1875,9 +1922,17 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
               </div>
             )}
             <div>
-              <label className="block text-gray-400 text-xs font-semibold mb-1">Subject</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-gray-400 text-xs font-semibold">Subject</label>
+                {draftSavedAt && (
+                  <span className="flex items-center gap-2">
+                    <span className="text-[11px] text-emerald-400">💾 Draft saved</span>
+                    <button type="button" onClick={clearDraft} className="text-[11px] text-gray-500 hover:text-red-400">Clear draft</button>
+                  </span>
+                )}
+              </div>
               <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. 2026-2027 Boys Tryouts Are Back!"
-                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white font-bold placeholder-gray-600 placeholder:font-normal text-sm focus:outline-none focus:border-blue-500" />
             </div>
             <div>
               <label className="block text-gray-400 text-xs font-semibold mb-1">Message</label>

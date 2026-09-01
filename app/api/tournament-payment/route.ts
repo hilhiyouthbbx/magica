@@ -135,7 +135,7 @@ async function sendEmails(data: {
     // Admin notification
     transporter.sendMail({
       from:    `"Hilhi Youth Basketball" <${process.env.SMTP_USER}>`,
-      to:      "info@hilhiyouthbbx.com",
+      to:      "order@hilhiyouthbbx.com",
       subject: `✅ Tournament Registration — ${orgName} — ${tournamentName} — $${total.toFixed(2)}`,
       html: `
         <div style="font-family:sans-serif;max-width:600px">

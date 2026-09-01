@@ -241,7 +241,7 @@ async function sendEmails(
     // Admin notification
     transporter.sendMail({
       from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
-      to:      "info@hilhiyouthbbx.com",
+      to:      "order@hilhiyouthbbx.com",
       subject: `✅ New Camp Registration — ${parentInfo.guardianName} — ${camperList.length} camper${camperList.length > 1 ? "s" : ""} — $${total.toFixed(2)}`,
       html:    adminHtml,
     }),

@@ -17,7 +17,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   CARD_EXPIRED:                 "This card has expired. Please use a different card.",
   INVALID_CARD:                 "The card information is invalid. Please check and try again.",
   TRANSACTION_LIMIT:            "This transaction exceeds your card limit.",
-  TEMPORARY_ERROR:              "A temporary error occurred with the payment processor. Please try again.",
+  TEMPORARY_ERROR:                "A temporary error occurred with the payment processor. Please try again.",
 };
 
 export async function POST(req: NextRequest) {
@@ -130,7 +130,7 @@ async function sendEmails(data: {
     // Admin notification
     transporter.sendMail({
       from:    process.env.SMTP_USER,
-      to:      "info@hilhiyouthbbx.com",
+      to:      "order@hilhiyouthbbx.com",
       subject: `✅ Tournament Registration — ${orgName} — ${tournamentName} — $${total.toFixed(2)}`,
       html: `
         <div style="font-family:sans-serif;max-width:600px">

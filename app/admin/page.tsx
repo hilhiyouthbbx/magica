@@ -2006,6 +2006,17 @@ export default function AdminPage() {
     });
   }
 
+  // One-click confirm for PayPal/Venmo registrations, which save as "Pending - PayPal/Venmo"
+  // until you've actually seen the money land in your account.
+  async function markPaid(id: string) {
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, paymentStatus: "Paid" } : c));
+    await fetch(`/api/admin/contacts?key=${adminKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", id, patch: { paymentStatus: "Paid" } }),
+    });
+  }
+
   async function toggleTournament(t: TournamentConfig) {
     const updated = { ...t, enabled: !t.enabled };
     await fetch(`/api/tournament?key=${adminKey}`, { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(updated) });
@@ -2880,6 +2891,11 @@ export default function AdminPage() {
                             }} className="text-gray-600 hover:text-purple-400 transition-colors" title="Copy / Duplicate">
                               <Copy className="w-4 h-4" />
                             </button>
+                            {(c.paymentStatus || "").startsWith("Pending") && (
+                              <button onClick={() => markPaid(c.id)} className="text-amber-400 hover:text-green-400 transition-colors" title={`${c.paymentStatus} — click to mark Paid`}>
+                                <DollarSign className="w-4 h-4" />
+                              </button>
+                            )}
                             <button onClick={() => deleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition-colors" title="Delete">
                               <Trash2 className="w-4 h-4" />
                             </button>

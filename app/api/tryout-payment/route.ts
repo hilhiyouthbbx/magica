@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
   try {
     const {
       sourceId, total: clientTotal, basePrice: clientBase, quantity,
+      paymentMethod, // "card" | "paypal" | "venmo" — off-site methods skip Square and land as "Pending"
       parentName, email, phone,
       playerName, grade,
       nextSeasonSchool, address, boundarySchool, inHillsboroBoundary,
@@ -37,9 +38,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "The Liability Waiver must be signed before registering." }, { status: 400 });
     }
 
-    // Free registration — skip Square
+    // Free registration — skip Square. PayPal/Venmo also skip Square — payment happens off-site
+    // and gets confirmed manually by the admin afterward (no API keys for those, so no way to
+    // auto-verify here).
+    const isAltPayment = paymentMethod === "paypal" || paymentMethod === "venmo";
     let paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
-    if (sourceId !== "FREE" && total > 0) {  // skip Square for free
+    let paymentStatus = total > 0 ? "Paid" : "Free";
+
+    if (isAltPayment && total > 0) {
+      paymentId = `PENDING-${paymentMethod.toUpperCase()}-${crypto.randomUUID().slice(0, 8)}`;
+      paymentStatus = `Pending - ${paymentMethod === "paypal" ? "PayPal" : "Venmo"}`;
+    } else if (sourceId !== "FREE" && total > 0) {  // skip Square for free
       const sqRes = await fetch(`${SQ_BASE}/payments`, {
         method:  "POST",
         headers: {
@@ -82,7 +91,9 @@ export async function POST(req: NextRequest) {
       boundarySchool: boundarySchool || "",
       inHillsboroBoundary: inHillsboroBoundary || "unknown",
       shirtSize: uniformSize || "",
-      notes:  `Player: ${playerName} | Grade: ${grade} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
+      amountPaid: total.toFixed(2),
+      paymentStatus,
+      notes:  `Player: ${playerName} | Grade: ${grade} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Payment: ${paymentStatus}${isAltPayment ? ` (${paymentId})` : ""} | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
     });
 
     return NextResponse.json({ success: true, paymentId });

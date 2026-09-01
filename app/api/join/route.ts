@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const body: JoinBody = await req.json();
     const { guardianName, email, phone, players, howHeard, website } = body;
 
-    // ── Anti-spam: honeypot field must stay empty ──────────────────────────
+    // ── Anti-spam: honeypot field must stay empty ───────────────────
     if (website && website.trim()) {
       // Silently accept without saving/emailing — don't tip off the bot.
       return NextResponse.json({ ok: true });
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // ── Anti-spam: reject obvious bot-generated gibberish ───────────────────────
+    // ── Anti-spam: reject obvious bot-generated gibberish ─────────────────────
     // Real phone numbers always contain at least a few digits; bot-filled ones here were pure letters.
     if (phone && phone.trim() && !/\d/.test(phone)) {
       return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please enter valid names." }, { status: 400 });
     }
 
-    // ── Save to contacts DB ────────────────────────────────────────────────
+    // ── Save to contacts DB ────────────────────────────────
     const playerSummary = players
       .map((p) => `${p.firstName} ${p.lastName} (${p.grade})`)
       .join(", ");
@@ -66,14 +66,14 @@ export async function POST(req: NextRequest) {
         name:   guardianName,
         email,
         phone:  phone || "",
-        source: "registration",
+        source: "membership-signup", // free interest sign-up — NOT a paid camp/tryout registration
         notes:  `Membership signup — Player(s): ${playerSummary}${howHeard ? ` — Heard via: ${howHeard}` : ""}`,
       });
     } catch (err) {
       console.error("Contact save error:", err);
     }
 
-    // ── Build player rows for email ──────────────────────────────────────────────
+    // ── Build player rows for email ────────────────────────────────────────
     const playerRows = players
       .map(
         (p) => `
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       )
       .join("");
 
-    // ── Admin notification email ────────────────────────────────────────────────
+    // ── Admin notification email ──────────────────────────────────────────────────
     const adminHtml = `
 <!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
   </div>
 </body></html>`;
 
-    // ── Welcome email to registrant ────────────────────────────────────────────────
+    // ── Welcome email to registrant ─────────────────────────────────────────────
     const welcomeHtml = `
 <!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">

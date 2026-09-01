@@ -1738,9 +1738,16 @@ function PagesTab({ adminKey }: { adminKey: string }) {
 // Email Blast — compose a custom email and send it to whatever contacts are
 // currently on screen (respects the Contacts tab's active filters/search).
 // ─────────────────────────────────────────────────────────────────────────────
-function EmailBlastModal({ adminKey, recipients, onClose }: {
-  adminKey: string; recipients: Contact[]; onClose: () => void;
+function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
+  adminKey: string; allContacts: Contact[]; initialSource: string; onClose: () => void;
 }) {
+  // Independent Source picker inside the modal — doesn't depend on whatever filter happens to
+  // be active on the Contacts tab behind it. Defaults to whatever was selected there, but you
+  // can freely change it here without closing the modal.
+  const emailSources = [...new Set(allContacts.map(c => c.source).filter(Boolean))].sort();
+  const [blastSource, setBlastSource] = useState(initialSource !== "all" ? initialSource : "all");
+  const [searchQ, setSearchQ] = useState("");
+
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [testEmail, setTestEmail] = useState("");
@@ -1750,11 +1757,17 @@ function EmailBlastModal({ adminKey, recipients, onClose }: {
   const [result, setResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
   const [error, setError] = useState("");
 
-  // Recipients are de-duped by email client-side too, so the count shown matches what's sent.
+  // Recipients: filtered by the Source picker (and optional search) above, de-duped by email so
+  // the count shown always matches what actually gets sent.
   const uniqueRecipients = (() => {
+    let list = allContacts.filter(c => c.email && c.email.includes("@") && !c.email.includes("noemail"));
+    if (blastSource !== "all") list = list.filter(c => c.source === blastSource);
+    if (searchQ.trim()) {
+      const q = searchQ.trim().toLowerCase();
+      list = list.filter(c => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+    }
     const seen = new Set<string>();
-    return recipients.filter(c => {
-      if (!c.email || !c.email.includes("@") || c.email.includes("noemail")) return false;
+    return list.filter(c => {
       const e = c.email.toLowerCase();
       if (seen.has(e)) return false;
       seen.add(e);
@@ -1808,7 +1821,7 @@ function EmailBlastModal({ adminKey, recipients, onClose }: {
               <MailIcon className="w-4 h-4 text-blue-400" /> Email Blast
             </h2>
             <p className="text-gray-500 text-xs mt-0.5">
-              Sending to <span className="text-blue-300 font-bold">{uniqueRecipients.length}</span> contact{uniqueRecipients.length !== 1 ? "s" : ""} — whatever's currently filtered in the Contacts list.
+              Sending to <span className="text-blue-300 font-bold">{uniqueRecipients.length}</span> contact{uniqueRecipients.length !== 1 ? "s" : ""}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5" /></button>
@@ -1826,9 +1839,25 @@ function EmailBlastModal({ adminKey, recipients, onClose }: {
           </div>
         ) : (
           <div className="p-5 space-y-4">
+            {/* Recipient picker — Source + optional search, independent of the Contacts tab's own filters */}
+            <div className="flex flex-wrap gap-2">
+              <div className="flex-1 min-w-[160px]">
+                <label className="block text-gray-400 text-xs font-semibold mb-1">Send To (Source)</label>
+                <select value={blastSource} onChange={e => setBlastSource(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500">
+                  <option value="all" className="bg-gray-900">All Sources</option>
+                  {emailSources.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
+                </select>
+              </div>
+              <div className="flex-1 min-w-[160px]">
+                <label className="block text-gray-400 text-xs font-semibold mb-1">Search (optional)</label>
+                <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Name or email…"
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+              </div>
+            </div>
             {uniqueRecipients.length === 0 && (
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-300">
-                No contacts with a valid email match your current filters. Adjust the filters in the Contacts tab, then reopen this.
+                No contacts with a valid email match this Source/search. Try a different Source above.
               </div>
             )}
             <div>
@@ -2873,7 +2902,8 @@ export default function AdminPage() {
         {showEmailBlast && (
           <EmailBlastModal
             adminKey={adminKey}
-            recipients={sorted}
+            allContacts={contacts}
+            initialSource={sourceFilter}
             onClose={() => setShowEmailBlast(false)}
           />
         )}

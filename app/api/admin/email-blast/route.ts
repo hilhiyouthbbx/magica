@@ -32,8 +32,15 @@ function blastHtml(subject: string, message: string, firstName?: string): string
 <!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">
   <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
-    <div style="background:#1e3a8a;padding:28px 32px;">
-      <h1 style="margin:0;color:#fff;font-size:20px;font-weight:800;">🏀 Hilhi Youth Basketball</h1>
+    <div style="background:#1e3a8a;padding:24px 32px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="padding-right:14px;vertical-align:middle;">
+          <img src="https://www.hilhiyouthbbx.com/spartan-head.png" alt="Hilhi Spartans" width="40" height="42" style="display:block;" />
+        </td>
+        <td style="vertical-align:middle;">
+          <h1 style="margin:0;color:#fff;font-size:28px;font-weight:800;line-height:1.2;">Hilhi Youth Basketball</h1>
+        </td>
+      </tr></table>
     </div>
     <div style="padding:28px 32px;">
       ${paragraphs}

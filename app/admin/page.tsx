@@ -18,6 +18,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "import":       "Import",
   "tournament":   "Tournament",
   "tryout":       "Tryout Registration",
+  "membership-signup": "Membership Sign-Up (Join Us — No Payment)",
 };
 
 interface Contact {
@@ -2142,7 +2143,7 @@ export default function AdminPage() {
 
   // Every distinct source actually present in the data that ISN'T one of the built-in options below —
   // covers custom import labels (e.g. "2025-2026 Youth Registration") so they're filterable/deletable too.
-  const BUILT_IN_SOURCES = new Set(["2026 Youth Summer Camp", "tournament", "merch-order", "import", "tryout"]);
+  const BUILT_IN_SOURCES = new Set(["2026 Youth Summer Camp", "tournament", "merch-order", "import", "tryout", "membership-signup"]);
   const customSources = [...new Set(
     contacts.map(c => c.source).filter(s => s && !BUILT_IN_SOURCES.has(s) && !isCampSource(s))
   )].sort();
@@ -2387,6 +2388,7 @@ export default function AdminPage() {
                         <option value="2026 Youth Summer Camp" className="bg-slate-900">2026 Youth Summer Camp</option>
                         <option value="import" className="bg-slate-900">Import</option>
                         <option value="tryout" className="bg-slate-900">Tryout</option>
+                        <option value="membership-signup" className="bg-slate-900">Membership Sign-Up</option>
                       </select>
                     ) : (
                       <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -2599,6 +2601,7 @@ export default function AdminPage() {
                   <option value="merch-order"  className="bg-gray-900">Merch Orders</option>
                   <option value="import"       className="bg-gray-900">Imports</option>
                   <option value="tryout"       className="bg-gray-900">Tryout Registrations</option>
+                  <option value="membership-signup" className="bg-gray-900">Membership Sign-Up (Join Us)</option>
                   {customSources.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
                 </select>
 

@@ -29,29 +29,39 @@ function blastHtml(subject: string, message: string, firstName?: string): string
     .join("");
 
   return `
-<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
+<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="color-scheme" content="light"/><meta name="supported-color-schemes" content="light"/></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">
-  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
-    <div style="background:#1e3a8a;padding:24px 32px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="padding-right:14px;vertical-align:middle;">
-          <img src="https://www.hilhiyouthbbx.com/spartan-head.png" alt="Hilhi Spartans" width="40" height="42" style="display:block;" />
-        </td>
-        <td style="vertical-align:middle;">
-          <h1 style="margin:0;color:#fff;font-size:28px;font-weight:800;line-height:1.2;">Hilhi Youth Basketball</h1>
-        </td>
-      </tr></table>
-    </div>
-    <div style="padding:28px 32px;">
-      ${paragraphs}
-    </div>
-    <div style="padding:20px 32px;background:#f8fafc;border-top:1px solid #e5e7eb;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">
-        Hilhi Youth Basketball · Hillsboro, Oregon<br/>
-        Questions? Email us at <a href="mailto:info@hilhiyouthbbx.com" style="color:#2563eb;">info@hilhiyouthbbx.com</a>
-      </p>
-    </div>
-  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f9fafb;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td bgcolor="#1e3a8a" style="background-color:#1e3a8a;padding:24px 32px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="padding-right:16px;vertical-align:middle;">
+                <img src="https://www.hilhiyouthbbx.com/spartan-head.png" alt="Hilhi Spartans" width="60" height="63" style="display:block;border:0;" />
+              </td>
+              <td style="vertical-align:middle;">
+                <span style="display:inline-block;color:#ffffff !important;font-size:28px;font-weight:800;line-height:1.2;font-family:system-ui,sans-serif;">Hilhi Youth Basketball</span>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px;">
+            ${paragraphs}
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">
+              Hilhi Youth Basketball · Hillsboro, Oregon<br/>
+              Questions? Email us at <a href="mailto:info@hilhiyouthbbx.com" style="color:#2563eb;">info@hilhiyouthbbx.com</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
 </body></html>`;
 }
 

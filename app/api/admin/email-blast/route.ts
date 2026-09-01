@@ -10,31 +10,58 @@ function checkAuth(req: NextRequest) {
   return key === expected;
 }
 
-/** Turns plain-text (with blank-line paragraph breaks) into a simple, branded HTML email. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/** Turns plain-text (blank line = new paragraph, single line break = line break within a
+ *  paragraph — e.g. a "Coach Kem / Hilhi Youth Basketball" signature) into a simple, branded
+ *  HTML email. Line breaks are converted to explicit <br/> tags rather than relying on CSS
+ *  white-space, since several email clients (Outlook especially) don't reliably honor that. */
 function blastHtml(subject: string, message: string, firstName?: string): string {
   const greeted = firstName ? message.replace(/\{\{name\}\}/gi, firstName) : message.replace(/\{\{name\}\}/gi, "there");
   const paragraphs = greeted
     .split(/\n\s*\n/)
-    .map(p => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;white-space:pre-line;">${p}</p>`)
+    .map(p => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`)
     .join("");
 
   return `
-<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
+<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="color-scheme" content="light"/><meta name="supported-color-schemes" content="light"/></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">
-  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
-    <div style="background:#1e3a8a;padding:28px 32px;">
-      <h1 style="margin:0;color:#fff;font-size:20px;font-weight:800;">🏀 Hilhi Youth Basketball</h1>
-    </div>
-    <div style="padding:28px 32px;">
-      ${paragraphs}
-    </div>
-    <div style="padding:20px 32px;background:#f8fafc;border-top:1px solid #e5e7eb;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">
-        Hilhi Youth Basketball · Hillsboro, Oregon<br/>
-        Questions? Email us at <a href="mailto:info@hilhiyouthbbx.com" style="color:#2563eb;">info@hilhiyouthbbx.com</a>
-      </p>
-    </div>
-  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f9fafb;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td bgcolor="#1e3a8a" style="background-color:#1e3a8a;padding:24px 32px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="padding-right:16px;vertical-align:middle;">
+                <img src="https://www.hilhiyouthbbx.com/spartan-head-white.png" alt="Hilhi Spartans" width="60" height="63" style="display:block;border:0;" />
+              </td>
+              <td style="vertical-align:middle;">
+                <span style="display:inline-block;color:#ffffff !important;font-size:28px;font-weight:800;line-height:1.2;font-family:system-ui,sans-serif;">Hilhi Youth Basketball</span>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px;">
+            ${paragraphs}
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">
+              Hilhi Youth Basketball · Hillsboro, Oregon<br/>
+              Questions? Email us at <a href="mailto:info@hilhiyouthbbx.com" style="color:#2563eb;">info@hilhiyouthbbx.com</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
 </body></html>`;
 }
 
@@ -112,22 +139,33 @@ export async function POST(req: NextRequest) {
     auth:   { user: smtpUser, pass: smtpPass },
   });
 
-  // ── Test send — one email, to the admin, never touches real contacts ──────
+  // ── Test send — sends its OWN individual email to each address, exactly like the real
+  //   bulk send does — never touches real contacts. Accepts multiple addresses separated by
+  //   commas/semicolons/whitespace so you can test how it looks for more than one person at once,
+  //   without them ending up in the same "To:" line seeing each other.
   if (body.testEmail?.trim()) {
+    const testAddrs = [...new Set(
+      body.testEmail.split(/[,;\s]+/).map(s => s.trim()).filter(s => s.includes("@"))
+    )];
+    if (testAddrs.length === 0) {
+      return NextResponse.json({ error: "Enter at least one valid email address." }, { status: 400 });
+    }
     try {
-      await transporter.sendMail({
-        from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
-        to:      body.testEmail.trim(),
-        subject: `[TEST] ${body.subject}`,
-        html:    blastHtml(body.subject, body.message, "Coach"),
-      });
-      return NextResponse.json({ ok: true, sent: 1, test: true });
+      await Promise.all(testAddrs.map(addr =>
+        transporter.sendMail({
+          from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
+          to:      addr,
+          subject: `[TEST] ${body.subject}`,
+          html:    blastHtml(body.subject, body.message, "Coach"),
+        })
+      ));
+      return NextResponse.json({ ok: true, sent: testAddrs.length, test: true });
     } catch (e) {
       return NextResponse.json({ error: `Test send failed: ${String(e)}` }, { status: 500 });
     }
   }
 
-  // ── Real bulk send ──────────────────────────────────────
+  // ── Real bulk send ──────────────────────
   const allContacts = await getContacts();
   const targets = matchingContacts(allContacts, body);
   if (targets.length === 0) {

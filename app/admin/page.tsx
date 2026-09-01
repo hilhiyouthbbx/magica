@@ -1744,10 +1744,15 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
 }) {
   // Independent Source picker inside the modal — doesn't depend on whatever filter happens to
   // be active on the Contacts tab behind it. Defaults to whatever was selected there, but you
-  // can freely change it here without closing the modal.
+  // can freely pick ANY combination of sources here (e.g. blast every past season at once)
+  // without closing the modal.
   const emailSources = [...new Set(allContacts.map(c => c.source).filter(Boolean))].sort();
-  const [blastSource, setBlastSource] = useState(initialSource !== "all" ? initialSource : "all");
+  const [blastSources, setBlastSources] = useState<string[]>(initialSource !== "all" ? [initialSource] : []);
   const [searchQ, setSearchQ] = useState("");
+
+  function toggleSource(src: string) {
+    setBlastSources(prev => prev.includes(src) ? prev.filter(s => s !== src) : [...prev, src]);
+  }
 
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -1759,10 +1764,10 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
   const [error, setError] = useState("");
 
   // Recipients: filtered by the Source picker (and optional search) above, de-duped by email so
-  // the count shown always matches what actually gets sent.
+  // the count shown always matches what actually gets sent. Empty selection = every source.
   const uniqueRecipients = (() => {
     let list = allContacts.filter(c => c.email && c.email.includes("@") && !c.email.includes("noemail"));
-    if (blastSource !== "all") list = list.filter(c => c.source === blastSource);
+    if (blastSources.length > 0) list = list.filter(c => blastSources.includes(c.source));
     if (searchQ.trim()) {
       const q = searchQ.trim().toLowerCase();
       list = list.filter(c => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
@@ -1840,17 +1845,25 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
           </div>
         ) : (
           <div className="p-5 space-y-4">
-            {/* Recipient picker — Source + optional search, independent of the Contacts tab's own filters */}
-            <div className="flex flex-wrap gap-2">
-              <div className="flex-1 min-w-[160px]">
-                <label className="block text-gray-400 text-xs font-semibold mb-1">Send To (Source)</label>
-                <select value={blastSource} onChange={e => setBlastSource(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500">
-                  <option value="all" className="bg-gray-900">All Sources</option>
-                  {emailSources.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
-                </select>
+            {/* Recipient picker — pick ANY combination of Sources + optional search, independent of the Contacts tab's own filters */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-gray-400 text-xs font-semibold">Send To (Source) — pick one or more</label>
+                {blastSources.length > 0 && (
+                  <button type="button" onClick={() => setBlastSources([])} className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold">Clear (use All Sources)</button>
+                )}
               </div>
-              <div className="flex-1 min-w-[160px]">
+              <div className="max-h-40 overflow-y-auto rounded-xl bg-white/5 border border-white/15 p-2 space-y-1">
+                {emailSources.map(s => (
+                  <label key={s} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer text-sm text-gray-300">
+                    <input type="checkbox" checked={blastSources.includes(s)} onChange={() => toggleSource(s)}
+                      className="w-4 h-4 rounded accent-blue-600" />
+                    {SOURCE_LABELS[s] || s}
+                  </label>
+                ))}
+              </div>
+              <p className="text-gray-600 text-[11px]">{blastSources.length === 0 ? "Nothing checked = every Source." : `${blastSources.length} source${blastSources.length !== 1 ? "s" : ""} selected.`}</p>
+              <div>
                 <label className="block text-gray-400 text-xs font-semibold mb-1">Search (optional)</label>
                 <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Name or email…"
                   className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />

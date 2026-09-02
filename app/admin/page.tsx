@@ -17,7 +17,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "merch-order":  "Merch Order",
   "import":       "Import",
   "tournament":   "Tournament",
-  "tryout":       "Tryout Registration",
+  "tryout":       "2026-2027 Youth Tryout",
   "membership-signup": "Membership Sign-Up (Join Us — No Payment)",
 };
 
@@ -2668,7 +2668,7 @@ export default function AdminPage() {
                   <option value="tournament"   className="bg-gray-900">Tournament</option>
                   <option value="merch-order"  className="bg-gray-900">Merch Orders</option>
                   <option value="import"       className="bg-gray-900">Imports</option>
-                  <option value="tryout"       className="bg-gray-900">Tryout Registrations</option>
+                  <option value="tryout"       className="bg-gray-900">2026-2027 Youth Tryout</option>
                   <option value="membership-signup" className="bg-gray-900">Membership Sign-Up (Join Us)</option>
                   {customSources.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
                 </select>

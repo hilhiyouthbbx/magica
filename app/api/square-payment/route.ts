@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
+import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -22,45 +23,71 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { sourceId, total, cart, contact } = await req.json();
+    const { sourceId, total: clientTotal, cart, contact, voucherCode } = await req.json();
 
-    if (!sourceId || typeof total !== "number" || !Array.isArray(cart) || !contact?.name) {
+    if (!sourceId || typeof clientTotal !== "number" || !Array.isArray(cart) || !contact?.name) {
       return NextResponse.json(
         { success: false, error: "Invalid request. Please try again." },
         { status: 400 }
       );
     }
 
-    // ── Create payment via Square ──────────────────────────────────────────
-    const sqRes = await fetch(`${SQ_BASE}/payments`, {
-      method: "POST",
-      headers: {
-        "Content-Type":   "application/json",
-        "Authorization":  `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
-        "Square-Version": "2024-10-17",
-      },
-      body: JSON.stringify({
-        source_id:         sourceId,
-        idempotency_key:   crypto.randomUUID(),
-        amount_money: {
-          amount:   Math.round(total * 100), // cents
-          currency: "USD",
-        },
-        location_id:           process.env.SQUARE_LOCATION_ID,
-        note:                  `Hilhi Youth BBX Merch — ${contact.name}`,
-        buyer_email_address:   contact.email || undefined,
-      }),
-    });
+    // ── Recompute the subtotal server-side from the cart (never trust the client's total alone) ──
+    const subtotal: number = (cart as Array<{ price: number; qty: number }>)
+      .reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
 
-    const sqData = await sqRes.json();
-
-    if (!sqRes.ok || sqData.errors?.length) {
-      const code = sqData.errors?.[0]?.code as string | undefined;
-      const msg  = ERROR_MESSAGES[code ?? ""] || sqData.errors?.[0]?.detail || "Payment was declined. Please try a different card.";
-      return NextResponse.json({ success: false, error: msg }, { status: 400 });
+    // ── Server-side voucher validation — a voucher discounts the subtotal and waives the 3% fee ──
+    let total = clientTotal;
+    let voucherApplied = false;
+    if (voucherCode && subtotal > 0) {
+      const check = await validateVoucher(voucherCode, "merch", subtotal);
+      if (check.valid) {
+        total = check.finalTotal!;
+        voucherApplied = true;
+      }
     }
 
-    const paymentId = sqData.payment?.id as string | undefined;
+    let paymentId: string | undefined;
+    if (total > 0 && sourceId !== "FREE") {
+      // ── Create payment via Square ──────────────────────────────────────────
+      const sqRes = await fetch(`${SQ_BASE}/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type":   "application/json",
+          "Authorization":  `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
+          "Square-Version": "2024-10-17",
+        },
+        body: JSON.stringify({
+          source_id:         sourceId,
+          idempotency_key:   crypto.randomUUID(),
+          amount_money: {
+            amount:   Math.round(total * 100), // cents
+            currency: "USD",
+          },
+          location_id:           process.env.SQUARE_LOCATION_ID,
+          note:                  `Hilhi Youth BBX Merch — ${contact.name}`,
+          buyer_email_address:   contact.email || undefined,
+        }),
+      });
+
+      const sqData = await sqRes.json();
+
+      if (!sqRes.ok || sqData.errors?.length) {
+        const code = sqData.errors?.[0]?.code as string | undefined;
+        const msg  = ERROR_MESSAGES[code ?? ""] || sqData.errors?.[0]?.detail || "Payment was declined. Please try a different card.";
+        return NextResponse.json({ success: false, error: msg }, { status: 400 });
+      }
+
+      paymentId = sqData.payment?.id as string | undefined;
+    } else {
+      // Free order (a voucher covered the full amount) — no Square charge needed.
+      paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
+    }
+
+    // ── Redeem voucher after a successful (or fully-covered) order ──────────
+    if (voucherCode && voucherApplied) {
+      try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
+    }
 
     // ── Save contact ───────────────────────────────────────────────────────
     try {
@@ -71,7 +98,7 @@ export async function POST(req: NextRequest) {
         source: "merch-order",
         notes:  `Items: ${(cart as Array<{ name: string; size: string; qty: number; price: number }>)
           .map(i => `${i.name} (${i.size}) ×${i.qty}`)
-          .join(", ")} | Total: $${total.toFixed(2)} | Square ID: ${paymentId ?? "n/a"}`,
+          .join(", ")} | Subtotal: $${subtotal.toFixed(2)}${voucherApplied ? ` | Promo: ${voucherCode}` : ""} | Total: $${total.toFixed(2)} | Square ID: ${paymentId ?? "n/a"}`,
       });
     } catch {/* non-fatal */}
 

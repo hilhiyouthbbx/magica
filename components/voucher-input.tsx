@@ -12,7 +12,7 @@ export interface AppliedVoucher {
 }
 
 interface Props {
-  event:    "camp" | "tournament" | "tryout";
+  event:    "camp" | "tournament" | "tryout" | "merch";
   subtotal: number;
   onApply:  (v: AppliedVoucher | null) => void;
   applied:  AppliedVoucher | null;

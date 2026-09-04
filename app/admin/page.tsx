@@ -41,7 +41,7 @@ interface Contact {
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 
-type Tab = "contacts" | "tournaments" | "pages" | "vouchers" | "filmroom" | "camp" | "tourney";
+type Tab = "contacts" | "tournaments" | "pages" | "vouchers" | "invoices" | "filmroom" | "camp" | "tourney";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-component: image field with upload
@@ -629,7 +629,7 @@ import { TourneyTab } from "./tourney-tab";
 
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
-type VoucherEvent = "camp" | "tournament" | "tryout";
+type VoucherEvent = "camp" | "tournament" | "tryout" | "merch";
 interface Voucher {
   id: string; code: string; description: string;
   type: "percent" | "fixed"; amount: number;
@@ -639,9 +639,317 @@ interface Voucher {
 }
 const BLANK_VOUCHER: Omit<Voucher,"id"|"usedCount"|"createdAt"> = {
   code:"", description:"", type:"percent", amount:10,
-  events:["camp","tournament","tryout"], maxUses:null,
+  events:["camp","tournament","tryout","merch"], maxUses:null,
   expiresAt:null, minOrderAmount:0, enabled:true,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Invoices — create/edit invoices for organizations (tournament hosts, sponsors, etc.),
+// track paid/unpaid status, and email them directly from here.
+// ─────────────────────────────────────────────────────────────────────────────
+interface InvoiceItem { description: string; amount: number; }
+interface Invoice {
+  id: string; invoiceNumber: string;
+  organizationName: string; contactName?: string; contactEmail: string;
+  items: InvoiceItem[]; notes?: string;
+  issueDate: string; dueDate?: string;
+  status: "unpaid" | "paid"; paidAt?: string; lastSentAt?: string;
+  createdAt: string; updatedAt: string;
+}
+const BLANK_INVOICE_ITEM: InvoiceItem = { description: "", amount: 0 };
+function invoiceTotalLocal(inv: { items: InvoiceItem[] }): number {
+  return inv.items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+}
+
+function InvoicesTab({ adminKey }: { adminKey: string }) {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loaded,   setLoaded]   = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [sendingId,setSendingId]= useState<string | null>(null);
+  const [msg,      setMsg]      = useState("");
+  const [editing,  setEditing]  = useState<Partial<Invoice> | null>(null);
+  const [filter,   setFilter]   = useState<"all" | "unpaid" | "paid">("all");
+
+  useEffect(() => {
+    fetch(`/api/admin/invoices?key=${adminKey}`)
+      .then(r => r.json()).then(d => { setInvoices(d.invoices ?? []); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [adminKey]);
+
+  function startNew() {
+    setEditing({
+      organizationName: "", contactName: "", contactEmail: "",
+      items: [{ ...BLANK_INVOICE_ITEM }],
+      notes: "", issueDate: new Date().toISOString().slice(0, 10), dueDate: "",
+      status: "unpaid",
+    });
+  }
+
+  async function save() {
+    if (!editing) return;
+    if (!editing.organizationName?.trim()) { setMsg("Organization name is required."); return; }
+    if (!editing.contactEmail?.trim())      { setMsg("Contact email is required."); return; }
+    const items = (editing.items || []).filter(i => i.description.trim() || i.amount);
+    if (items.length === 0) { setMsg("Add at least one line item."); return; }
+
+    setSaving(true); setMsg("");
+    const res = await fetch(`/api/admin/invoices?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", ...editing, items }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setInvoices(prev => editing.id ? prev.map(x => x.id === data.invoice.id ? data.invoice : x) : [data.invoice, ...prev]);
+      setEditing(null); setMsg("Saved!");
+    } else {
+      setMsg(data.error || "Failed to save.");
+    }
+    setSaving(false);
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  async function setStatus(inv: Invoice, status: "paid" | "unpaid") {
+    setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, status } : x));
+    await fetch(`/api/admin/invoices?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "setStatus", id: inv.id, status }),
+    });
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Delete this invoice? This can't be undone.")) return;
+    await fetch(`/api/admin/invoices?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    setInvoices(prev => prev.filter(x => x.id !== id));
+  }
+
+  async function sendInvoice(inv: Invoice) {
+    if (!confirm(`Send this invoice to ${inv.contactEmail}?`)) return;
+    setSendingId(inv.id);
+    const res = await fetch(`/api/admin/invoices?key=${adminKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "send", id: inv.id }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, lastSentAt: new Date().toISOString() } : x));
+      setMsg(`Sent to ${inv.contactEmail}!`);
+    } else {
+      setMsg(data.error || "Send failed.");
+    }
+    setSendingId(null);
+    setTimeout(() => setMsg(""), 4000);
+  }
+
+  function updateItem(idx: number, patch: Partial<InvoiceItem>) {
+    setEditing(prev => {
+      if (!prev) return prev;
+      const items = [...(prev.items || [])];
+      items[idx] = { ...items[idx], ...patch };
+      return { ...prev, items };
+    });
+  }
+  function addItem() {
+    setEditing(prev => prev ? { ...prev, items: [...(prev.items || []), { ...BLANK_INVOICE_ITEM }] } : prev);
+  }
+  function removeItem(idx: number) {
+    setEditing(prev => prev ? { ...prev, items: (prev.items || []).filter((_, i) => i !== idx) } : prev);
+  }
+
+  const filtered = invoices.filter(i => filter === "all" || i.status === filter);
+  const totalOutstanding = invoices.filter(i => i.status === "unpaid").reduce((s, i) => s + invoiceTotalLocal(i), 0);
+
+  if (!loaded) return <div className="text-gray-500 text-sm">Loading invoices…</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="glass rounded-2xl border border-white/10 p-4">
+          <div className="text-3xl font-black text-white">{invoices.length}</div>
+          <div className="text-gray-500 text-xs mt-1">Total Invoices</div>
+        </div>
+        <div className="glass rounded-2xl border border-white/10 p-4">
+          <div className="text-3xl font-black text-amber-400">${totalOutstanding.toFixed(2)}</div>
+          <div className="text-gray-500 text-xs mt-1">Outstanding (Unpaid)</div>
+        </div>
+        <div className="glass rounded-2xl border border-white/10 p-4">
+          <div className="text-3xl font-black text-green-400">{invoices.filter(i => i.status === "paid").length}</div>
+          <div className="text-gray-500 text-xs mt-1">Paid Invoices</div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-1 glass rounded-xl border border-white/10 p-1 w-fit">
+          {(["all", "unpaid", "paid"] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === f ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>
+              {f === "all" ? "All" : f === "unpaid" ? "Unpaid" : "Paid"}
+            </button>
+          ))}
+        </div>
+        <button onClick={startNew}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-all">
+          <Plus className="w-4 h-4" /> New Invoice
+        </button>
+      </div>
+
+      {msg && <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5 text-sm text-blue-300">{msg}</div>}
+
+      {filtered.length === 0 ? (
+        <div className="glass border border-white/10 rounded-2xl p-8 text-center text-gray-500">
+          No invoices {filter !== "all" ? `(${filter})` : ""} yet.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(inv => (
+            <div key={inv.id} className="glass border border-white/10 rounded-2xl p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-bold">{inv.invoiceNumber}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      inv.status === "paid"
+                        ? "bg-green-500/20 text-green-300 border-green-500/30"
+                        : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                    }`}>{inv.status === "paid" ? "PAID" : "UNPAID"}</span>
+                  </div>
+                  <div className="text-gray-300 text-sm mt-1">{inv.organizationName}{inv.contactName ? ` · ${inv.contactName}` : ""}</div>
+                  <div className="text-gray-500 text-xs mt-0.5">{inv.contactEmail}</div>
+                  <div className="text-gray-500 text-xs mt-1">
+                    Issued {inv.issueDate}{inv.dueDate ? ` · Due ${inv.dueDate}` : ""}
+                    {inv.lastSentAt ? ` · Sent ${new Date(inv.lastSentAt).toLocaleDateString()}` : " · Not sent yet"}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-white font-black text-xl">${invoiceTotalLocal(inv).toFixed(2)}</div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-white/10">
+                <button onClick={() => setStatus(inv, inv.status === "paid" ? "unpaid" : "paid")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    inv.status === "paid"
+                      ? "bg-amber-600/20 text-amber-300 hover:bg-amber-600/30"
+                      : "bg-green-600/20 text-green-300 hover:bg-green-600/30"
+                  }`}>
+                  <DollarSign className="w-3.5 h-3.5" /> Mark as {inv.status === "paid" ? "Unpaid" : "Paid"}
+                </button>
+                <button onClick={() => sendInvoice(inv)} disabled={sendingId === inv.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 disabled:opacity-40 text-xs font-bold transition-all">
+                  <MailIcon className="w-3.5 h-3.5" /> {sendingId === inv.id ? "Sending…" : inv.lastSentAt ? "Resend" : "Send"}
+                </button>
+                <button onClick={() => setEditing(inv)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-gray-300 hover:bg-white/20 text-xs font-bold transition-all">
+                  <Edit2 className="w-3.5 h-3.5" /> Edit
+                </button>
+                <button onClick={() => remove(inv.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/10 text-red-400 hover:bg-red-600/20 text-xs font-bold transition-all">
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
+          <div className="glass border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-white/10">
+              <h2 className="text-white font-bold text-lg">{editing.id ? "Edit Invoice" : "New Invoice"}</h2>
+              <button onClick={() => setEditing(null)} className="text-gray-500 hover:text-white p-1"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Organization Name *</label>
+                  <input value={editing.organizationName || ""} onChange={e => setEditing(p => p ? { ...p, organizationName: e.target.value } : p)}
+                    placeholder="e.g. Aloha Youth Basketball"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Contact Name</label>
+                  <input value={editing.contactName || ""} onChange={e => setEditing(p => p ? { ...p, contactName: e.target.value } : p)}
+                    placeholder="Coach Smith"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Contact Email *</label>
+                  <input type="email" value={editing.contactEmail || ""} onChange={e => setEditing(p => p ? { ...p, contactEmail: e.target.value } : p)}
+                    placeholder="coach@email.com"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Issue Date</label>
+                  <input type="date" value={editing.issueDate || ""} onChange={e => setEditing(p => p ? { ...p, issueDate: e.target.value } : p)}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Due Date</label>
+                  <input type="date" value={editing.dueDate || ""} onChange={e => setEditing(p => p ? { ...p, dueDate: e.target.value } : p)}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-gray-400 text-xs font-semibold">Line Items *</label>
+                  <button type="button" onClick={addItem} className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold">+ Add Item</button>
+                </div>
+                <div className="space-y-2">
+                  {(editing.items || []).map((item, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <input value={item.description} onChange={e => updateItem(idx, { description: e.target.value })}
+                        placeholder="Description (e.g. Tournament entry fee)"
+                        className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                      <input type="number" step="0.01" min="0" value={item.amount || ""} onChange={e => updateItem(idx, { amount: parseFloat(e.target.value) || 0 })}
+                        placeholder="0.00"
+                        className="w-28 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                      {(editing.items || []).length > 1 && (
+                        <button type="button" onClick={() => removeItem(idx)} className="text-gray-600 hover:text-red-400 px-1"><X className="w-4 h-4" /></button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-right text-gray-400 text-sm font-bold mt-2">Total: ${invoiceTotalLocal({ items: editing.items || [] }).toFixed(2)}</p>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-xs font-semibold mb-1">Notes (optional)</label>
+                <textarea rows={3} value={editing.notes || ""} onChange={e => setEditing(p => p ? { ...p, notes: e.target.value } : p)}
+                  placeholder="Payment instructions, thank-you note, etc."
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 resize-none" />
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-xs font-semibold mb-1">Status</label>
+                <div className="flex gap-2">
+                  {(["unpaid", "paid"] as const).map(s => (
+                    <button key={s} type="button" onClick={() => setEditing(p => p ? { ...p, status: s } : p)}
+                      className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${
+                        editing.status === s ? "bg-blue-600 border-blue-500 text-white" : "bg-white/5 border-white/15 text-gray-400 hover:border-white/30"
+                      }`}>
+                      {s === "paid" ? "Paid" : "Unpaid"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {msg && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 text-sm text-red-400">{msg}</div>}
+
+              <button onClick={save} disabled={saving}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all">
+                {saving ? "Saving…" : "Save Invoice"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function VouchersTab({ adminKey }: { adminKey: string }) {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -811,7 +1119,7 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
           <div>
             <label className="block text-gray-400 text-xs font-semibold mb-2 uppercase tracking-wider">Applies To</label>
             <div className="flex gap-3">
-              {(["camp","tournament","tryout"] as VoucherEvent[]).map(ev => {
+              {(["camp","tournament","tryout","merch"] as VoucherEvent[]).map(ev => {
                 const on = (editing.events ?? []).includes(ev);
                 return (
                   <button key={ev} type="button"
@@ -820,7 +1128,7 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
                       return { ...p, events: on ? evs.filter(e => e!==ev) : [...evs, ev] };
                     })}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold capitalize border transition-all ${on ? "bg-orange-500/20 border-orange-500/60 text-orange-300" : "bg-white/5 border-white/15 text-gray-500 hover:text-gray-300"}`}>
-                    {ev==="camp" ? "🏕️" : ev==="tournament" ? "🏆" : "📋"} {ev}
+                    {ev==="camp" ? "🏕️" : ev==="tournament" ? "🏆" : ev==="tryout" ? "📋" : "🛒"} {ev==="merch" ? "merch order" : ev}
                   </button>
                 );
               })}
@@ -881,7 +1189,7 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
                         <span>Min. order ${v.minOrderAmount.toFixed(2)}</span>
                       )}
                       <span className="flex items-center gap-1">
-                        {v.events.map(e => e==="camp" ? "🏕️" : e==="tournament" ? "🏆" : "📋").join(" ")}
+                        {v.events.map(e => e==="camp" ? "🏕️" : e==="tournament" ? "🏆" : e==="tryout" ? "📋" : "🛒").join(" ")}
                         {" "}{v.events.join(", ")}
                       </span>
                     </div>
@@ -2409,6 +2717,7 @@ export default function AdminPage() {
             { id:"contacts",    icon:<Users    className="w-4 h-4"/>, label:"Contacts"    },
             { id:"tournaments", icon:<Trophy   className="w-4 h-4"/>, label:"Tournaments" },
             { id:"vouchers",    icon:<Tag      className="w-4 h-4"/>, label:"Vouchers"    },
+            { id:"invoices",    icon:<FileText className="w-4 h-4"/>, label:"Invoices"    },
             { id:"filmroom",    icon:<Video    className="w-4 h-4"/>, label:"Film Room"   },
             { id:"camp",        icon:<Trophy   className="w-4 h-4"/>, label:"Camp Hub"    },
             { id:"tourney",     icon:<Trophy   className="w-4 h-4"/>, label:"Tournament Manager" },
@@ -3076,6 +3385,7 @@ export default function AdminPage() {
 
         {/* ── PAGES TAB ── */}
         {tab === "vouchers"  && <VouchersTab  adminKey={adminKey} />}
+        {tab === "invoices"  && <InvoicesTab  adminKey={adminKey} />}
         {tab === "filmroom"  && <FilmRoomTab  adminKey={adminKey} />}
         {tab === "camp"      && <CampTab      adminKey={adminKey} />}
         {tab === "tourney"   && <TourneyTab contacts={contacts} tournaments={tournaments} adminKey={adminKey} />}

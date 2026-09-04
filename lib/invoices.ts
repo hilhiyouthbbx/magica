@@ -21,8 +21,9 @@ async function kvSet(key: string, value: unknown): Promise<void> {
 
 // ── Data model ──────────────────────────────────────────────────────
 export interface InvoiceItem {
-  description: string;
-  amount: number;
+  quantity:    number;   // e.g. 2
+  description: string;   // memo / line description
+  amount:      number;   // unit price — line total = quantity × amount
 }
 
 export interface Invoice {
@@ -44,8 +45,12 @@ export interface Invoice {
 
 function makeId() { return `inv-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`; }
 
+export function lineTotal(item: Pick<InvoiceItem, "quantity" | "amount">): number {
+  return (Number(item.quantity) || 0) * (Number(item.amount) || 0);
+}
+
 export function invoiceTotal(inv: Pick<Invoice, "items">): number {
-  return inv.items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  return inv.items.reduce((s, i) => s + lineTotal(i), 0);
 }
 
 // ── Read ─────────────────────────────────────────────────────────────────

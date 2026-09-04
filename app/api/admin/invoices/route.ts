@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import {
   getInvoices, upsertInvoice, setInvoiceStatus, deleteInvoice, markInvoiceSent,
-  invoiceTotal, type Invoice, type InvoiceItem,
+  invoiceTotal, lineTotal, type Invoice, type InvoiceItem,
 } from "@/lib/invoices";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +25,10 @@ function invoiceHtml(inv: Invoice): string {
   const total = invoiceTotal(inv);
   const rows = inv.items.map(i => `
     <tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111;text-align:center;">${Number(i.quantity) || 0}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111;">${escapeHtml(i.description)}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111;text-align:right;">${money(Number(i.amount) || 0)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111;text-align:right;font-weight:700;">${money(lineTotal(i))}</td>
     </tr>`).join("");
 
   return `
@@ -63,14 +65,16 @@ function invoiceHtml(inv: Invoice): string {
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
               <thead>
                 <tr style="background:#f1f5f9;">
-                  <th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;">Description</th>
+                  <th style="padding:10px 12px;text-align:center;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;width:60px;">Qty</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;">Memo</th>
                   <th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;">Amount</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;">Total</th>
                 </tr>
               </thead>
               <tbody>${rows}</tbody>
               <tfoot>
                 <tr>
-                  <td style="padding:12px;text-align:right;font-size:14px;font-weight:700;color:#111;">Total</td>
+                  <td colspan="3" style="padding:12px;text-align:right;font-size:14px;font-weight:700;color:#111;">Total</td>
                   <td style="padding:12px;text-align:right;font-size:16px;font-weight:800;color:#111;">${money(total)}</td>
                 </tr>
               </tfoot>
@@ -135,7 +139,7 @@ export async function POST(req: NextRequest) {
       organizationName: draft.organizationName || "(Organization Name)",
       contactName: draft.contactName || "",
       contactEmail: draft.contactEmail || "",
-      items: (draft.items && draft.items.length > 0) ? draft.items : [{ description: "(line item)", amount: 0 }],
+      items: (draft.items && draft.items.length > 0) ? draft.items : [{ quantity: 1, description: "(line item)", amount: 0 }],
       notes: draft.notes || "",
       issueDate: draft.issueDate || new Date().toISOString().slice(0, 10),
       dueDate: draft.dueDate || "",

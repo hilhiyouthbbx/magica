@@ -12,8 +12,9 @@ import { Navbar }  from "@/components/navbar";
 import { Footer }  from "@/components/footer";
 import type { SiteContent, MerchProduct } from "@/lib/content";
 import { DynamicTitle } from "@/components/dynamic-title";
+import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
-// ── Square config ─────────────────────────────────────────────────────────
+// ── Square config ─────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
 const SQ_LOC_ID = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? "";
 const SQ_SCRIPT = SQ_APP_ID.startsWith("sandbox-")
@@ -37,7 +38,7 @@ const CATS  = [
 interface CartItem { productId:string; name:string; price:number; size:string; qty:number; imageUrl:string; }
 type Step = "browse" | "contact" | "pay" | "done";
 
-// ── Square card style ─────────────────────────────────────────────────────
+// ── Square card style ─────────────────────────────────────────────────────────────────────
 const SQ_STYLE = {
   ".input-container":          { borderColor: "#e5e7eb", borderRadius: "10px" },
   ".input-container.is-focus": { borderColor: "#3b82f6" },
@@ -66,6 +67,7 @@ export default function MerchPage() {
   const [paymentError, setPaymentError] = useState("");
   const [paymentId,    setPaymentId]    = useState("");
   const [retryCount,   setRetryCount]   = useState(0);
+  const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
 
   // Load products from CMS
   useEffect(() => {
@@ -81,11 +83,13 @@ export default function MerchPage() {
 
   const filtered  = useMemo(() => cat === "all" ? products : products.filter(p => p.cat === cat), [cat, products]);
   const subtotal  = cart.reduce((s,i) => s + i.price * i.qty, 0);
-  const fee       = Math.round(subtotal * 0.03 * 100) / 100;
-  const total     = subtotal + fee;
+  // A voucher discounts the subtotal and waives the service fee (same treatment as camp/tournament/tryout
+  // registrations) — the discounted total below is what actually gets charged and shown at checkout.
+  const fee       = appliedVoucher ? 0 : Math.round(subtotal * 0.03 * 100) / 100;
+  const total     = appliedVoucher ? appliedVoucher.finalTotal : subtotal + fee;
   const cartCount = cart.reduce((s,i) => s + i.qty, 0);
 
-  // ── Init Square card whenever step becomes "pay" ───────────────────────
+  // ── Init Square card whenever step becomes "pay" ─────────────────────────
   useEffect(() => {
     if (step !== "pay") return;
 
@@ -156,7 +160,7 @@ export default function MerchPage() {
     };
   }, [step, retryCount]); // retryCount lets the retry button re-trigger the effect
 
-  // ── Cart helpers ──────────────────────────────────────────────────────
+  // ── Cart helpers ─────────────────────────────────────────────────
   function addToCart(p: MerchProduct) {
     const size = sizes[p.id];
     if (!size) { setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
@@ -178,20 +182,26 @@ export default function MerchPage() {
   }
 
   async function handlePay() {
-    if (!cardRef.current) { setPaymentError("Card form not ready — please wait a moment."); return; }
+    // A voucher covering the full order skips Square entirely — no card needed.
+    if (total > 0 && !cardRef.current) { setPaymentError("Card form not ready — please wait a moment."); return; }
     setPaying(true); setPaymentError("");
     try {
-      const result = await cardRef.current.tokenize();
-      if (result.status !== "OK") {
-        setPaymentError(result.errors?.map((e:any) => e.message).join(" ") || "Card validation failed. Please check your details.");
-        setPaying(false); return;
+      let sourceId = "FREE";
+      if (total > 0) {
+        const result = await cardRef.current.tokenize();
+        if (result.status !== "OK") {
+          setPaymentError(result.errors?.map((e:any) => e.message).join(" ") || "Card validation failed. Please check your details.");
+          setPaying(false); return;
+        }
+        sourceId = result.token;
       }
       const res  = await fetch("/api/square-payment", {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
-          sourceId: result.token, total,
+          sourceId, total,
           cart: cart.map(i => ({ name:i.name, size:i.size, qty:i.qty, price:i.price })),
           contact: { name, email, phone, notes },
+          voucherCode: appliedVoucher?.code ?? null,
         }),
       });
       const data = await res.json();
@@ -203,10 +213,10 @@ export default function MerchPage() {
 
   function resetAll() {
     setCart([]); setSizes({}); setName(""); setEmail(""); setPhone(""); setNotes("");
-    setStep("browse"); setPaymentError(""); setSquareError(""); setPaymentId("");
+    setStep("browse"); setPaymentError(""); setSquareError(""); setPaymentId(""); setAppliedVoucher(null);
   }
 
-  // ──────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-[#080D1A]">
 
@@ -451,17 +461,34 @@ export default function MerchPage() {
                               <span className="text-blue-300/70">Subtotal</span>
                               <span className="text-gray-300">${subtotal.toFixed(2)}</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-blue-300/70">Service fee (3%)</span>
-                              <span className="text-gray-300">${fee.toFixed(2)}</span>
-                            </div>
+                            {appliedVoucher ? (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-green-400/80">Promo ({appliedVoucher.code})</span>
+                                <span className="text-green-400">-${appliedVoucher.discountAmount.toFixed(2)}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-blue-300/70">Service fee (3%)</span>
+                                <span className="text-gray-300">${fee.toFixed(2)}</span>
+                              </div>
+                            )}
                             <div className="flex items-center justify-between pt-1 border-t border-blue-500/20">
                               <span className="text-blue-300 text-sm font-semibold">Total due</span>
                               <span className="text-white font-black text-2xl">${total.toFixed(2)}</span>
                             </div>
                           </div>
 
-                          {/* Card form */}
+                          {/* Promo / voucher code */}
+                          <VoucherInput
+                            event="merch"
+                            subtotal={subtotal}
+                            onApply={setAppliedVoucher}
+                            applied={appliedVoucher}
+                          />
+
+                          {/* Card form — hidden entirely when a voucher covers the full order */}
+                          {total > 0 && (
+                          <>
                           {squareError ? (
                             <div className="space-y-3">
                               <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
@@ -484,6 +511,8 @@ export default function MerchPage() {
                               <div id="sq-card-container" className="bg-white rounded-xl p-4 min-h-[120px]" />
                             </div>
                           )}
+                          </>
+                          )}
 
                           {paymentError && (
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
@@ -492,17 +521,21 @@ export default function MerchPage() {
                           )}
 
                           <button onClick={handlePay}
-                            disabled={paying || cardLoading || !!squareError}
+                            disabled={paying || (total > 0 && (cardLoading || !!squareError))}
                             className="w-full py-3.5 bg-gradient-to-r from-[#006aff] to-[#00aaff] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
                             {paying
                               ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
-                              : <><Lock className="w-4 h-4" /> Pay ${total.toFixed(2)} Securely</>
+                              : total === 0
+                                ? <><CheckCircle className="w-4 h-4" /> Complete Free Order</>
+                                : <><Lock className="w-4 h-4" /> Pay ${total.toFixed(2)} Securely</>
                             }
                           </button>
 
+                          {total > 0 && (
                           <p className="text-gray-600 text-[11px] text-center flex items-center justify-center gap-1">
                             <Lock className="w-3 h-3" /> 256-bit encrypted · Powered by Square
                           </p>
+                          )}
 
                           <button type="button" onClick={() => setStep("contact")}
                             className="w-full text-gray-500 hover:text-gray-300 text-xs transition-colors flex items-center justify-center gap-1">

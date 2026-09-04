@@ -20,7 +20,7 @@ async function kvSet(key: string, value: unknown): Promise<void> {
 }
 
 // ── Data model ─────────────────────────────────────────────────────────────
-export type VoucherEvent = "camp" | "tournament" | "tryout";
+export type VoucherEvent = "camp" | "tournament" | "tryout" | "merch";
 
 export interface Voucher {
   id:             string;
@@ -76,7 +76,7 @@ export async function upsertVoucher(v: Partial<Voucher> & { code: string }): Pro
     description:    v.description    ?? "",
     type:           v.type           ?? "percent",
     amount:         v.amount         ?? 10,
-    events:         v.events         ?? ["camp", "tournament", "tryout"],
+    events:         v.events         ?? ["camp", "tournament", "tryout", "merch"],
     maxUses:        v.maxUses        ?? null,
     usedCount:      0,
     expiresAt:      v.expiresAt      ?? null,

@@ -124,6 +124,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, invoice });
   }
 
+  // Renders the exact same HTML the real email uses, from whatever draft data is currently in
+  // the compose form — no save required. Lets the admin see precisely what a recipient will get
+  // (including the live PAID/PAYMENT DUE stamp) before ever hitting Send.
+  if (body.action === "preview") {
+    const draft = body.invoice as Partial<Invoice> & { items?: InvoiceItem[] };
+    const previewInvoice: Invoice = {
+      id: draft.id || "preview",
+      invoiceNumber: draft.invoiceNumber || "INV-DRAFT",
+      organizationName: draft.organizationName || "(Organization Name)",
+      contactName: draft.contactName || "",
+      contactEmail: draft.contactEmail || "",
+      items: (draft.items && draft.items.length > 0) ? draft.items : [{ description: "(line item)", amount: 0 }],
+      notes: draft.notes || "",
+      issueDate: draft.issueDate || new Date().toISOString().slice(0, 10),
+      dueDate: draft.dueDate || "",
+      status: draft.status === "paid" ? "paid" : "unpaid",
+      createdAt: "", updatedAt: "",
+    };
+    return NextResponse.json({ ok: true, html: invoiceHtml(previewInvoice) });
+  }
+
   if (body.action === "setStatus" && body.id && (body.status === "paid" || body.status === "unpaid")) {
     const ok = await setInvoiceStatus(body.id, body.status);
     return NextResponse.json({ ok });

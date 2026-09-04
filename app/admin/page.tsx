@@ -647,7 +647,7 @@ const BLANK_VOUCHER: Omit<Voucher,"id"|"usedCount"|"createdAt"> = {
 // Invoices — create/edit invoices for organizations (tournament hosts, sponsors, etc.),
 // track paid/unpaid status, and email them directly from here.
 // ─────────────────────────────────────────────────────────────────────────────
-interface InvoiceItem { description: string; amount: number; }
+interface InvoiceItem { quantity: number; description: string; amount: number; }
 interface Invoice {
   id: string; invoiceNumber: string;
   organizationName: string; contactName?: string; contactEmail: string;
@@ -656,9 +656,12 @@ interface Invoice {
   status: "unpaid" | "paid"; paidAt?: string; lastSentAt?: string;
   createdAt: string; updatedAt: string;
 }
-const BLANK_INVOICE_ITEM: InvoiceItem = { description: "", amount: 0 };
+const BLANK_INVOICE_ITEM: InvoiceItem = { quantity: 1, description: "", amount: 0 };
+function lineTotalLocal(item: Pick<InvoiceItem, "quantity" | "amount">): number {
+  return (Number(item.quantity) || 0) * (Number(item.amount) || 0);
+}
 function invoiceTotalLocal(inv: { items: InvoiceItem[] }): number {
-  return inv.items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  return inv.items.reduce((s, i) => s + lineTotalLocal(i), 0);
 }
 
 function InvoicesTab({ adminKey }: { adminKey: string }) {
@@ -669,12 +672,31 @@ function InvoicesTab({ adminKey }: { adminKey: string }) {
   const [msg,      setMsg]      = useState("");
   const [editing,  setEditing]  = useState<Partial<Invoice> | null>(null);
   const [filter,   setFilter]   = useState<"all" | "unpaid" | "paid">("all");
+  const [previewHtml,    setPreviewHtml]    = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/admin/invoices?key=${adminKey}`)
       .then(r => r.json()).then(d => { setInvoices(d.invoices ?? []); setLoaded(true); })
       .catch(() => setLoaded(true));
   }, [adminKey]);
+
+  /** Renders the exact email HTML for whatever invoice data is passed — a saved invoice from the
+   *  list, or the in-progress draft straight out of the compose form — with no send/save involved. */
+  async function openPreview(inv: Partial<Invoice>) {
+    setPreviewLoading(true); setPreviewHtml("");
+    try {
+      const res = await fetch(`/api/admin/invoices?key=${adminKey}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "preview", invoice: inv }),
+      });
+      const data = await res.json();
+      setPreviewHtml(data.html || "<p>Preview failed to load.</p>");
+    } catch {
+      setPreviewHtml("<p>Preview failed to load.</p>");
+    }
+    setPreviewLoading(false);
+  }
 
   function startNew() {
     setEditing({
@@ -836,6 +858,10 @@ function InvoicesTab({ adminKey }: { adminKey: string }) {
                   }`}>
                   <DollarSign className="w-3.5 h-3.5" /> Mark as {inv.status === "paid" ? "Unpaid" : "Paid"}
                 </button>
+                <button onClick={() => openPreview(inv)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 text-xs font-bold transition-all">
+                  <Eye className="w-3.5 h-3.5" /> Preview
+                </button>
                 <button onClick={() => sendInvoice(inv)} disabled={sendingId === inv.id}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 disabled:opacity-40 text-xs font-bold transition-all">
                   <MailIcon className="w-3.5 h-3.5" /> {sendingId === inv.id ? "Sending…" : inv.lastSentAt ? "Resend" : "Send"}
@@ -898,15 +924,26 @@ function InvoicesTab({ adminKey }: { adminKey: string }) {
                   <label className="block text-gray-400 text-xs font-semibold">Line Items *</label>
                   <button type="button" onClick={addItem} className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold">+ Add Item</button>
                 </div>
+                <div className="grid grid-cols-[56px_1fr_88px_88px_20px] gap-2 mb-1 px-0.5">
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Qty</span>
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">Memo</span>
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider text-right">Amount</span>
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider text-right">Total</span>
+                  <span></span>
+                </div>
                 <div className="space-y-2">
                   {(editing.items || []).map((item, idx) => (
-                    <div key={idx} className="flex gap-2">
+                    <div key={idx} className="grid grid-cols-[56px_1fr_88px_88px_20px] gap-2 items-center">
+                      <input type="number" step="1" min="0" value={item.quantity ?? 1} onChange={e => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                        placeholder="1"
+                        className="w-full px-2 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm text-center focus:outline-none focus:border-blue-500" />
                       <input value={item.description} onChange={e => updateItem(idx, { description: e.target.value })}
-                        placeholder="Description (e.g. Tournament entry fee)"
-                        className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                        placeholder="Memo (e.g. Tournament entry fee)"
+                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
                       <input type="number" step="0.01" min="0" value={item.amount || ""} onChange={e => updateItem(idx, { amount: parseFloat(e.target.value) || 0 })}
                         placeholder="0.00"
-                        className="w-28 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
+                        className="w-full px-2 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm text-right focus:outline-none focus:border-blue-500" />
+                      <div className="px-2 py-2 text-right text-white text-sm font-bold">${lineTotalLocal(item).toFixed(2)}</div>
                       {(editing.items || []).length > 1 && (
                         <button type="button" onClick={() => removeItem(idx)} className="text-gray-600 hover:text-red-400 px-1"><X className="w-4 h-4" /></button>
                       )}
@@ -939,10 +976,34 @@ function InvoicesTab({ adminKey }: { adminKey: string }) {
 
               {msg && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 text-sm text-red-400">{msg}</div>}
 
-              <button onClick={save} disabled={saving}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all">
-                {saving ? "Saving…" : "Save Invoice"}
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => openPreview(editing)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-bold rounded-xl transition-all">
+                  <Eye className="w-4 h-4" /> Preview
+                </button>
+                <button onClick={save} disabled={saving}
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all">
+                  {saving ? "Saving…" : "Save Invoice"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(previewHtml !== null || previewLoading) && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4" onClick={() => { setPreviewHtml(null); setPreviewLoading(false); }}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 bg-gray-900 flex-shrink-0">
+              <span className="text-white font-bold text-sm flex items-center gap-2"><Eye className="w-4 h-4" /> Email Preview</span>
+              <button onClick={() => { setPreviewHtml(null); setPreviewLoading(false); }} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-gray-100">
+              {previewLoading ? (
+                <div className="flex items-center justify-center h-64 text-gray-500 text-sm">Loading preview…</div>
+              ) : (
+                <iframe title="Invoice preview" srcDoc={previewHtml || ""} className="w-full h-[80vh] border-0" />
+              )}
             </div>
           </div>
         </div>

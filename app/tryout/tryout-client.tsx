@@ -61,7 +61,7 @@ const UNIFORM_SIZES = ["YS (Youth Small)","YM (Youth Medium)","YL (Youth Large)"
 // ────────────────────────────────────────────────────────
 export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; contact: ContactData }) {
   const isFree     = t.price === 0;
-  const fee        = isFree ? 0 : Math.round(t.price * 0.03 * 100) / 100;
+  const fee        = isFree ? 0 : 10;
   const total      = t.price + fee;
   // treat as free when voucher covers everything
   const effectiveTotal = (v: typeof appliedVoucher) => v?.finalTotal ?? (total * qty);
@@ -343,7 +343,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     </div>
                     {!isFree && appliedVoucher === null && (
                     <div className="flex justify-between items-center">
-                      <div className="text-gray-500 text-xs">Service fee (3%)</div>
+                      <div className="text-gray-500 text-xs">Service fee</div>
                       <div className="text-gray-400 text-xs">${fee.toFixed(2)}</div>
                     </div>
                     )}
@@ -461,7 +461,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                     </div>
                     {!isFree && appliedVoucher === null && (
                     <div className="flex justify-between text-xs text-blue-300/70">
-                      <span>Service fee (3%)</span>
+                      <span>Service fee</span>
                       <span>${(fee * qty).toFixed(2)}</span>
                     </div>
                     )}

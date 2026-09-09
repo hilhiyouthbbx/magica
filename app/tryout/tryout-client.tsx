@@ -332,6 +332,8 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                 /* Info form */
                 <form onSubmit={(e) => {
                   e.preventDefault();
+                  if (!boundaryResult) { alert("Please click \"Check Boundary\" to confirm your address is within the Hillsboro HS attendance boundary before continuing."); return; }
+                  if (!boundaryResult.inHillsboro) { alert("Sorry — tryout registration is limited to players within the Hillsboro High School attendance boundary. Your address did not match that boundary."); return; }
                   if (!waiverSigned || !waiverName.trim()) { alert("Please read and agree to the Liability Waiver, then type your name to sign it before continuing."); return; }
                   setStep("pay");
                 }} className="p-6 space-y-4">
@@ -361,6 +363,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   <div>
                     <label className="block text-gray-300 text-sm font-semibold mb-1.5">
                       Home Address<span className="text-red-400"> *</span>
+                      <span className="text-gray-500 font-normal text-xs ml-1">(boundary check required to register)</span>
                     </label>
                     <div className="flex gap-2">
                       <input type="text" required value={address}
@@ -380,8 +383,13 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       </div>
                     )}
                     {boundaryResult && (
-                      <div className={`mt-2 p-2.5 rounded-lg border text-xs ${boundaryResult.inHillsboro ? "bg-green-500/10 border-green-500/30 text-green-300" : "bg-yellow-500/10 border-yellow-500/30 text-yellow-200"}`}>
+                      <div className={`mt-2 p-2.5 rounded-lg border text-xs ${boundaryResult.inHillsboro ? "bg-green-500/10 border-green-500/30 text-green-300" : "bg-red-500/10 border-red-500/30 text-red-300"}`}>
                         {boundaryResult.message}
+                        {!boundaryResult.inHillsboro && (
+                          <div className="mt-1.5 font-bold">
+                            Registration is limited to players within the Hillsboro HS attendance boundary — you will not be able to continue.
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -447,7 +455,8 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   </div>
 
                   <button type="submit"
-                    className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
+                    disabled={!boundaryResult || !boundaryResult.inHillsboro}
+                    className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
                     Continue to Payment <ChevronRight className="w-5 h-5" />
                   </button>
                 </form>

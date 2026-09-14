@@ -19,6 +19,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "tournament":   "Tournament",
   "tryout":       "2026-2027 Youth Tryout",
   "membership-signup": "Membership Sign-Up (Join Us — No Payment)",
+  "raffle": "Fundraiser Raffle",
 };
 
 interface Contact {
@@ -629,7 +630,7 @@ import { TourneyTab } from "./tourney-tab";
 
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
-type VoucherEvent = "camp" | "tournament" | "tryout" | "merch";
+type VoucherEvent = "camp" | "tournament" | "tryout" | "merch" | "raffle";
 interface Voucher {
   id: string; code: string; description: string;
   type: "percent" | "fixed"; amount: number;
@@ -639,7 +640,7 @@ interface Voucher {
 }
 const BLANK_VOUCHER: Omit<Voucher,"id"|"usedCount"|"createdAt"> = {
   code:"", description:"", type:"percent", amount:10,
-  events:["camp","tournament","tryout","merch"], maxUses:null,
+  events:["camp","tournament","tryout","merch","raffle"], maxUses:null,
   expiresAt:null, minOrderAmount:0, enabled:true,
 };
 
@@ -1180,7 +1181,7 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
           <div>
             <label className="block text-gray-400 text-xs font-semibold mb-2 uppercase tracking-wider">Applies To</label>
             <div className="flex gap-3">
-              {(["camp","tournament","tryout","merch"] as VoucherEvent[]).map(ev => {
+              {(["camp","tournament","tryout","merch","raffle"] as VoucherEvent[]).map(ev => {
                 const on = (editing.events ?? []).includes(ev);
                 return (
                   <button key={ev} type="button"
@@ -1189,7 +1190,7 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
                       return { ...p, events: on ? evs.filter(e => e!==ev) : [...evs, ev] };
                     })}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold capitalize border transition-all ${on ? "bg-orange-500/20 border-orange-500/60 text-orange-300" : "bg-white/5 border-white/15 text-gray-500 hover:text-gray-300"}`}>
-                    {ev==="camp" ? "🏕️" : ev==="tournament" ? "🏆" : ev==="tryout" ? "📋" : "🛒"} {ev==="merch" ? "merch order" : ev}
+                    {ev==="camp" ? "🏕️" : ev==="tournament" ? "🏆" : ev==="tryout" ? "📋" : ev==="raffle" ? "🎟️" : "🛒"} {ev==="merch" ? "merch order" : ev}
                   </button>
                 );
               })}
@@ -1250,7 +1251,7 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
                         <span>Min. order ${v.minOrderAmount.toFixed(2)}</span>
                       )}
                       <span className="flex items-center gap-1">
-                        {v.events.map(e => e==="camp" ? "🏕️" : e==="tournament" ? "🏆" : e==="tryout" ? "📋" : "🛒").join(" ")}
+                        {v.events.map(e => e==="camp" ? "🏕️" : e==="tournament" ? "🏆" : e==="tryout" ? "📋" : e==="raffle" ? "🎟️" : "🛒").join(" ")}
                         {" "}{v.events.join(", ")}
                       </span>
                     </div>
@@ -2580,7 +2581,7 @@ export default function AdminPage() {
 
   // Every distinct source actually present in the data that ISN'T one of the built-in options below —
   // covers custom import labels (e.g. "2025-2026 Youth Registration") so they're filterable/deletable too.
-  const BUILT_IN_SOURCES = new Set(["2026 Youth Summer Camp", "tournament", "merch-order", "import", "tryout", "membership-signup"]);
+  const BUILT_IN_SOURCES = new Set(["2026 Youth Summer Camp", "tournament", "merch-order", "import", "tryout", "membership-signup", "raffle"]);
   const customSources = [...new Set(
     contacts.map(c => c.source).filter(s => s && !BUILT_IN_SOURCES.has(s) && !isCampSource(s))
   )].sort();
@@ -2826,6 +2827,7 @@ export default function AdminPage() {
                         <option value="2026 Youth Summer Camp" className="bg-slate-900">2026 Youth Summer Camp</option>
                         <option value="import" className="bg-slate-900">Import</option>
                         <option value="tryout" className="bg-slate-900">Tryout</option>
+                        <option value="raffle" className="bg-slate-900">Fundraiser Raffle</option>
                         <option value="membership-signup" className="bg-slate-900">Membership Sign-Up</option>
                       </select>
                     ) : (
@@ -3039,6 +3041,7 @@ export default function AdminPage() {
                   <option value="merch-order"  className="bg-gray-900">Merch Orders</option>
                   <option value="import"       className="bg-gray-900">Imports</option>
                   <option value="tryout"       className="bg-gray-900">2026-2027 Youth Tryout</option>
+                  <option value="raffle"       className="bg-gray-900">Fundraiser Raffle</option>
                   <option value="membership-signup" className="bg-gray-900">Membership Sign-Up (Join Us)</option>
                   {customSources.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
                 </select>
@@ -3293,13 +3296,14 @@ export default function AdminPage() {
                       <th className="text-left px-4 py-3 font-semibold">Tournament</th>
                       <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("teamName")}>Team <SortIcon field="teamName" /></th>
                       <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("division")}>Division <SortIcon field="division" /></th>
+                      <th className="text-left px-4 py-3 font-semibold">Amount</th>
                       <th className="text-left px-4 py-3 font-semibold cursor-pointer hover:text-white" onClick={() => toggleSort("date")}>Date <SortIcon field="date" /></th>
                       <th className="text-left px-4 py-3 font-semibold w-24"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {sorted.length === 0 && (
-                      <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-600">No contacts found.</td></tr>
+                      <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-600">No contacts found.</td></tr>
                     )}
                     {sorted.map(c => (
                       <tr key={c.id} className="hover:bg-white/5 transition-colors">
@@ -3317,6 +3321,20 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-gray-400 text-xs">{c.tournamentName||"—"}</td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{c.teamName||"—"}</td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{c.division||"—"}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {c.amountPaid ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-green-400 font-bold text-sm">${c.amountPaid}</span>
+                              {c.paymentStatus && (
+                                <span className={`text-[10px] font-semibold ${
+                                  c.paymentStatus.startsWith("Pending") ? "text-yellow-400" :
+                                  c.paymentStatus === "Free" ? "text-sky-400" :
+                                  "text-gray-500"
+                                }`}>{c.paymentStatus}</span>
+                              )}
+                            </div>
+                          ) : <span className="text-gray-600 text-xs">—</span>}
+                        </td>
                         <td className="px-4 py-3 text-gray-500 text-xs">{new Date(c.date).toLocaleDateString()}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">

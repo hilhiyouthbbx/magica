@@ -6,6 +6,7 @@ import {
   Trophy, Gift, Tv, Headphones, Calendar, Ticket, ChevronRight,
   CheckCircle, Loader2, AlertCircle,
 } from "lucide-react";
+import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
 
 // Card/Square not used here — PayPal and Venmo only, same as tryout registration.
 const PAYPAL_LINK   = "https://www.paypal.com/ncp/payment/4TKZ7WGKJFMG8";
@@ -13,7 +14,7 @@ const VENMO_HANDLE   = "@hilhiyouthbbx";
 const TICKET_PRICE   = 20;
 const DRAWING_DATE    = "December 21, 2026";
 
-const GRADES = ["Pre-K","Kindergarten","1st Grade","2nd Grade","3rd Grade","4th Grade","5th Grade","6th Grade","7th Grade","8th Grade","9th Grade","10th Grade","11th Grade","12th Grade","N/A"];
+const GRADES = ["4th Grade","5th Grade","6th Grade","7th Grade","8th Grade","9th Grade","10th Grade","11th Grade","12th Grade","N/A"];
 
 function IF({ label, value, onChange, ph = "", type = "text", req = false }: {
   label: string; value: string; onChange: (v: string) => void;
@@ -61,14 +62,16 @@ export function RaffleClient() {
   const [payError,    setPayError]   = useState("");
   const [loading,     setLoading]    = useState(false);
   const [ticketNumbers, setTicketNumbers] = useState<string[]>([]);
+  const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
 
   const total = TICKET_PRICE * qty;
+  const chargeTotal = appliedVoucher?.finalTotal ?? total;
 
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
     setPayError(""); setLoading(true);
     try {
-      const sourceId = paymentMethod === "paypal" ? "PAYPAL_PENDING" : "VENMO_PENDING";
+      const sourceId = chargeTotal > 0 ? (paymentMethod === "paypal" ? "PAYPAL_PENDING" : "VENMO_PENDING") : "FREE";
       const res = await fetch("/api/raffle-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,6 +79,7 @@ export function RaffleClient() {
           sourceId, quantity: qty, paymentMethod,
           buyerName, email, phone,
           athleteFirstName, athleteGrade,
+          voucherCode: appliedVoucher?.code ?? null,
         }),
       });
       const data = await res.json();
@@ -235,30 +239,45 @@ export function RaffleClient() {
                 </form>
               ) : (
                 <form onSubmit={handlePay} className="p-6 space-y-5">
-                  <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl px-4 py-3 flex justify-between items-center">
-                    <span className="text-blue-300 text-sm font-semibold">{qty} ticket{qty > 1 ? "s" : ""} × ${TICKET_PRICE}</span>
-                    <span className="text-white font-black text-lg">${total.toFixed(2)}</span>
+                  <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl px-4 py-3 space-y-1.5">
+                    <div className="flex justify-between text-xs text-blue-300/70">
+                      <span>{qty} ticket{qty > 1 ? "s" : ""} × ${TICKET_PRICE}</span>
+                      <span>${total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-blue-500/20">
+                      <span className="text-blue-300 text-sm font-semibold">Total due</span>
+                      <span className="text-white font-black text-lg">${chargeTotal.toFixed(2)}</span>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    {([["paypal","🅿️ PayPal"],["venmo","💸 Venmo"]] as const).map(([val, label]) => (
-                      <button key={val} type="button"
-                        onClick={() => { setPaymentMethod(val); setAltPaymentConfirmed(false); setPayError(""); }}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
-                          paymentMethod === val
-                            ? "bg-blue-600 border-blue-500 text-white"
-                            : "bg-white/5 border-white/15 text-gray-400 hover:border-white/30"
-                        }`}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  <VoucherInput
+                    event="raffle"
+                    subtotal={total}
+                    onApply={setAppliedVoucher}
+                    applied={appliedVoucher}
+                  />
 
-                  {paymentMethod === "paypal" && (
+                  {chargeTotal > 0 && (
+                    <div className="flex gap-2">
+                      {([["paypal","🅿️ PayPal"],["venmo","💸 Venmo"]] as const).map(([val, label]) => (
+                        <button key={val} type="button"
+                          onClick={() => { setPaymentMethod(val); setAltPaymentConfirmed(false); setPayError(""); }}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                            paymentMethod === val
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-white/5 border-white/15 text-gray-400 hover:border-white/30"
+                          }`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {chargeTotal > 0 && paymentMethod === "paypal" && (
                     <div className="space-y-3">
                       <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl p-4 space-y-3">
                         <p className="text-gray-300 text-sm">
-                          Click below to pay <strong className="text-white">${total.toFixed(2)}</strong> via PayPal, then come back here and check the box to finish.
+                          Click below to pay <strong className="text-white">${chargeTotal.toFixed(2)}</strong> via PayPal, then come back here and check the box to finish.
                         </p>
                         <a href={PAYPAL_LINK} target="_blank" rel="noopener noreferrer"
                           className="block w-full text-center py-3 bg-[#ffc439] hover:brightness-95 text-[#003087] font-black rounded-xl transition-all">
@@ -268,22 +287,22 @@ export function RaffleClient() {
                       <label className="flex items-start gap-2.5 cursor-pointer">
                         <input type="checkbox" checked={altPaymentConfirmed} onChange={e => setAltPaymentConfirmed(e.target.checked)}
                           className="w-4 h-4 mt-0.5 rounded accent-blue-600" />
-                        <span className="text-gray-300 text-sm">I&apos;ve sent <strong className="text-white">${total.toFixed(2)}</strong> via PayPal.</span>
+                        <span className="text-gray-300 text-sm">I&apos;ve sent <strong className="text-white">${chargeTotal.toFixed(2)}</strong> via PayPal.</span>
                       </label>
                     </div>
                   )}
 
-                  {paymentMethod === "venmo" && (
+                  {chargeTotal > 0 && paymentMethod === "venmo" && (
                     <div className="space-y-3">
                       <div className="bg-[#3D95CE]/10 border border-[#3D95CE]/30 rounded-xl p-4 space-y-2">
-                        <p className="text-gray-300 text-sm">Send <strong className="text-white">${total.toFixed(2)}</strong> via Venmo to:</p>
+                        <p className="text-gray-300 text-sm">Send <strong className="text-white">${chargeTotal.toFixed(2)}</strong> via Venmo to:</p>
                         <p className="text-2xl font-black text-[#3D95CE]">{VENMO_HANDLE}</p>
                         <p className="text-gray-500 text-xs">Please include &quot;Raffle&quot; and the athlete&apos;s name in the payment note.</p>
                       </div>
                       <label className="flex items-start gap-2.5 cursor-pointer">
                         <input type="checkbox" checked={altPaymentConfirmed} onChange={e => setAltPaymentConfirmed(e.target.checked)}
                           className="w-4 h-4 mt-0.5 rounded accent-blue-600" />
-                        <span className="text-gray-300 text-sm">I&apos;ve sent <strong className="text-white">${total.toFixed(2)}</strong> via Venmo to {VENMO_HANDLE}.</span>
+                        <span className="text-gray-300 text-sm">I&apos;ve sent <strong className="text-white">${chargeTotal.toFixed(2)}</strong> via Venmo to {VENMO_HANDLE}.</span>
                       </label>
                     </div>
                   )}
@@ -295,9 +314,14 @@ export function RaffleClient() {
                     </div>
                   )}
 
-                  <button type="submit" disabled={loading || !altPaymentConfirmed}
+                  <button type="submit" disabled={loading || (chargeTotal > 0 && !altPaymentConfirmed)}
                     className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
-                    {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</> : <><Ticket className="w-5 h-5" /> Get My Ticket{qty > 1 ? "s" : ""}</>}
+                    {loading
+                      ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</>
+                      : chargeTotal === 0
+                        ? <><CheckCircle className="w-5 h-5" /> Complete Free Registration</>
+                        : <><Ticket className="w-5 h-5" /> Get My Ticket{qty > 1 ? "s" : ""}</>
+                    }
                   </button>
 
                   <button type="button" onClick={() => { setStep("info"); setPayError(""); }}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
 import { reserveTicketNumbers } from "@/lib/raffle";
+import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
 
 const TICKET_PRICE = 20;
 const ADMIN_COPY_EMAIL = "info@hilhiyouthbbx.com";
@@ -120,21 +121,42 @@ export async function POST(req: NextRequest) {
       sourceId, quantity, paymentMethod, // "paypal" | "venmo" — off-site, confirmed manually by admin afterward
       buyerName, email, phone,
       athleteFirstName, athleteGrade,
+      voucherCode,
     } = await req.json();
 
-    const qty = Math.max(1, Math.min(50, parseInt(quantity, 10) || 1)); // hard cap of 50/order as a sanity limit
-    const total = TICKET_PRICE * qty; // price is server-authoritative — never trust a client-sent total
+    const qty      = Math.max(1, Math.min(50, parseInt(quantity, 10) || 1)); // hard cap of 50/order as a sanity limit
+    const subtotal = TICKET_PRICE * qty; // price is server-authoritative — never trust a client-sent total
 
     if (!sourceId || !buyerName || !email || !athleteFirstName || !athleteGrade) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
-    if (paymentMethod !== "paypal" && paymentMethod !== "venmo") {
+
+    // ── Server-side voucher validation ───────────────────────────────────────
+    let total = subtotal;
+    let voucherApplied = false;
+    if (voucherCode) {
+      const check = await validateVoucher(voucherCode, "raffle", subtotal);
+      if (check.valid && check.finalTotal !== undefined) {
+        total = check.finalTotal;
+        voucherApplied = true;
+      }
+    }
+
+    if (total > 0 && paymentMethod !== "paypal" && paymentMethod !== "venmo") {
       return NextResponse.json({ error: "Invalid payment method." }, { status: 400 });
     }
 
     const ticketNumbers = await reserveTicketNumbers(qty);
-    const paymentId = `PENDING-${paymentMethod.toUpperCase()}-${crypto.randomUUID().slice(0, 8)}`;
-    const paymentStatus = `Pending - ${paymentMethod === "paypal" ? "PayPal" : "Venmo"}`;
+    let paymentId     = `FREE-${crypto.randomUUID().slice(0, 8)}`;
+    let paymentStatus = total > 0 ? "Pending" : "Free";
+    if (total > 0) {
+      paymentId     = `PENDING-${paymentMethod.toUpperCase()}-${crypto.randomUUID().slice(0, 8)}`;
+      paymentStatus = `Pending - ${paymentMethod === "paypal" ? "PayPal" : "Venmo"}`;
+    }
+
+    if (voucherCode && voucherApplied) {
+      try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
+    }
 
     await saveContact({
       name:   buyerName,

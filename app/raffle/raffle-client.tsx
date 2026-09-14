@@ -135,8 +135,15 @@ export function RaffleClient() {
               🎟️ Fundraiser Raffle
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white leading-tight mb-4">Hilhi Youth Basketball Raffle</h1>
-            <p className="text-gray-300 max-w-2xl mx-auto mb-5">Buy raffle tickets to support your athlete — proceeds benefit Hilhi Youth Basketball.</p>
-            <img src="https://g.tlcdn.com/view/2940a42489fa49268a178999d040f6c1.png" alt="Kem Hoops Sports Academy" className="h-16 sm:h-20 mx-auto opacity-90" />
+            <p className="text-gray-300 max-w-2xl mx-auto mb-6">Buy raffle tickets to support your athlete — proceeds benefit Hilhi Youth Basketball.</p>
+            <div className="flex flex-col items-center gap-2">
+              <div className="text-gray-500 text-xs font-bold uppercase tracking-widest">Sponsorship by</div>
+              <div className="flex items-center justify-center gap-6">
+                <img src="https://g.tlcdn.com/view/2940a42489fa49268a178999d040f6c1.png" alt="Kem Hoops Sports Academy" className="h-16 sm:h-20 opacity-90" />
+                <div className="w-px h-12 bg-white/15" />
+                <img src="https://g.tlcdn.com/view/03fde12403b344e5b5da2042de0d7f5e.jpg" alt="Hotel Eastlund" className="h-14 sm:h-16 rounded-lg opacity-90" />
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>

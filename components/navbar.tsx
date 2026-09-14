@@ -134,7 +134,6 @@ export function Navbar() {
     }] : []),
     ...(navConfig.showTournaments  ? [{ label: lbl(navConfig, "labelTournaments"), href: "/tournaments" }] : []),
     ...(navConfig.showTryouts      ? [{ label: lbl(navConfig, "labelTryout"),      href: "/tryout" }] : []),
-    { label: "🎟️ Raffle", href: "/raffle" },
     ...(navConfig.showYouthCoaches ? [{ label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" }] : []),
     ...(navConfig.showHSCoaches    ? [{ label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" }] : []),
     ...(navConfig.showHSSchedule   ? [{ label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" }] : []),
@@ -199,6 +198,9 @@ export function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
+          <a href="/raffle" className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-orange-500/30 whitespace-nowrap flex items-center gap-1.5">
+            🎟️ Raffle
+          </a>
           {navConfig.showRegisterCta && (
             <a href="/join" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 whitespace-nowrap">
               Join HILHI
@@ -239,6 +241,9 @@ export function Navbar() {
               className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all"
             >{l.label}</a>;
           })}
+          <a href="/raffle" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-orange-500 text-white font-bold text-sm rounded-xl mt-2">
+            🎟️ Raffle
+          </a>
           {navConfig.showRegisterCta && (
             <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
               Join HILHI

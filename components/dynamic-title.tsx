@@ -6,7 +6,7 @@ const BRAND = "Hilhi Youth Basketball";
 type PageKey =
   | "home" | "events" | "campSchedule" | "tournaments"
   | "tryout" | "youthCoaches" | "hsCoaches" | "merch"
-  | "filmRoom" | "register";
+  | "filmRoom" | "register" | "raffle";
 
 interface Props {
   pageKey: PageKey;

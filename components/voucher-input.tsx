@@ -12,7 +12,7 @@ export interface AppliedVoucher {
 }
 
 interface Props {
-  event:    "camp" | "tournament" | "tryout" | "merch";
+  event:    "camp" | "tournament" | "tryout" | "merch" | "raffle";
   subtotal: number;
   onApply:  (v: AppliedVoucher | null) => void;
   applied:  AppliedVoucher | null;
@@ -56,7 +56,7 @@ export function VoucherInput({ event, subtotal, onApply, applied }: Props) {
     setError("");
   }
 
-  // ── Applied state ──────────────────────────────────────────────────────
+  // ── Applied state ──────────────────────────────────────────────────
   if (applied) {
     return (
       <div className="flex items-center justify-between gap-3 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3">
@@ -82,7 +82,7 @@ export function VoucherInput({ event, subtotal, onApply, applied }: Props) {
     );
   }
 
-  // ── Collapsed state ────────────────────────────────────────────────────
+  // ── Collapsed state ─────────────────────────────────────────────────
   if (!open) {
     return (
       <button
@@ -96,7 +96,7 @@ export function VoucherInput({ event, subtotal, onApply, applied }: Props) {
     );
   }
 
-  // ── Expanded input ─────────────────────────────────────────────────────
+  // ── Expanded input ────────────────────────────────────────────────
   return (
     <div className="space-y-2">
       <div className="flex gap-2">

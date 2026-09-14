@@ -19,8 +19,8 @@ async function kvSet(key: string, value: unknown): Promise<void> {
   const redis = await getRedis(); await redis.set(key, value);
 }
 
-// ── Data model ─────────────────────────────────────────────────────────────
-export type VoucherEvent = "camp" | "tournament" | "tryout" | "merch";
+// ── Data model ───────────────────────────────────────────────────────────
+export type VoucherEvent = "camp" | "tournament" | "tryout" | "merch" | "raffle";
 
 export interface Voucher {
   id:             string;
@@ -39,7 +39,7 @@ export interface Voucher {
 
 function makeId() { return `v-${Date.now()}-${Math.random().toString(36).slice(2,5)}`; }
 
-// ── Read ───────────────────────────────────────────────────────────────────
+// ── Read ─────────────────────────────────────────────────────────────────
 export async function getVouchers(): Promise<Voucher[]> {
   if (hasKV()) {
     try { return (await kvGet<Voucher[]>(KV_KEY)) ?? []; } catch { return []; }
@@ -48,7 +48,7 @@ export async function getVouchers(): Promise<Voucher[]> {
   try { return JSON.parse(fs.readFileSync(FILE, "utf8")) as Voucher[]; } catch { return []; }
 }
 
-// ── Write ──────────────────────────────────────────────────────────────────
+// ── Write ──────────────────────────────────────────────────────────────
 export async function saveVouchers(list: Voucher[]): Promise<void> {
   if (hasKV()) {
     await kvSet(KV_KEY, list); return;
@@ -58,7 +58,7 @@ export async function saveVouchers(list: Voucher[]): Promise<void> {
   fs.writeFileSync(FILE, JSON.stringify(list, null, 2));
 }
 
-// ── CRUD helpers ───────────────────────────────────────────────────────────
+// ── CRUD helpers ──────────────────────────────────────────────────────────
 export async function upsertVoucher(v: Partial<Voucher> & { code: string }): Promise<Voucher> {
   const all = await getVouchers();
   const now = new Date().toISOString();
@@ -76,7 +76,7 @@ export async function upsertVoucher(v: Partial<Voucher> & { code: string }): Pro
     description:    v.description    ?? "",
     type:           v.type           ?? "percent",
     amount:         v.amount         ?? 10,
-    events:         v.events         ?? ["camp", "tournament", "tryout", "merch"],
+    events:         v.events         ?? ["camp", "tournament", "tryout", "merch", "raffle"],
     maxUses:        v.maxUses        ?? null,
     usedCount:      0,
     expiresAt:      v.expiresAt      ?? null,
@@ -93,7 +93,7 @@ export async function deleteVoucher(id: string): Promise<void> {
   await saveVouchers(all.filter(v => v.id !== id));
 }
 
-// ── Validate a code at checkout ────────────────────────────────────────────
+// ── Validate a code at checkout ────────────────────────────────────────────────
 export interface VoucherCheckResult {
   valid:           boolean;
   voucher?:        Voucher;
@@ -138,7 +138,7 @@ export async function validateVoucher(
   return { valid: true, voucher: v, discountAmount, finalTotal };
 }
 
-// ── Increment use count after successful payment ───────────────────────────
+// ── Increment use count after successful payment ───────────────────────────────────────
 export async function redeemVoucher(code: string): Promise<void> {
   const all = await getVouchers();
   const idx = all.findIndex(x => x.code === code.toUpperCase().trim());

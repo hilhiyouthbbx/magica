@@ -134,6 +134,7 @@ export function Navbar() {
     }] : []),
     ...(navConfig.showTournaments  ? [{ label: lbl(navConfig, "labelTournaments"), href: "/tournaments" }] : []),
     ...(navConfig.showTryouts      ? [{ label: lbl(navConfig, "labelTryout"),      href: "/tryout" }] : []),
+    { label: "🎟️ Raffle", href: "/raffle" },
     ...(navConfig.showYouthCoaches ? [{ label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" }] : []),
     ...(navConfig.showHSCoaches    ? [{ label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" }] : []),
     ...(navConfig.showHSSchedule   ? [{ label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" }] : []),

@@ -33,8 +33,11 @@ function ticketEmailHtml(opts: {
               <td style="padding-right:16px;vertical-align:middle;">
                 <img src="https://www.hilhiyouthbbx.com/spartan-head-white.png" alt="Hilhi Spartans" width="48" height="50" style="display:block;border:0;" />
               </td>
-              <td style="vertical-align:middle;">
+              <td style="vertical-align:middle;padding-right:16px;">
                 <span style="display:inline-block;color:#ffffff !important;font-size:22px;font-weight:800;line-height:1.2;font-family:system-ui,sans-serif;">Hilhi Youth Basketball</span>
+              </td>
+              <td style="vertical-align:middle;">
+                <img src="https://g.tlcdn.com/view/2940a42489fa49268a178999d040f6c1.png" alt="Kem Hoops Sports Academy" width="56" style="display:block;border:0;" />
               </td>
             </tr></table>
           </td>
@@ -73,9 +76,16 @@ function ticketEmailHtml(opts: {
               </tr>
             </table>
 
-            <div style="padding:14px 18px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;">
-              <p style="margin:0;font-size:13px;font-weight:700;color:#92400e;">🎉 Drawing held December 21, 2026 — Grand Prize: 2 Night Stay @ the Eastlund Hotel + 2 Blazer Tickets. Winners notified by phone/email.</p>
-            </div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:8px;background:#fffbeb;border:1px solid #fde68a;">
+              <tr>
+                <td style="padding:14px 18px;vertical-align:middle;">
+                  <p style="margin:0;font-size:13px;font-weight:700;color:#92400e;">🎉 Drawing held December 21, 2026 — Grand Prize: 2 Night Stay @ the Eastlund Hotel + 2 Blazer Tickets. Winners notified by phone/email.</p>
+                </td>
+                <td style="padding:14px 18px 14px 0;vertical-align:middle;width:56px;">
+                  <img src="https://g.tlcdn.com/view/03fde12403b344e5b5da2042de0d7f5e.jpg" alt="Hotel Eastlund" width="48" style="display:block;border-radius:6px;" />
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
         <tr>

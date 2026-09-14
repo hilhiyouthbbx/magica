@@ -131,7 +131,8 @@ export function RaffleClient() {
               🎟️ Fundraiser Raffle
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white leading-tight mb-4">Hilhi Youth Basketball Raffle</h1>
-            <p className="text-gray-300 max-w-2xl mx-auto">Buy raffle tickets to support your athlete — proceeds benefit Hilhi Youth Basketball.</p>
+            <p className="text-gray-300 max-w-2xl mx-auto mb-5">Buy raffle tickets to support your athlete — proceeds benefit Hilhi Youth Basketball.</p>
+            <img src="https://g.tlcdn.com/view/2940a42489fa49268a178999d040f6c1.png" alt="Kem Hoops Sports Academy" className="h-16 sm:h-20 mx-auto opacity-90" />
           </motion.div>
         </div>
       </section>
@@ -145,8 +146,11 @@ export function RaffleClient() {
               className="glass rounded-3xl p-7 border-2 border-yellow-500/30 relative overflow-hidden">
               <div className="absolute -top-6 -right-6 text-yellow-500/10"><Trophy className="w-32 h-32" /></div>
               <div className="relative">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 text-xs font-black uppercase tracking-widest mb-4">
-                  <Trophy className="w-3.5 h-3.5" /> Grand Prize
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 text-xs font-black uppercase tracking-widest">
+                    <Trophy className="w-3.5 h-3.5" /> Grand Prize
+                  </div>
+                  <img src="https://g.tlcdn.com/view/03fde12403b344e5b5da2042de0d7f5e.jpg" alt="Hotel Eastlund" className="h-10 rounded-md" />
                 </div>
                 <h2 className="text-2xl font-black text-white mb-2">2 Night Stay @ the Eastlund Hotel</h2>
                 <ul className="text-gray-300 text-sm space-y-1.5">

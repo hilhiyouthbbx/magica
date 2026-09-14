@@ -18,6 +18,7 @@ const FALLBACK: ProgramCard[] = [
   { id:"prog-2", icon:"📅", title:"Events & Camps", subtitle:"Register Today",    desc:"Stay up to date with all youth camps, league games, practice schedules, and important events throughout the season.",          tag:"Camp Open!",   link:"/events",    highlight:false },
   { id:"prog-3", icon:"⭐", title:"HS Calendar",    subtitle:"High School Events",desc:"High school basketball events, tryouts, and elite training opportunities for advanced players looking to compete at the next level.", tag:"High School", link:"https://www.hilhiyouthbbx.com/hs-calender", highlight:false },
   { id:"prog-4", icon:"🛒", title:"Merchandise",    subtitle:"Official Gear",     desc:"Rep your team with official Hilhi Youth Basketball apparel. New arrivals available — jerseys, hoodies, and more.",             tag:"New Arrivals", link:"/merch",     highlight:false },
+  { id:"prog-5", icon:"🎟️", title:"Fundraiser Raffle", subtitle:"Support Your Athlete", desc:"Buy raffle tickets to support your athlete's season. Grand Prize: a 2-night stay at the Eastlund Hotel plus Blazers tickets.", tag:"Enter Now", link:"/raffle", highlight:false },
 ];
 
 // Map a program card's link to the navbar toggle that should gate its visibility.

@@ -22,7 +22,7 @@ async function kvSet(key: string, value: unknown): Promise<void> {
   await redis.set(key, value);
 }
 
-// ── Interfaces ─────────────────────────────────────────────────────
+// ── Interfaces ─────────────────────────────────────────────────────────────
 export interface CampItem {
   id:          string;
   title:       string;
@@ -218,7 +218,7 @@ export interface SiteContent {
   };
 }
 
-// ── Defaults ────────────────────────────────────────────────────────────────
+// ── Defaults ──────────────────────────────────────────────────────────────────────────────────────────
 export const DEFAULTS: SiteContent = {
   pageTitles: {
     home:         "",
@@ -277,6 +277,7 @@ export const DEFAULTS: SiteContent = {
       { id:"prog-2", icon:"📅", title:"Events & Camps", subtitle:"Register Today",         desc:"Stay up to date with all youth camps, league games, practice schedules, and important events throughout the season.",          tag:"Camp Open!",   link:"/events",    highlight:false },
       { id:"prog-3", icon:"⭐", title:"HS Calendar",    subtitle:"High School Events",     desc:"High school basketball events, tryouts, and elite training opportunities for advanced players looking to compete at the next level.", tag:"High School", link:"https://www.hilhiyouthbbx.com/hs-calender", highlight:false },
       { id:"prog-4", icon:"🛒", title:"Merchandise",    subtitle:"Official Gear",          desc:"Rep your team with official Hilhi Youth Basketball apparel. New arrivals available — jerseys, hoodies, and more.",             tag:"New Arrivals", link:"/merch",     highlight:false },
+      { id:"prog-5", icon:"🎟️", title:"Fundraiser Raffle", subtitle:"Support Your Athlete", desc:"Buy raffle tickets to support your athlete's season. Grand Prize: a 2-night stay at the Eastlund Hotel plus Blazers tickets.", tag:"Enter Now", link:"/raffle", highlight:false },
     ],
     quoteText:    "Don't measure yourself by what you have accomplished, but by what you should have accomplished with your ability.",
     quoteAuthor:  "John Wooden",
@@ -452,7 +453,7 @@ export const DEFAULTS: SiteContent = {
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 
-// ── Merge saved data with defaults ────────────────────────────────────────────────────
+// ── Merge saved data with defaults ─────────────────────────────────────────────────
 function mergeContent(saved: Partial<SiteContent>): SiteContent {
   return {
     pageTitles:   { ...DEFAULTS.pageTitles,   ...(saved.pageTitles ?? {}) },
@@ -503,7 +504,7 @@ function mergeContent(saved: Partial<SiteContent>): SiteContent {
   };
 }
 
-// ── File-based helpers (local dev only) ─────────────────────────────────────────────
+// ── File-based helpers (local dev only) ─────────────────────────────────────────────────────
 function getContentFromFile(): SiteContent {
   if (!fs.existsSync(FILE)) return DEFAULTS;
   try {
@@ -513,7 +514,7 @@ function getContentFromFile(): SiteContent {
   } catch { return DEFAULTS; }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Public API ─────────────────────────────────────────────────────────────────────────────────
 export async function getContent(): Promise<SiteContent> {
   if (hasKV()) {
     try {

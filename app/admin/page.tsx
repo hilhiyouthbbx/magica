@@ -627,6 +627,7 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
 
 import { CampTab } from "./camp-tab";
 import { TourneyTab } from "./tourney-tab";
+import { RaffleSwitch } from "./raffle-switch";
 
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1438,6 +1439,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
         </ol>
         <p className="text-gray-600 text-xs mt-1">Until then, paste any public image URL directly into the image field.</p>
       </div>
+
+      {/* Raffle on/off */}
+      <Section openId={section} setOpenId={setSection} id="raffle" title="🎟️ Fundraiser Raffle">
+        <RaffleSwitch adminKey={adminKey} />
+      </Section>
 
       {/* ── Tryout Page ──────────────────────────────────────────────────── */}
       <Section openId={section} setOpenId={setSection} id="tryout" title="🏀 Tryout Page" badge={t.enabled ? "Live" : "Hidden"}>

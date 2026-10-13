@@ -1,22 +1,10 @@
 --- a/app/admin/page.tsx
 +++ b/app/admin/page.tsx
-@@ -627,6 +627,7 @@
- 
- import { CampTab } from "./camp-tab";
- import { TourneyTab } from "./tourney-tab";
+@@ -629,0 +630 @@
 +import { RaffleSwitch } from "./raffle-switch";
- 
- // VouchersTab — Create and manage discount promo codes
- // ────────────────────────────────────────────────────────────────────────────────
-@@ -1439,6 +1440,11 @@
-         <p className="text-gray-600 text-xs mt-1">Until then, paste any public image URL directly into the image field.</p>
-       </div>
- 
-+      {/* ── Raffle on/off ────────────────────────────────────────────────────────────────── */}
+@@ -1440,0 +1442,5 @@
++
++      {/* Raffle on/off */}
 +      <Section openId={section} setOpenId={setSection} id="raffle" title="🎟️ Fundraiser Raffle">
 +        <RaffleSwitch adminKey={adminKey} />
 +      </Section>
-+
-       {/* ── Tryout Page ─────────────────────────────────────────────────────────────────────────────────── 
-       <Section openId={section} setOpenId={setSection} id="tryout" title="🏀 Tryout Page" badge={t.enabled ? "Live" : "Hidden"}>
-         <Toggle

@@ -15,7 +15,7 @@ jobs:
           shopt -s nullglob
           files=(patches/*.patch)
           if [ ${#files[@]} -eq 0 ]; then echo "no patches"; exit 0; fi
-          for p in "${files[@]}"; do git apply --whitespace=nowarn "$p"; git rm -q "$p"; done
+          for p in "${files[@]}"; do git apply --unidiff-zero --whitespace=nowarn "$p"; git rm -q "$p"; done
           git config user.name "hilhiyouthbbx"
           git config user.email "info@hilhiyouthbbx.com"
           git add -A

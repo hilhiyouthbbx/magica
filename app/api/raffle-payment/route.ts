@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
 import { reserveTicketNumbers } from "@/lib/raffle";
 import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
+import { getRaffleSettings } from "@/lib/raffle-settings";
 
 const TICKET_PRICE = 20;
 const ADMIN_COPY_EMAIL = "info@hilhiyouthbbx.com";
@@ -117,6 +118,9 @@ async function sendEmail(to: string, subject: string, html: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await getRaffleSettings()).open) {
+      return NextResponse.json({ error: "Raffle ticket sales are currently closed." }, { status: 403 });
+    }
     const {
       sourceId, quantity, paymentMethod, // "paypal" | "venmo" — off-site, confirmed manually by admin afterward
       buyerName, email, phone,
@@ -131,7 +135,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    // ── Server-side voucher validation ───────────────────────────────────────
+    // ── Server-side voucher validation ──────────────────────────────────────
     let total = subtotal;
     let voucherApplied = false;
     if (voucherCode) {

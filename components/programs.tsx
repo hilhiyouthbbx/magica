@@ -34,6 +34,7 @@ function navKeyForLink(link: string): keyof SiteContent["navbar"] | null {
 export function Programs() {
   const [cards, setCards] = useState<ProgramCard[]>(FALLBACK);
   const [navbar, setNavbar] = useState<SiteContent["navbar"] | null>(null);
+  const [raffleOpen, setRaffleOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/content")
@@ -43,9 +44,11 @@ export function Programs() {
         if (data?.navbar) setNavbar(data.navbar);
       })
       .catch(() => {});
+    fetch("/api/raffle-settings", { cache: "no-store" }).then(r => r.json()).then(d => setRaffleOpen(d.open !== false)).catch(() => {});
   }, []);
 
   const visibleCards = cards.filter(p => {
+    if (p.link === "/raffle" && !raffleOpen) return false;
     const key = navKeyForLink(p.link);
     return key ? navbar?.[key] !== false : true;
   });

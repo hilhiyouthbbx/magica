@@ -64,7 +64,12 @@ export function Navbar() {
     labelTournaments: "", labelTryout: "", labelYouthCoaches: "",
     labelHSCoaches: "", labelMerch: "", labelFilmRoom: "", labelContact: "",
   });
+  const [raffleOpen, setRaffleOpen] = useState(false);
   const campRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/raffle-settings", { cache: "no-store" }).then(r => r.json()).then(d => setRaffleOpen(d.open !== false)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -198,9 +203,11 @@ export function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-3">
+          {raffleOpen && (
           <a href="/raffle" className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-orange-500/30 whitespace-nowrap flex items-center gap-1.5">
             🎟️ Raffle
           </a>
+          )}
           {navConfig.showRegisterCta && (
             <a href="/join" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 whitespace-nowrap">
               Join HILHI
@@ -241,9 +248,11 @@ export function Navbar() {
               className="block px-4 py-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all"
             >{l.label}</a>;
           })}
+          {raffleOpen && (
           <a href="/raffle" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-orange-500 text-white font-bold text-sm rounded-xl mt-2">
             🎟️ Raffle
           </a>
+          )}
           {navConfig.showRegisterCta && (
             <a href="/join" onClick={() => setOpen(false)} className="block text-center px-4 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl mt-2">
               Join HILHI

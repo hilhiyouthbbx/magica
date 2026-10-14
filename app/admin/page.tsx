@@ -628,6 +628,7 @@ function FilmRoomTab({ adminKey }: { adminKey: string }) {
 import { CampTab } from "./camp-tab";
 import { TourneyTab } from "./tourney-tab";
 import { RaffleSwitch } from "./raffle-switch";
+import { ExportSourcesModal } from "./export-sources-modal";
 
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2364,6 +2365,7 @@ export default function AdminPage() {
   const [sortDir,       setSortDir]       = useState<"asc"|"desc">("desc");
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [showEmailBlast, setShowEmailBlast] = useState(false);
+  const [showExportPick, setShowExportPick] = useState(false);
   const dlARef = useRef<HTMLAnchorElement>(null);
   const [contactsLoaded,setContactsLoaded]= useState(false);
   const [expandedContact, setExpandedContact] = useState<string|null>(null);
@@ -3142,6 +3144,12 @@ export default function AdminPage() {
                   Export {sorted.length}{sorted.length !== contacts.length ? " Filtered" : ""} CSV
                 </a>
                 <button
+                  onClick={(e) => { e.stopPropagation(); setShowExportPick(true); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-all">
+                  <Download className="w-4 h-4" />
+                  Export by Source...
+                </button>
+                <button
                   onClick={(e) => { e.stopPropagation(); setShowEmailBlast(true); }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-all">
                   <MailIcon className="w-4 h-4" />
@@ -3380,6 +3388,9 @@ export default function AdminPage() {
           </div>
         )}
 
+        {showExportPick && (
+          <ExportSourcesModal adminKey={adminKey} contacts={contacts} sourceLabels={SOURCE_LABELS} sortField={sortField} sortDir={sortDir} onClose={() => setShowExportPick(false)} />
+        )}
         {showEmailBlast && (
           <EmailBlastModal
             adminKey={adminKey}

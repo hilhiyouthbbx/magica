@@ -59,11 +59,13 @@ export async function GET(req: NextRequest) {
   const searchQ      = (p.get("q")      || "").toLowerCase();
   const sortField    = p.get("sort")    || "date";
   const sortDir      = (p.get("dir")    || "desc") as "asc" | "desc";
+  const sourcesParam = (p.get("sources") || "").split(",").map(x => x.trim()).filter(Boolean);
 
   let contacts: Contact[] = await getContacts();
 
   // ── Filter — same logic as admin page.tsx ────────────────────────────────
   contacts = contacts.filter(c => {
+    if (sourcesParam.length > 0) return sourcesParam.includes(c.source);
     if (sourceFilter !== "all") {
       if (isCampSource(sourceFilter) ? !isCampSource(c.source) : c.source !== sourceFilter) return false;
     }
@@ -100,6 +102,21 @@ export async function GET(req: NextRequest) {
   let rows: string[];
   let filename: string;
 
+  if (sourcesParam.length > 0) {
+    const LABELS: Record<string, string> = { "registration": "2026 Youth Summer Camp", "merch-order": "Merch Order", "import": "Import", "tournament": "Tournament", "tryout": "2026-2027 Youth Tryout", "membership-signup": "Membership Sign-Up", "raffle": "Fundraiser Raffle" };
+    headers = ["Source","Order Number","Order Date","Camper Name","Grade","Gender","Shirt Size","Parent Name","Email","Phone","Emergency Contact","Emergency Phone","Total Amount","Payment Status","Checked In","Tournament","Team","Division","Notes","Date"].join(",");
+    rows = contacts.map(c => [
+      LABELS[c.source] || c.source, c.orderNumber||"", c.orderDate||"",
+      c.camperName||"", c.grade||"", c.gender||"", fmtShirt(c.shirtSize)||"",
+      c.name, c.email, c.phone,
+      c.emergencyContact||"", c.emergencyPhone||"",
+      c.amountPaid||"", c.paymentStatus||"", c.checkedIn||"",
+      c.tournamentName||"", c.teamName||"", c.division||"",
+      c.notes||"", c.date ? new Date(c.date).toLocaleDateString() : "",
+    ].map(esc).join(","));
+    filename = `hilhi-contacts-${sourcesParam.length}-sources-${today}.csv`;
+  }
+  else
   if (isCampSource(sourceFilter) && sourceFilter !== "all") {
     headers = [
       "Ticket Type",

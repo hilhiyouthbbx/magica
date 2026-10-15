@@ -1021,6 +1021,8 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
   const [saving,   setSaving]   = useState(false);
   const [msg,      setMsg]      = useState("");
   const [editing,  setEditing]  = useState<Partial<Voucher> | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (editing) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [editing?.id, editing !== null]);
 
   useEffect(() => {
     fetch(`/api/vouchers?key=${adminKey}`)
@@ -1092,7 +1094,7 @@ function VouchersTab({ adminKey }: { adminKey: string }) {
 
       {/* ── Edit / Create form ── */}
       {editing !== null && (
-        <div className="glass rounded-2xl border border-orange-500/30 bg-orange-500/5 p-6 space-y-4">
+        <div ref={formRef} className="glass rounded-2xl border border-orange-500/30 bg-orange-500/5 p-6 space-y-4">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-white font-bold text-base">{editing.id ? "Edit Voucher" : "Create New Voucher"}</h3>
             <button onClick={() => setEditing(null)}><X className="w-5 h-5 text-gray-400 hover:text-white" /></button>

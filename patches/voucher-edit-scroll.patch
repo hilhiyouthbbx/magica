@@ -1,8 +1,0 @@
---- a/app/admin/page.tsx
-+++ b/app/admin/page.tsx
-@@ -1023,0 +1024,2 @@
-+  const formRef = useRef<HTMLDivElement>(null);
-+  useEffect(() => { if (editing) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [editing?.id, editing !== null]);
-@@ -1095 +1097 @@
--        <div className="glass rounded-2xl border border-orange-500/30 bg-orange-500/5 p-6 space-y-4">
-+        <div ref={formRef} className="glass rounded-2xl border border-orange-500/30 bg-orange-500/5 p-6 space-y-4">

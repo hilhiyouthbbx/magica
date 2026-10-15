@@ -19,7 +19,7 @@ async function kvSet(key: string, value: unknown): Promise<void> {
   const redis = await getRedis(); await redis.set(key, value);
 }
 
-// ── Data model ───────────────────────────────────────────────────────────
+// ── Data model ───────────────────────────────────────────────────────────────
 export type VoucherEvent = "camp" | "tournament" | "tryout" | "merch" | "raffle";
 
 export interface Voucher {
@@ -37,9 +37,12 @@ export interface Voucher {
   createdAt:      string;
 }
 
+// Forgiving match: "reg50", "REG 50", "Reg-50" and "REG50 " all match REG50.
+const norm = (c: string) => (c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
 function makeId() { return `v-${Date.now()}-${Math.random().toString(36).slice(2,5)}`; }
 
-// ── Read ─────────────────────────────────────────────────────────────────
+// ── Read ─────────────────────────────────────────────────────────────
 export async function getVouchers(): Promise<Voucher[]> {
   if (hasKV()) {
     try { return (await kvGet<Voucher[]>(KV_KEY)) ?? []; } catch { return []; }
@@ -93,7 +96,7 @@ export async function deleteVoucher(id: string): Promise<void> {
   await saveVouchers(all.filter(v => v.id !== id));
 }
 
-// ── Validate a code at checkout ────────────────────────────────────────────────
+// ── Validate a code at checkout ──────────────────────────────────────────────────────────────────
 export interface VoucherCheckResult {
   valid:           boolean;
   voucher?:        Voucher;
@@ -115,7 +118,7 @@ export async function validateVoucher(
   subtotal: number,
 ): Promise<VoucherCheckResult> {
   const all = await getVouchers();
-  const v   = all.find(x => x.code === code.toUpperCase().trim());
+  const v   = all.find(x => norm(x.code) === norm(code));
 
   if (!v)         return { valid: false, error: "Invalid promo code." };
   if (!v.enabled) return { valid: false, error: "This promo code is no longer active." };
@@ -138,10 +141,10 @@ export async function validateVoucher(
   return { valid: true, voucher: v, discountAmount, finalTotal };
 }
 
-// ── Increment use count after successful payment ───────────────────────────────────────
+// ── Increment use count after successful payment ──────────────────────────────────────────────────────────────────
 export async function redeemVoucher(code: string): Promise<void> {
   const all = await getVouchers();
-  const idx = all.findIndex(x => x.code === code.toUpperCase().trim());
+  const idx = all.findIndex(x => norm(x.code) === norm(code));
   if (idx >= 0) {
     all[idx].usedCount += 1;
     await saveVouchers(all);

@@ -119,6 +119,9 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [paymentMethod, setPaymentMethod] = useState<"paypal" | "venmo">("paypal"); // Card/Square removed from this form
   const [altPaymentConfirmed, setAltPaymentConfirmed] = useState(false);
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
+  const dueNow = appliedVoucher?.finalTotal ?? (total * qty);
+  // The PayPal link is a fixed-price checkout, so with a promo code (a different amount) only Venmo can take the exact amount.
+  const payMethod: "paypal" | "venmo" = (appliedVoucher && dueNow > 0) ? "venmo" : paymentMethod;
 
   const grades = ["3rd Grade","4th Grade","5th Grade","6th Grade","7th Grade","8th Grade"];
 
@@ -130,7 +133,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
 
       // No card option on this form anymore — PayPal/Venmo happen off-site and get confirmed
       // manually later, so we just need to know which method was used (and "FREE" if $0).
-      const sourceId = chargeTotal > 0 ? (paymentMethod === "paypal" ? "PAYPAL_PENDING" : "VENMO_PENDING") : "FREE";
+      const sourceId = chargeTotal > 0 ? (payMethod === "paypal" ? "PAYPAL_PENDING" : "VENMO_PENDING") : "FREE";
 
       const res = await fetch("/api/tryout-payment", {
         method: "POST",
@@ -140,7 +143,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
           total:       chargeTotal,
           basePrice:   t.price * qty,
           quantity:    qty,
-          paymentMethod,
+          paymentMethod: payMethod,
           parentName, email, phone,
           playerName, grade,
           nextSeasonSchool, address, uniformSize,
@@ -474,9 +477,15 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <span>${(fee * qty).toFixed(2)}</span>
                     </div>
                     )}
+                    {appliedVoucher && (
+                    <div className="flex justify-between text-xs text-green-400">
+                      <span>Promo code {appliedVoucher.code}</span>
+                      <span>-${appliedVoucher.discountAmount.toFixed(2)}</span>
+                    </div>
+                    )}
                     <div className="flex justify-between items-center pt-1 border-t border-blue-500/20">
-                      <span className="text-blue-300 text-sm font-semibold">Total due</span>
-                      <span className="text-white font-black text-lg">${(total * qty).toFixed(2)}</span>
+                      <span className="text-blue-300 text-sm font-semibold">{appliedVoucher ? "Pay today" : "Total due"}</span>
+                      <span className="text-white font-black text-lg">${dueNow.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -489,7 +498,13 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   />
 
                   {/* Payment method picker — hidden when free (Card/Square removed — PayPal/Venmo only) */}
-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && (
+                  {appliedVoucher && dueNow > 0 && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-sm text-green-200">
+                      <strong className="text-white">Your promo code is applied. You pay ${dueNow.toFixed(2)} today.</strong>
+                      <br />Please pay with <strong className="text-white">Venmo</strong> below. (The PayPal checkout only works for the full price, so it is turned off when a promo code is used.)
+                    </div>
+                  )}
+                  {dueNow > 0 && !appliedVoucher && (
                     <div className="flex gap-2">
                       {([["paypal","🅿️ PayPal"],["venmo","💸 Venmo"]] as const).map(([val, label]) => (
                         <button key={val} type="button"
@@ -506,7 +521,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   )}
 
                   {/* PayPal — off-site payment, confirmed manually by the admin afterward */}
-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && paymentMethod === "paypal" && (
+                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && payMethod === "paypal" && (
                     <div className="space-y-3">
                       <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl p-4 space-y-3">
                         <p className="text-gray-300 text-sm">
@@ -526,7 +541,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   )}
 
                   {/* Venmo — off-site payment, confirmed manually by the admin afterward */}
-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && paymentMethod === "venmo" && (
+                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && payMethod === "venmo" && (
                     <div className="space-y-3">
                       <div className="bg-[#3D95CE]/10 border border-[#3D95CE]/30 rounded-xl p-4 space-y-2">
                         <p className="text-gray-300 text-sm">

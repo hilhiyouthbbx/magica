@@ -19,7 +19,7 @@ function esc(s: unknown): string {
 interface TryoutEmailOpts {
   parentName: string; email: string; phone: string;
   playerName: string; grade: string; school: string; uniformSize: string; address: string;
-  boundary: string; qty: number; total: number; paymentStatus: string; voucherCode?: string | null;
+  boundary: string; qty: number; total: number; paymentStatus: string; voucherCode?: string | null; voucherDiscount: number;
   sessions: { label: string; time: string }[]; location: string; locationAddress: string; title: string;
   isAdminCopy: boolean;
 }
@@ -62,8 +62,8 @@ function tryoutEmailHtml(o: TryoutEmailOpts): string {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         ${row("Player", o.playerName)}${row("Grade", o.grade)}${row("Uniform size", o.uniformSize)}${row("School next season", o.school)}
         ${o.qty > 1 ? row("Quantity", String(o.qty)) : ""}
-        ${o.isAdminCopy ? row("Parent / guardian", o.parentName) + row("Email", o.email) + row("Phone", o.phone) + row("Home address", o.address) + row("Boundary check", o.boundary) + row("Voucher", o.voucherCode || "") : ""}
-        ${row("Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
+        ${o.isAdminCopy ? row("Parent / guardian", o.parentName) + row("Email", o.email) + row("Phone", o.phone) + row("Home address", o.address) + row("Boundary check", o.boundary) : ""}
+        ${o.voucherCode ? row("Promo code", o.voucherCode + " (-$" + o.voucherDiscount.toFixed(2) + ")") : ""}${row(o.voucherCode ? "Due today" : "Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
       </table>
     </td></tr></table>
 
@@ -165,6 +165,8 @@ export async function POST(req: NextRequest) {
       try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
     }
 
+    const voucherDiscount = voucherApplied ? Math.max(0, baseOnly - total) : 0;
+
     // Save to contacts
     await saveContact({
       name:   parentName,
@@ -180,7 +182,7 @@ export async function POST(req: NextRequest) {
       shirtSize: uniformSize || "",
       amountPaid: total.toFixed(2),
       paymentStatus,
-      notes:  `Player: ${playerName} | Grade: ${grade} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Payment: ${paymentStatus}${isAltPayment ? ` (${paymentId})` : ""} | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
+      notes:  `Player: ${playerName} | Grade: ${grade} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Voucher: ${voucherApplied ? `${String(voucherCode).toUpperCase()} (-$${voucherDiscount.toFixed(2)})` : "none"} | Due today: $${total.toFixed(2)} | Payment: ${paymentStatus}${isAltPayment ? ` (${paymentId})` : ""} | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
     });
 
     // ── Confirmation emails (parent + admin copy). Never block the registration if email fails. ──
@@ -191,7 +193,7 @@ export async function POST(req: NextRequest) {
         parentName, email, phone: phone || "", playerName, grade: grade || "", school: nextSeasonSchool || "",
         uniformSize: uniformSize || "", address: address || "",
         boundary: boundarySchool ? `${boundarySchool} (${inHillsboroBoundary || "unknown"})` : (inHillsboroBoundary || ""),
-        qty: Number(quantity) || 1, total, paymentStatus, voucherCode: voucherApplied ? voucherCode : null,
+        qty: Number(quantity) || 1, total, paymentStatus, voucherCode: voucherApplied ? String(voucherCode).toUpperCase() : null, voucherDiscount,
         sessions: (t.sessions || []).map((x: { label: string; time: string }) => ({ label: x.label, time: x.time })),
         location: t.location || "", locationAddress: t.address || "", title: t.title || "Youth Tryouts",
       };

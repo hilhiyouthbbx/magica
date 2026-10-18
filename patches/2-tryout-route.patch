@@ -1,0 +1,19 @@
+--- a/app/api/tryout-payment/route.ts
++++ b/app/api/tryout-payment/route.ts
+@@ -22 +22 @@
+-  boundary: string; qty: number; total: number; paymentStatus: string; voucherCode?: string | null;
++  boundary: string; qty: number; total: number; paymentStatus: string; voucherCode?: string | null; voucherDiscount: number;
+@@ -65,2 +65,2 @@
+-        ${o.isAdminCopy ? row("Parent / guardian", o.parentName) + row("Email", o.email) + row("Phone", o.phone) + row("Home address", o.address) + row("Boundary check", o.boundary) + row("Voucher", o.voucherCode || "") : ""}
+-        ${row("Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
++        ${o.isAdminCopy ? row("Parent / guardian", o.parentName) + row("Email", o.email) + row("Phone", o.phone) + row("Home address", o.address) + row("Boundary check", o.boundary) : ""}
++        ${o.voucherCode ? row("Promo code", o.voucherCode + " (-$" + o.voucherDiscount.toFixed(2) + ")") : ""}${row(o.voucherCode ? "Due today" : "Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
+@@ -167,0 +168,2 @@
++    const voucherDiscount = voucherApplied ? Math.max(0, baseOnly - total) : 0;
++
+@@ -183 +185 @@
+-      notes:  `Player: ${playerName} | Grade: ${grade} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Payment: ${paymentStatus}${isAltPayment ? ` (${paymentId})` : ""} | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
++      notes:  `Player: ${playerName} | Grade: ${grade} | Qty: ${quantity} | Uniform size: ${uniformSize || "n/a"} | Next season school: ${nextSeasonSchool || "n/a"} | Address: ${address || "n/a"} | Boundary check: ${boundarySchool || "not checked"} (${inHillsboroBoundary || "unknown"}) | Voucher: ${voucherApplied ? `${String(voucherCode).toUpperCase()} (-$${voucherDiscount.toFixed(2)})` : "none"} | Due today: $${total.toFixed(2)} | Payment: ${paymentStatus}${isAltPayment ? ` (${paymentId})` : ""} | Waiver (2026-2027 Winter Season): ${waiverSigned ? `Signed by ${waiverName || "n/a"}` : "NOT SIGNED"}`,
+@@ -194 +196 @@
+-        qty: Number(quantity) || 1, total, paymentStatus, voucherCode: voucherApplied ? voucherCode : null,
++        qty: Number(quantity) || 1, total, paymentStatus, voucherCode: voucherApplied ? String(voucherCode).toUpperCase() : null, voucherDiscount,

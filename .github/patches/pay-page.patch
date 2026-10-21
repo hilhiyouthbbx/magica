@@ -1,0 +1,15 @@
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -2462,0 +2463,3 @@
++    const c = contacts.find(x => x.id === id);
++    const canEmail = !!(c && c.email && c.email.includes("@") && !c.email.includes("noemail"));
++    if (!confirm(canEmail ? `Mark ${c!.name} as Paid and email a payment receipt to ${c!.email}?` : "Mark this registration as Paid?")) return;
+@@ -2464 +2467 @@
+-    await fetch(`/api/admin/contacts?key=${adminKey}`, {
++    const res = await fetch(`/api/admin/contacts?key=${adminKey}`, {
+@@ -2467 +2470 @@
+-      body: JSON.stringify({ action: "update", id, patch: { paymentStatus: "Paid" } }),
++      body: JSON.stringify({ action: "update", id, patch: { paymentStatus: "Paid" }, notify: canEmail }),
+@@ -2468,0 +2472,2 @@
++    const data = await res.json().catch(() => ({} as { emailed?: boolean; emailError?: string }));
++    if (canEmail) alert(data.emailed ? `Marked Paid. A receipt was emailed to ${c!.email}.` : `Marked Paid, but the receipt email could not be sent${data.emailError ? " (" + data.emailError + ")" : ""}.`);

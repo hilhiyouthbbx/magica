@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { getContacts, type Contact } from "@/lib/contacts";
+import { sanitizeEmailHtml, plainToEmailHtml, escapeHtml, htmlIsEmpty } from "@/lib/email-html";
 
 export const dynamic = "force-dynamic";
 
@@ -10,23 +11,10 @@ function checkAuth(req: NextRequest) {
   return key === expected;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-/** Turns plain-text (blank line = new paragraph, single line break = line break within a
- *  paragraph — e.g. a "Coach Kem / Hilhi Youth Basketball" signature) into a simple, branded
- *  HTML email. Line breaks are converted to explicit <br/> tags rather than relying on CSS
- *  white-space, since several email clients (Outlook especially) don't reliably honor that. */
-function blastHtml(subject: string, message: string, firstName?: string): string {
-  const greeted = firstName ? message.replace(/\{\{name\}\}/gi, firstName) : message.replace(/\{\{name\}\}/gi, "there");
-  const paragraphs = greeted
-    .split(/\n\s*\n/)
-    .map(p => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#374151;">${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`)
-    .join("");
+/** Wraps already-sanitized, already-styled message HTML (see lib/email-html.ts) in the branded email
+ *  template, replacing {{name}} with the recipient's first name. */
+function blastHtml(subject: string, contentHtml: string, firstName?: string): string {
+  const paragraphs = contentHtml.replace(/\{\{name\}\}/gi, () => escapeHtml(firstName || "there"));
 
   return `
 <!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="color-scheme" content="light"/><meta name="supported-color-schemes" content="light"/></head>
@@ -67,7 +55,10 @@ function blastHtml(subject: string, message: string, firstName?: string): string
 
 interface BlastBody {
   subject: string;
-  message: string;
+  /** Rich-text message (HTML from the editor). Sanitized server-side. Preferred. */
+  messageHtml?: string;
+  /** Legacy plain-text message (blank line = new paragraph). Used only if messageHtml is absent. */
+  message?: string;
   /** "" / omitted = all sources. Otherwise an exact source string (e.g. "2025-2026 Youth Registration"). */
   source?: string;
   /** Case-insensitive substring match against name/email — applied on top of `source`. */
@@ -128,7 +119,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json() as BlastBody;
-  if (!body.subject?.trim() || !body.message?.trim()) {
+  const contentHtml = body.messageHtml?.trim()
+    ? sanitizeEmailHtml(body.messageHtml)
+    : plainToEmailHtml(body.message || "");
+  if (!body.subject?.trim() || htmlIsEmpty(contentHtml)) {
     return NextResponse.json({ error: "Subject and message are required." }, { status: 400 });
   }
 
@@ -156,7 +150,7 @@ export async function POST(req: NextRequest) {
           from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
           to:      addr,
           subject: `[TEST] ${body.subject}`,
-          html:    blastHtml(body.subject, body.message, "Coach"),
+          html:    blastHtml(body.subject, contentHtml, "Coach"),
         })
       ));
       return NextResponse.json({ ok: true, sent: testAddrs.length, test: true });
@@ -165,7 +159,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── Real bulk send ──────────────────────
+  // ── Real bulk send ──────────────────────────────
   const allContacts = await getContacts();
   const targets = matchingContacts(allContacts, body);
   if (targets.length === 0) {
@@ -187,7 +181,7 @@ export async function POST(req: NextRequest) {
           from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
           to:      contact.email,
           subject: body.subject,
-          html:    blastHtml(body.subject, body.message, firstName),
+          html:    blastHtml(body.subject, contentHtml, firstName),
         });
         sent++;
       } catch (e) {

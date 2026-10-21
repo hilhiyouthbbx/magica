@@ -1,0 +1,38 @@
+--- a/app/api/tryout-payment/route.ts
++++ b/app/api/tryout-payment/route.ts
+@@ -5,0 +6 @@
++import { tryoutAmountDue } from "@/lib/tryout-pricing";
+@@ -66 +67 @@
+-        ${o.voucherCode ? row("Promo code", o.voucherCode + " (-$" + o.voucherDiscount.toFixed(2) + ")") : ""}${row(o.voucherCode ? "Due today" : "Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
++        ${o.voucherCode ? row("Promo code", o.voucherCode + " (-$" + o.voucherDiscount.toFixed(2) + ")") : ""}${row(o.total > 0 ? (o.voucherCode ? "Due today (incl. 3.5% fee)" : "Total (incl. $10 fee)") : "Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
+@@ -110,2 +111,6 @@
+-    const baseOnly = typeof clientBase === "number" ? clientBase : (typeof clientTotal === "number" ? clientTotal : 0);
+-    let total: number = typeof clientTotal === "number" ? clientTotal : 0;
++    // NOTE: the price is calculated here on the server, never taken from the browser.
++    // Full price = tryout price + $10 fee per player. Any other amount (promo code / payment plan) = amount + 3.5%.
++    const tryoutCfg = (await getContent()).tryout;
++    const qtyN      = Math.max(1, Math.min(20, Math.floor(Number(quantity)) || 1));
++    const baseOnly  = tryoutCfg.price * qtyN;
++    let discountedBase: number | null = null;
+@@ -115,4 +120 @@
+-      if (check.valid && check.voucher) {
+-        total = check.finalTotal!;   // discounted base, no fee
+-        voucherApplied = true;
+-      }
++      if (check.valid && check.voucher) { discountedBase = check.finalTotal!; voucherApplied = true; }
+@@ -119,0 +122 @@
++    const total: number = tryoutAmountDue(tryoutCfg.price, qtyN, discountedBase);
+@@ -131,0 +135,3 @@
++    if (total > 0 && !isAltPayment) {
++      return NextResponse.json({ error: "Please choose PayPal or Venmo to pay." }, { status: 400 });
++    }
+@@ -168 +174 @@
+-    const voucherDiscount = voucherApplied ? Math.max(0, baseOnly - total) : 0;
++    const voucherDiscount = voucherApplied && discountedBase !== null ? Math.max(0, baseOnly - discountedBase) : 0;
+@@ -190,2 +196 @@
+-      const site = await getContent();
+-      const t = site.tryout;
++      const t = tryoutCfg;
+@@ -196 +201 @@
+-        qty: Number(quantity) || 1, total, paymentStatus, voucherCode: voucherApplied ? String(voucherCode).toUpperCase() : null, voucherDiscount,
++        qty: qtyN, total, paymentStatus, voucherCode: voucherApplied ? String(voucherCode).toUpperCase() : null, voucherDiscount,

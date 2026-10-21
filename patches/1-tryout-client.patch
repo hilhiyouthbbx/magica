@@ -1,0 +1,44 @@
+--- a/app/tryout/tryout-client.tsx
++++ b/app/tryout/tryout-client.tsx
+@@ -12,0 +13 @@
++import { tryoutAmountDue } from "@/lib/tryout-pricing";
+@@ -122 +123 @@
+-  const dueNow = appliedVoucher?.finalTotal ?? (total * qty);
++  const dueNow = appliedVoucher ? tryoutAmountDue(t.price, qty, appliedVoucher.finalTotal) : (total * qty);
+@@ -132 +133 @@
+-      const chargeTotal = appliedVoucher?.finalTotal ?? (total * qty);
++      const chargeTotal = dueNow;
+@@ -485,0 +487,6 @@
++                    {appliedVoucher && dueNow > 0 && (
++                    <div className="flex justify-between text-xs text-blue-300/70">
++                      <span>Processing fee (3.5%)</span>
++                      <span>${(dueNow - appliedVoucher.finalTotal).toFixed(2)}</span>
++                    </div>
++                    )}
+@@ -504 +511 @@
+-                      <br />Please pay with <strong className="text-white">Venmo</strong> below. (The PayPal checkout only works for the full price, so it is turned off when a promo code is used.)
++                      <br />This includes a 3.5% processing fee. Please pay with <strong className="text-white">Venmo</strong> below. (The PayPal checkout only works for the full price, so it is turned off when a promo code is used.)
+@@ -524 +531 @@
+-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && payMethod === "paypal" && (
++                  {dueNow > 0 && payMethod === "paypal" && (
+@@ -528 +535 @@
+-                          Click below to pay <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via PayPal, then come back here and check the box to finish registering.
++                          Click below to pay <strong className="text-white">${dueNow.toFixed(2)}</strong> via PayPal, then come back here and check the box to finish registering.
+@@ -538 +545 @@
+-                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via PayPal.</span>
++                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${dueNow.toFixed(2)}</strong> via PayPal.</span>
+@@ -544 +551 @@
+-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && payMethod === "venmo" && (
++                  {dueNow > 0 && payMethod === "venmo" && (
+@@ -548 +555 @@
+-                          Send <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via Venmo to:
++                          Send <strong className="text-white">${dueNow.toFixed(2)}</strong> via Venmo to:
+@@ -556 +563 @@
+-                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via Venmo to {VENMO_HANDLE}.</span>
++                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${dueNow.toFixed(2)}</strong> via Venmo to {VENMO_HANDLE}.</span>
+@@ -571 +578 @@
+-                      (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && !altPaymentConfirmed)
++                      ((dueNow > 0) && !altPaymentConfirmed)
+@@ -576 +583 @@
+-                      : (appliedVoucher?.finalTotal ?? (total * qty)) === 0
++                      : dueNow === 0

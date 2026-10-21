@@ -629,6 +629,7 @@ import { CampTab } from "./camp-tab";
 import { TourneyTab } from "./tourney-tab";
 import { RaffleSwitch } from "./raffle-switch";
 import { ExportSourcesModal } from "./export-sources-modal";
+import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
 
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2161,14 +2162,14 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
   });
   const [message, setMessage] = useState(() => {
     if (typeof window === "undefined") return "";
-    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}").message || ""; } catch { return ""; }
+    try { return plainToHtml(JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}").message || ""); } catch { return ""; }
   });
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     // Don't overwrite the saved draft with the initial empty values on first mount.
-    if (!subject.trim() && !message.trim()) return;
+    if (!subject.trim() && isHtmlEmpty(message)) return;
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, message }));
     setDraftSavedAt(Date.now());
   }, [subject, message]);
@@ -2205,13 +2206,13 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
   })();
 
   async function sendTest() {
-    if (!testEmail.trim() || !subject.trim() || !message.trim()) return;
+    if (!testEmail.trim() || !subject.trim() || isHtmlEmpty(message)) return;
     setSendingTest(true); setTestResult(null); setError("");
     try {
       const res = await fetch(`/api/admin/email-blast?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, message, testEmail: testEmail.trim() }),
+        body: JSON.stringify({ subject, messageHtml: message, testEmail: testEmail.trim() }),
       });
       const data = await res.json();
       if (data.ok) setTestResult(`✓ ${data.sent} individual test email${data.sent !== 1 ? "s" : ""} sent (each address gets its own separate email).`);
@@ -2223,14 +2224,14 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
   }
 
   async function sendBlast() {
-    if (!subject.trim() || !message.trim() || uniqueRecipients.length === 0) return;
+    if (!subject.trim() || isHtmlEmpty(message) || uniqueRecipients.length === 0) return;
     if (!confirm(`Send this email to ${uniqueRecipients.length} contact${uniqueRecipients.length !== 1 ? "s" : ""}? This can't be undone.`)) return;
     setSending(true); setError(""); setResult(null);
     try {
       const res = await fetch(`/api/admin/email-blast?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, message, contactIds: uniqueRecipients.map(c => c.id) }),
+        body: JSON.stringify({ subject, messageHtml: message, contactIds: uniqueRecipients.map(c => c.id) }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -2315,10 +2316,9 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
             </div>
             <div>
               <label className="block text-gray-400 text-xs font-semibold mb-1">Message</label>
-              <textarea rows={10} value={message} onChange={e => setMessage(e.target.value)}
-                placeholder={"Hi {{name}},\n\nWrite your message here. Leave a blank line between paragraphs.\n\nSee you on the court,\nCoach Kem"}
-                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 resize-none font-mono" />
-              <p className="text-gray-600 text-[11px] mt-1">Use <code className="text-gray-400">{"{{name}}"}</code> anywhere to auto-insert each contact's first name.</p>
+              <RichEditor value={message} onChange={setMessage}
+                placeholder={"Hi {{name}},\n\nWrite or paste your message here. Bold, italics, links and lists are kept."} />
+              <p className="text-gray-600 text-[11px] mt-1">Pasting from Gmail, Google Docs or Word keeps your bold, italics, links and lists. Use the <span className="text-gray-400">+ First name</span> button (or type <code className="text-gray-400">{"{{name}}"}</code>) to auto-insert each contact's first name.</p>
             </div>
 
             {error && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
@@ -2328,7 +2328,7 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
               <div className="flex gap-2">
                 <input value={testEmail} onChange={e => setTestEmail(e.target.value)} type="email" multiple placeholder="you@email.com, coach2@email.com"
                   className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500" />
-                <button onClick={sendTest} disabled={sendingTest || !testEmail.trim() || !subject.trim() || !message.trim()}
+                <button onClick={sendTest} disabled={sendingTest || !testEmail.trim() || !subject.trim() || isHtmlEmpty(message)}
                   className="px-4 py-2 bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all whitespace-nowrap">
                   {sendingTest ? "Sending…" : "Send Test"}
                 </button>
@@ -2336,7 +2336,7 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
               {testResult && <p className="text-emerald-400 text-xs">{testResult}</p>}
             </div>
 
-            <button onClick={sendBlast} disabled={sending || !subject.trim() || !message.trim() || uniqueRecipients.length === 0}
+            <button onClick={sendBlast} disabled={sending || !subject.trim() || isHtmlEmpty(message) || uniqueRecipients.length === 0}
               className="w-full py-3.5 bg-gradient-to-r from-[#006aff] to-[#00aaff] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl transition-all flex items-center justify-center gap-2">
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <>Send to {uniqueRecipients.length} Contact{uniqueRecipients.length !== 1 ? "s" : ""}</>}
             </button>

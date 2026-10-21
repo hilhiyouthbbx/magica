@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContacts, deleteContact, updateContact, importContactsCSV, createContact, deleteContactsBySource, renameContactsSource } from "@/lib/contacts";
 import { Redis } from "@upstash/redis";
+import { sendPaymentReceipt } from "@/lib/payment-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -52,8 +53,17 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "update" && body.id && body.patch) {
+    // When the admin confirms a "Pending - PayPal/Venmo" registration as Paid, optionally email the
+    // parent a receipt. Only fires on a real Pending -> Paid change, so it can never send twice.
+    const before = body.notify ? (await getContacts()).find(c => c.id === body.id) : undefined;
     const ok = await updateContact(body.id, body.patch);
-    return NextResponse.json({ ok });
+    if (ok && before && /^pending/i.test(before.paymentStatus || "") && body.patch.paymentStatus === "Paid"
+        && before.email && before.email.includes("@") && !before.email.includes("noemail")) {
+      const method = (before.paymentStatus || "").replace(/^pending\s*-?\s*/i, "").trim() || "PayPal / Venmo";
+      const r = await sendPaymentReceipt({ ...before, paymentStatus: "Paid" }, method);
+      return NextResponse.json({ ok, emailed: r.ok, emailTo: before.email, emailError: r.error });
+    }
+    return NextResponse.json({ ok, emailed: false });
   }
 
   if (body.action === "import" && body.csv) {

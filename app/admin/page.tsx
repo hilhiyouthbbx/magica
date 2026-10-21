@@ -2460,12 +2460,17 @@ export default function AdminPage() {
   // One-click confirm for PayPal/Venmo registrations, which save as "Pending - PayPal/Venmo"
   // until you've actually seen the money land in your account.
   async function markPaid(id: string) {
+    const c = contacts.find(x => x.id === id);
+    const canEmail = !!(c && c.email && c.email.includes("@") && !c.email.includes("noemail"));
+    if (!confirm(canEmail ? `Mark ${c!.name} as Paid and email a payment receipt to ${c!.email}?` : "Mark this registration as Paid?")) return;
     setContacts(prev => prev.map(c => c.id === id ? { ...c, paymentStatus: "Paid" } : c));
-    await fetch(`/api/admin/contacts?key=${adminKey}`, {
+    const res = await fetch(`/api/admin/contacts?key=${adminKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update", id, patch: { paymentStatus: "Paid" } }),
+      body: JSON.stringify({ action: "update", id, patch: { paymentStatus: "Paid" }, notify: canEmail }),
     });
+    const data = await res.json().catch(() => ({} as { emailed?: boolean; emailError?: string }));
+    if (canEmail) alert(data.emailed ? `Marked Paid. A receipt was emailed to ${c!.email}.` : `Marked Paid, but the receipt email could not be sent${data.emailError ? " (" + data.emailError + ")" : ""}.`);
   }
 
   async function toggleTournament(t: TournamentConfig) {

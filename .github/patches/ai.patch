@@ -1,0 +1,6 @@
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -632,0 +633 @@
++import { AiWriter } from "./ai-writer";
+@@ -2316,0 +2318 @@
++            <AiWriter adminKey={adminKey} subject={subject} message={message} setSubject={setSubject} setMessage={setMessage} />

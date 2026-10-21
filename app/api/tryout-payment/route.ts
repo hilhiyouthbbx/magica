@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
 import { getContent } from "@/lib/content";
 import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
+import { tryoutAmountDue } from "@/lib/tryout-pricing";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -63,7 +64,7 @@ function tryoutEmailHtml(o: TryoutEmailOpts): string {
         ${row("Player", o.playerName)}${row("Grade", o.grade)}${row("Uniform size", o.uniformSize)}${row("School next season", o.school)}
         ${o.qty > 1 ? row("Quantity", String(o.qty)) : ""}
         ${o.isAdminCopy ? row("Parent / guardian", o.parentName) + row("Email", o.email) + row("Phone", o.phone) + row("Home address", o.address) + row("Boundary check", o.boundary) : ""}
-        ${o.voucherCode ? row("Promo code", o.voucherCode + " (-$" + o.voucherDiscount.toFixed(2) + ")") : ""}${row(o.voucherCode ? "Due today" : "Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
+        ${o.voucherCode ? row("Promo code", o.voucherCode + " (-$" + o.voucherDiscount.toFixed(2) + ")") : ""}${row(o.total > 0 ? (o.voucherCode ? "Due today (incl. 3.5% fee)" : "Total (incl. $10 fee)") : "Total", o.total > 0 ? "$" + o.total.toFixed(2) : "Free")}${row("Payment status", o.paymentStatus)}
       </table>
     </td></tr></table>
 
@@ -107,16 +108,18 @@ export async function POST(req: NextRequest) {
     } = await req.json();
 
     // ── Server-side voucher validation (against BASE price, fee waived with voucher) ──
-    const baseOnly = typeof clientBase === "number" ? clientBase : (typeof clientTotal === "number" ? clientTotal : 0);
-    let total: number = typeof clientTotal === "number" ? clientTotal : 0;
+    // NOTE: the price is calculated here on the server, never taken from the browser.
+    // Full price = tryout price + $10 fee per player. Any other amount (promo code / payment plan) = amount + 3.5%.
+    const tryoutCfg = (await getContent()).tryout;
+    const qtyN      = Math.max(1, Math.min(20, Math.floor(Number(quantity)) || 1));
+    const baseOnly  = tryoutCfg.price * qtyN;
+    let discountedBase: number | null = null;
     let voucherApplied = false;
     if (voucherCode && baseOnly > 0) {
       const check = await validateVoucher(voucherCode, "tryout", baseOnly);
-      if (check.valid && check.voucher) {
-        total = check.finalTotal!;   // discounted base, no fee
-        voucherApplied = true;
-      }
+      if (check.valid && check.voucher) { discountedBase = check.finalTotal!; voucherApplied = true; }
     }
+    const total: number = tryoutAmountDue(tryoutCfg.price, qtyN, discountedBase);
 
     if (!sourceId || !parentName || !email) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
@@ -129,6 +132,9 @@ export async function POST(req: NextRequest) {
     // and gets confirmed manually by the admin afterward (no API keys for those, so no way to
     // auto-verify here).
     const isAltPayment = paymentMethod === "paypal" || paymentMethod === "venmo";
+    if (total > 0 && !isAltPayment) {
+      return NextResponse.json({ error: "Please choose PayPal or Venmo to pay." }, { status: 400 });
+    }
     let paymentId = "FREE-" + crypto.randomUUID().slice(0, 8);
     let paymentStatus = total > 0 ? "Paid" : "Free";
 
@@ -165,7 +171,7 @@ export async function POST(req: NextRequest) {
       try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
     }
 
-    const voucherDiscount = voucherApplied ? Math.max(0, baseOnly - total) : 0;
+    const voucherDiscount = voucherApplied && discountedBase !== null ? Math.max(0, baseOnly - discountedBase) : 0;
 
     // Save to contacts
     await saveContact({
@@ -187,13 +193,12 @@ export async function POST(req: NextRequest) {
 
     // ── Confirmation emails (parent + admin copy). Never block the registration if email fails. ──
     try {
-      const site = await getContent();
-      const t = site.tryout;
+      const t = tryoutCfg;
       const base = {
         parentName, email, phone: phone || "", playerName, grade: grade || "", school: nextSeasonSchool || "",
         uniformSize: uniformSize || "", address: address || "",
         boundary: boundarySchool ? `${boundarySchool} (${inHillsboroBoundary || "unknown"})` : (inHillsboroBoundary || ""),
-        qty: Number(quantity) || 1, total, paymentStatus, voucherCode: voucherApplied ? String(voucherCode).toUpperCase() : null, voucherDiscount,
+        qty: qtyN, total, paymentStatus, voucherCode: voucherApplied ? String(voucherCode).toUpperCase() : null, voucherDiscount,
         sessions: (t.sessions || []).map((x: { label: string; time: string }) => ({ label: x.label, time: x.time })),
         location: t.location || "", locationAddress: t.address || "", title: t.title || "Youth Tryouts",
       };

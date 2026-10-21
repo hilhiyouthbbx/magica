@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { SiteContent } from "@/lib/content";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
+import { tryoutAmountDue } from "@/lib/tryout-pricing";
 
 type TryoutData  = SiteContent["tryout"];
 type ContactData = SiteContent["contact"];
@@ -119,7 +120,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
   const [paymentMethod, setPaymentMethod] = useState<"paypal" | "venmo">("paypal"); // Card/Square removed from this form
   const [altPaymentConfirmed, setAltPaymentConfirmed] = useState(false);
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
-  const dueNow = appliedVoucher?.finalTotal ?? (total * qty);
+  const dueNow = appliedVoucher ? tryoutAmountDue(t.price, qty, appliedVoucher.finalTotal) : (total * qty);
   // The PayPal link is a fixed-price checkout, so with a promo code (a different amount) only Venmo can take the exact amount.
   const payMethod: "paypal" | "venmo" = (appliedVoucher && dueNow > 0) ? "venmo" : paymentMethod;
 
@@ -129,7 +130,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
     e.preventDefault();
     setPayError(""); setLoading(true);
     try {
-      const chargeTotal = appliedVoucher?.finalTotal ?? (total * qty);
+      const chargeTotal = dueNow;
 
       // No card option on this form anymore — PayPal/Venmo happen off-site and get confirmed
       // manually later, so we just need to know which method was used (and "FREE" if $0).
@@ -483,6 +484,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <span>-${appliedVoucher.discountAmount.toFixed(2)}</span>
                     </div>
                     )}
+                    {appliedVoucher && dueNow > 0 && (
+                    <div className="flex justify-between text-xs text-blue-300/70">
+                      <span>Processing fee (3.5%)</span>
+                      <span>${(dueNow - appliedVoucher.finalTotal).toFixed(2)}</span>
+                    </div>
+                    )}
                     <div className="flex justify-between items-center pt-1 border-t border-blue-500/20">
                       <span className="text-blue-300 text-sm font-semibold">{appliedVoucher ? "Pay today" : "Total due"}</span>
                       <span className="text-white font-black text-lg">${dueNow.toFixed(2)}</span>
@@ -501,7 +508,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   {appliedVoucher && dueNow > 0 && (
                     <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 text-sm text-green-200">
                       <strong className="text-white">Your promo code is applied. You pay ${dueNow.toFixed(2)} today.</strong>
-                      <br />Please pay with <strong className="text-white">Venmo</strong> below. (The PayPal checkout only works for the full price, so it is turned off when a promo code is used.)
+                      <br />This includes a 3.5% processing fee. Please pay with <strong className="text-white">Venmo</strong> below. (The PayPal checkout only works for the full price, so it is turned off when a promo code is used.)
                     </div>
                   )}
                   {dueNow > 0 && !appliedVoucher && (
@@ -521,11 +528,11 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   )}
 
                   {/* PayPal — off-site payment, confirmed manually by the admin afterward */}
-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && payMethod === "paypal" && (
+                  {dueNow > 0 && payMethod === "paypal" && (
                     <div className="space-y-3">
                       <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl p-4 space-y-3">
                         <p className="text-gray-300 text-sm">
-                          Click below to pay <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via PayPal, then come back here and check the box to finish registering.
+                          Click below to pay <strong className="text-white">${dueNow.toFixed(2)}</strong> via PayPal, then come back here and check the box to finish registering.
                         </p>
                         <a href={PAYPAL_LINK} target="_blank" rel="noopener noreferrer"
                           className="block w-full text-center py-3 bg-[#ffc439] hover:brightness-95 text-[#003087] font-black rounded-xl transition-all">
@@ -535,17 +542,17 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <label className="flex items-start gap-2.5 cursor-pointer">
                         <input type="checkbox" checked={altPaymentConfirmed} onChange={e => setAltPaymentConfirmed(e.target.checked)}
                           className="w-4 h-4 mt-0.5 rounded accent-blue-600" />
-                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via PayPal.</span>
+                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${dueNow.toFixed(2)}</strong> via PayPal.</span>
                       </label>
                     </div>
                   )}
 
                   {/* Venmo — off-site payment, confirmed manually by the admin afterward */}
-                  {(appliedVoucher?.finalTotal ?? (total * qty)) > 0 && payMethod === "venmo" && (
+                  {dueNow > 0 && payMethod === "venmo" && (
                     <div className="space-y-3">
                       <div className="bg-[#3D95CE]/10 border border-[#3D95CE]/30 rounded-xl p-4 space-y-2">
                         <p className="text-gray-300 text-sm">
-                          Send <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via Venmo to:
+                          Send <strong className="text-white">${dueNow.toFixed(2)}</strong> via Venmo to:
                         </p>
                         <p className="text-2xl font-black text-[#3D95CE]">{VENMO_HANDLE}</p>
                         <p className="text-gray-500 text-xs">Please include the player's name ({playerName || "your player"}) in the payment note so we can match it up.</p>
@@ -553,7 +560,7 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                       <label className="flex items-start gap-2.5 cursor-pointer">
                         <input type="checkbox" checked={altPaymentConfirmed} onChange={e => setAltPaymentConfirmed(e.target.checked)}
                           className="w-4 h-4 mt-0.5 rounded accent-blue-600" />
-                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${(appliedVoucher?.finalTotal ?? (total * qty)).toFixed(2)}</strong> via Venmo to {VENMO_HANDLE}.</span>
+                        <span className="text-gray-300 text-sm">I've sent <strong className="text-white">${dueNow.toFixed(2)}</strong> via Venmo to {VENMO_HANDLE}.</span>
                       </label>
                     </div>
                   )}
@@ -568,12 +575,12 @@ export function TryoutClient({ tryout: t, contact: c }: { tryout: TryoutData; co
                   <button type="submit"
                     disabled={
                       loading ||
-                      (((appliedVoucher?.finalTotal ?? (total * qty)) > 0) && !altPaymentConfirmed)
+                      ((dueNow > 0) && !altPaymentConfirmed)
                     }
                     className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-lg">
                     {loading
                       ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</>
-                      : (appliedVoucher?.finalTotal ?? (total * qty)) === 0
+                      : dueNow === 0
                         ? <><CheckCircle className="w-5 h-5" /> Complete Free Registration</>
                         : <><CheckCircle className="w-5 h-5" /> Finish Registration</>
                     }

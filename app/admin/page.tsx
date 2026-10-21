@@ -630,6 +630,7 @@ import { TourneyTab } from "./tourney-tab";
 import { RaffleSwitch } from "./raffle-switch";
 import { ExportSourcesModal } from "./export-sources-modal";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
+import { AiWriter } from "./ai-writer";
 
 // VouchersTab — Create and manage discount promo codes
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2314,6 +2315,7 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
               <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. 2026-2027 Boys Tryouts Are Back!"
                 className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white font-bold placeholder-gray-600 placeholder:font-normal text-sm focus:outline-none focus:border-blue-500" />
             </div>
+            <AiWriter adminKey={adminKey} subject={subject} message={message} setSubject={setSubject} setMessage={setMessage} />
             <div>
               <label className="block text-gray-400 text-xs font-semibold mb-1">Message</label>
               <RichEditor value={message} onChange={setMessage}

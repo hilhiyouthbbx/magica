@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.0.0",
     "@stripe/stripe-js": "^9.8.0",
     "@types/node": "^22",
     "@types/nodemailer": "^8.0.0",

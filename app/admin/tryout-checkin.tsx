@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Contact } from "@/lib/contacts";
+import { TryoutReminderModal } from "./tryout-reminder";
 
 const ordinal = (n: number) => (n % 100 >= 11 && n % 100 <= 13) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] || "th";
 const gradeNum = (g?: string) => { const m = /(\d+)/.exec(g || ""); return m ? Number(m[1]) : 0; };
@@ -28,6 +29,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
   const [view, setView] = useState<View>("all");
   const [q, setQ] = useState("");
   const [emailReceipts, setEmailReceipts] = useState(true);
+  const [reminderOpen, setReminderOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; bad?: boolean } | null>(null);
   const busy = useRef(0);
 
@@ -154,6 +156,13 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
         ))}
       </div>
 
+      {totals.unpaid > 0 && (
+        <button onClick={() => setReminderOpen(true)}
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-400/30 hover:bg-amber-500/25 text-amber-200 text-sm font-bold transition-colors">
+          &#9993; Email the {totals.unpaid} unpaid registration{totals.unpaid !== 1 ? "s" : ""} a payment reminder
+        </button>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setGrade("all")} className={pill(grade === "all")}>All grades ({totals.checkedIn}/{totals.total})</button>
         {gradeKeys.map(g => {
@@ -177,6 +186,11 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
       </label>
 
       {toast && <div className={`rounded-xl px-4 py-2 text-sm border ${toast.bad ? "bg-red-500/10 border-red-500/20 text-red-300" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"}`}>{toast.msg}</div>}
+
+      {reminderOpen && (
+        <TryoutReminderModal adminKey={adminKey} onClose={() => setReminderOpen(false)}
+          unpaid={tryouts.filter(c => !isPaid(c) && !isFree(c))} />
+      )}
 
       {loading ? (
         <div className="text-gray-500 text-sm py-8 text-center">Loading tryout registrations…</div>

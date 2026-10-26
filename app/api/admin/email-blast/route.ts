@@ -5,6 +5,9 @@ import { sanitizeEmailHtml, plainToEmailHtml, escapeHtml, htmlIsEmpty } from "@/
 
 export const dynamic = "force-dynamic";
 
+// Replies to a blast (e.g. a parent sending a payment receipt) go to the club inbox.
+const REPLY_TO = "info@hilhiyouthbbx.com";
+
 function checkAuth(req: NextRequest) {
   const key      = req.nextUrl.searchParams.get("key") || "";
   const expected = process.env.ADMIN_PASSWORD || "hilhi-admin";
@@ -13,8 +16,12 @@ function checkAuth(req: NextRequest) {
 
 /** Wraps already-sanitized, already-styled message HTML (see lib/email-html.ts) in the branded email
  *  template, replacing {{name}} with the recipient's first name. */
-function blastHtml(subject: string, contentHtml: string, firstName?: string): string {
-  const paragraphs = contentHtml.replace(/\{\{name\}\}/gi, () => escapeHtml(firstName || "there"));
+function blastHtml(subject: string, contentHtml: string, firstName?: string, extra?: { player?: string; amount?: string }): string {
+  // {{name}} = parent's first name. {{player}} / {{amount}} = player name(s) and amount on the contact's registration(s).
+  const paragraphs = contentHtml
+    .replace(/\{\{name\}\}/gi, () => escapeHtml(firstName || "there"))
+    .replace(/\{\{player\}\}/gi, () => escapeHtml(extra?.player || "your player"))
+    .replace(/\{\{amount\}\}/gi, () => escapeHtml(extra?.amount || "your registration total"));
 
   return `
 <!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="color-scheme" content="light"/><meta name="supported-color-schemes" content="light"/></head>
@@ -150,7 +157,8 @@ export async function POST(req: NextRequest) {
           from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
           to:      addr,
           subject: `[TEST] ${body.subject}`,
-          html:    blastHtml(body.subject, contentHtml, "Coach"),
+          replyTo: REPLY_TO,
+          html:    blastHtml(body.subject, contentHtml, "Coach", { player: "Sample Player", amount: "$310.00" }),
         })
       ));
       return NextResponse.json({ ok: true, sent: testAddrs.length, test: true });
@@ -166,22 +174,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No matching contacts with valid email addresses found." }, { status: 400 });
   }
 
+  // One email per address. A parent with several selected registrations gets a single email;
+  // {{player}} lists every player and {{amount}} is their combined total.
+  const groups = new Map<string, { contact: Contact; players: string[]; total: number }>();
+  for (const c of targets) {
+    const key = c.email.trim().toLowerCase();
+    const g = groups.get(key) ?? { contact: c, players: [], total: 0 };
+    if (c.camperName && !g.players.includes(c.camperName)) g.players.push(c.camperName);
+    g.total += parseFloat(c.amountPaid || "") || 0;
+    groups.set(key, g);
+  }
+  const recipients = [...groups.values()];
+  const joinNames = (n: string[]) => n.length <= 1 ? (n[0] || "") : n.slice(0, -1).join(", ") + " and " + n[n.length - 1];
+
   let sent = 0, failed = 0;
   const errors: string[] = [];
 
   // Send in small batches so one slow/failed send doesn't block everything, and so we don't
   // hammer the SMTP server with hundreds of simultaneous connections.
   const BATCH = 10;
-  for (let i = 0; i < targets.length; i += BATCH) {
-    const batch = targets.slice(i, i + BATCH);
-    await Promise.all(batch.map(async (contact) => {
+  for (let i = 0; i < recipients.length; i += BATCH) {
+    const batch = recipients.slice(i, i + BATCH);
+    await Promise.all(batch.map(async ({ contact, players, total }) => {
       try {
         const firstName = (contact.name || "").split(" ")[0] || undefined;
         await transporter.sendMail({
           from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
           to:      contact.email,
           subject: body.subject,
-          html:    blastHtml(body.subject, contentHtml, firstName),
+          replyTo: REPLY_TO,
+          html:    blastHtml(body.subject, contentHtml, firstName, { player: joinNames(players), amount: total > 0 ? "$" + total.toFixed(2) : "" }),
         });
         sent++;
       } catch (e) {
@@ -191,5 +213,5 @@ export async function POST(req: NextRequest) {
     }));
   }
 
-  return NextResponse.json({ ok: true, sent, failed, total: targets.length, errors: errors.slice(0, 5) });
+  return NextResponse.json({ ok: true, sent, failed, total: recipients.length, errors: errors.slice(0, 5) });
 }

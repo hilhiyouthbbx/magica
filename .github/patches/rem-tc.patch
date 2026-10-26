@@ -1,0 +1,20 @@
+--- a/app/admin/tryout-checkin.tsx
++++ b/app/admin/tryout-checkin.tsx
+@@ -7,0 +8 @@
++import { TryoutReminderModal } from "./tryout-reminder";
+@@ -30,0 +32 @@
++  const [reminderOpen, setReminderOpen] = useState(false);
+@@ -156,0 +159,7 @@
++      {totals.unpaid > 0 && (
++        <button onClick={() => setReminderOpen(true)}
++          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-400/30 hover:bg-amber-500/25 text-amber-200 text-sm font-bold transition-colors">
++          &#9993; Email the {totals.unpaid} unpaid registration{totals.unpaid !== 1 ? "s" : ""} a payment reminder
++        </button>
++      )}
++
+@@ -179,0 +189,5 @@
++
++      {reminderOpen && (
++        <TryoutReminderModal adminKey={adminKey} onClose={() => setReminderOpen(false)}
++          unpaid={tryouts.filter(c => !isPaid(c) && !isFree(c))} />
++      )}

@@ -42,8 +42,16 @@ function gradeNum(g?: string): number {
   return 99;
 }
 
+// Must match the admin page: only camp registrations count as "camp". (This used to treat EVERY
+// source other than tournament/merch as camp, so picking Tryout/Raffle/etc. exported everything.)
 function isCampSource(src: string) {
-  return src !== "all" && src !== "tournament" && src !== "merch-order";
+  return src === "registration" || src.includes("Camp") || src.includes("Summer");
+}
+
+const SOURCE_LABELS: Record<string, string> = { "registration": "2026 Youth Summer Camp", "merch-order": "Merch Order", "import": "Import", "tournament": "Tournament", "tryout": "2026-2027 Youth Tryout", "membership-signup": "Membership Sign-Up", "raffle": "Fundraiser Raffle" };
+
+function slug(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "contacts";
 }
 
 export async function GET(req: NextRequest) {
@@ -103,7 +111,7 @@ export async function GET(req: NextRequest) {
   let filename: string;
 
   if (sourcesParam.length > 0) {
-    const LABELS: Record<string, string> = { "registration": "2026 Youth Summer Camp", "merch-order": "Merch Order", "import": "Import", "tournament": "Tournament", "tryout": "2026-2027 Youth Tryout", "membership-signup": "Membership Sign-Up", "raffle": "Fundraiser Raffle" };
+    const LABELS = SOURCE_LABELS;
     headers = ["Source","Order Number","Order Date","Camper Name","Grade","Gender","Shirt Size","Parent Name","Email","Phone","Emergency Contact","Emergency Phone","Total Amount","Payment Status","Checked In","Tournament","Team","Division","Notes","Date"].join(",");
     rows = contacts.map(c => [
       LABELS[c.source] || c.source, c.orderNumber||"", c.orderDate||"",
@@ -138,7 +146,7 @@ export async function GET(req: NextRequest) {
       (()=>{ const _v=(c.checkedIn||"").trim().toLowerCase(); return (_v===""||_v==="no"||_v==="false") ? "" : (c.checkedIn||""); })(),
       c.date ? new Date(c.date).toLocaleDateString() : "",
     ].map(esc).join(","));
-    filename = `2026-youth-summer-camp-${today}.csv`;
+    filename = `${slug(SOURCE_LABELS[sourceFilter] || sourceFilter)}-${today}.csv`;
 
   } else if (sourceFilter === "tournament") {
     headers = "Name,Email,Phone,Tournament,Team Name,Division,Notes,Date";
@@ -151,6 +159,21 @@ export async function GET(req: NextRequest) {
     headers = "Name,Email,Phone,Notes,Date";
     rows = contacts.map(c => [c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
     filename = `merch-orders-${today}.csv`;
+
+  } else if (sourceFilter !== "all") {
+    // Any other specific source (tryout, raffle, import, membership sign-up, custom imports):
+    // export just that source, with Notes (promo code, amount due, etc.) included.
+    headers = ["Source","Order Number","Order Date","Camper Name","Grade","Gender","Shirt Size","Parent Name","Email","Phone","Emergency Contact","Emergency Phone","Total Amount","Payment Status","Checked In","Notes","Date"].join(",");
+    rows = contacts.map(c => [
+      SOURCE_LABELS[c.source] || c.source, c.orderNumber||"", c.orderDate||"",
+      c.camperName||"", c.grade||"", c.gender||"", fmtShirt(c.shirtSize)||"",
+      c.name, c.email, c.phone,
+      c.emergencyContact||"", c.emergencyPhone||"",
+      c.amountPaid||"", c.paymentStatus||"",
+      c.tryoutCheckedIn ? "Yes" : ((() => { const _v=(c.checkedIn||"").trim().toLowerCase(); return (_v===""||_v==="no"||_v==="false") ? "" : (c.checkedIn||""); })()),
+      c.notes||"", c.date ? new Date(c.date).toLocaleDateString() : "",
+    ].map(esc).join(","));
+    filename = `${slug(SOURCE_LABELS[sourceFilter] || sourceFilter)}-${today}.csv`;
 
   } else {
     headers = [

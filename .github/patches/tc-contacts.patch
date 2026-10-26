@@ -1,5 +1,0 @@
---- a/lib/contacts.ts
-+++ b/lib/contacts.ts
-@@ -76,0 +77,2 @@
-+  /** ISO timestamp of when the player was checked in at tryouts (empty/absent = not checked in). */
-+  tryoutCheckedIn?: string;

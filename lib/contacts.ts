@@ -74,6 +74,8 @@ export interface Contact {
   noOverlapWithTeam?: string;
 
   // Tryout fields
+  /** ISO timestamp of when the player was checked in at tryouts (empty/absent = not checked in). */
+  tryoutCheckedIn?: string;
   /** School the player will attend for the upcoming season (may differ from their current school). */
   nextSeasonSchool?: string;
   /** Home address entered at tryout registration — used for the Hillsboro HS attendance-boundary check. */

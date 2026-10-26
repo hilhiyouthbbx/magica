@@ -42,7 +42,7 @@ interface Contact {
 
 function makeId() { return `${Date.now()}-${Math.random().toString(36).slice(2,6)}`; }
 
-type Tab = "contacts" | "tournaments" | "pages" | "vouchers" | "invoices" | "filmroom" | "camp" | "tourney";
+type Tab = "contacts" | "tryouts" | "tournaments" | "pages" | "vouchers" | "invoices" | "filmroom" | "camp" | "tourney";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-component: image field with upload
@@ -629,6 +629,7 @@ import { CampTab } from "./camp-tab";
 import { TourneyTab } from "./tourney-tab";
 import { RaffleSwitch } from "./raffle-switch";
 import { ExportSourcesModal } from "./export-sources-modal";
+import { TryoutCheckin } from "./tryout-checkin";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
 import { AiWriter } from "./ai-writer";
 
@@ -2794,6 +2795,7 @@ export default function AdminPage() {
         <div className="flex gap-1 mb-6 glass rounded-xl border border-white/10 p-1 w-fit">
           {([
             { id:"contacts",    icon:<Users    className="w-4 h-4"/>, label:"Contacts"    },
+            { id:"tryouts",     icon:<span className="text-sm leading-none">&#9989;</span>, label:"Tryout Check-In" },
             { id:"tournaments", icon:<Trophy   className="w-4 h-4"/>, label:"Tournaments" },
             { id:"vouchers",    icon:<Tag      className="w-4 h-4"/>, label:"Vouchers"    },
             { id:"invoices",    icon:<FileText className="w-4 h-4"/>, label:"Invoices"    },
@@ -3492,6 +3494,7 @@ export default function AdminPage() {
         {tab === "vouchers"  && <VouchersTab  adminKey={adminKey} />}
         {tab === "invoices"  && <InvoicesTab  adminKey={adminKey} />}
         {tab === "filmroom"  && <FilmRoomTab  adminKey={adminKey} />}
+        {tab === "tryouts"   && <TryoutCheckin adminKey={adminKey} />}
         {tab === "camp"      && <CampTab      adminKey={adminKey} />}
         {tab === "tourney"   && <TourneyTab contacts={contacts} tournaments={tournaments} adminKey={adminKey} />}
         {tab === "pages"     && <PagesTab     adminKey={adminKey} />}

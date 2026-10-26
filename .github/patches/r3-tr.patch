@@ -1,5 +1,0 @@
---- a/app/admin/tryout-reminder.tsx
-+++ b/app/admin/tryout-reminder.tsx
-@@ -26 +26 @@
--    `<p><strong>If you believe you have already paid</strong>, please reply to this email with a copy of your receipt (a screenshot of your PayPal or Venmo confirmation works great) so we can match it and mark you as paid.</p>`,
-+    `<p><strong>If you believe you have already paid</strong>, a payment may have slipped past me. Please reply to this email with a copy of your receipt (a screenshot of your PayPal or Venmo confirmation works great) and I will get you marked as paid right away.</p>`,

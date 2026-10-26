@@ -23,7 +23,7 @@ function defaultMessage(sessions: Session[], location: string, address: string):
     list,
     where,
     `<p>We have <strong>not received payment yet</strong> for <strong>{{player}}</strong>'s tryout registration. Amount due: <strong>{{amount}}</strong>. You can pay by Venmo to <strong>@hilhiyouthbbx</strong> (reply to this email if you would like a PayPal link instead).</p>`,
-    `<p><strong>If you believe you have already paid</strong>, please reply to this email with a copy of your receipt (a screenshot of your PayPal or Venmo confirmation works great) so we can match it and mark you as paid.</p>`,
+    `<p><strong>If you believe you have already paid</strong>, a payment may have slipped past me. Please reply to this email with a copy of your receipt (a screenshot of your PayPal or Venmo confirmation works great) and I will get you marked as paid right away.</p>`,
     `<p>Thank you, and we look forward to seeing {{player}} on the court!</p>`,
     `<p>Coach Kem<br>Hilhi Youth Basketball</p>`,
   ].join("");

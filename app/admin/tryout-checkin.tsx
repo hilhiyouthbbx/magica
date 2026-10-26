@@ -29,7 +29,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
   const [view, setView] = useState<View>("all");
   const [q, setQ] = useState("");
   const [emailReceipts, setEmailReceipts] = useState(true);
-  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderTo, setReminderTo] = useState<Contact[] | null>(null);
   const [toast, setToast] = useState<{ msg: string; bad?: boolean } | null>(null);
   const busy = useRef(0);
 
@@ -157,7 +157,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
       </div>
 
       {totals.unpaid > 0 && (
-        <button onClick={() => setReminderOpen(true)}
+        <button onClick={() => setReminderTo(tryouts.filter(c => !isPaid(c) && !isFree(c)))}
           className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-400/30 hover:bg-amber-500/25 text-amber-200 text-sm font-bold transition-colors">
           &#9993; Email the {totals.unpaid} unpaid registration{totals.unpaid !== 1 ? "s" : ""} a payment reminder
         </button>
@@ -187,9 +187,18 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
 
       {toast && <div className={`rounded-xl px-4 py-2 text-sm border ${toast.bad ? "bg-red-500/10 border-red-500/20 text-red-300" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"}`}>{toast.msg}</div>}
 
-      {reminderOpen && (
-        <TryoutReminderModal adminKey={adminKey} onClose={() => setReminderOpen(false)}
-          unpaid={tryouts.filter(c => !isPaid(c) && !isFree(c))} />
+      {reminderTo && (
+        <TryoutReminderModal adminKey={adminKey} onClose={() => setReminderTo(null)} unpaid={reminderTo} />
+      )}
+
+      {view === "unpaid" && rows.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">
+          <span className="text-amber-200 text-sm">Showing <strong>{rows.length}</strong> not-paid registration{rows.length !== 1 ? "s" : ""}{grade !== "all" ? ` in ${gradeName(grade)}` : ""}.</span>
+          <button onClick={() => setReminderTo(rows)}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-gray-900 text-sm font-bold transition-colors">
+            &#9993; Send reminder to these {rows.length === 1 ? "parent" : "parents"}
+          </button>
+        </div>
       )}
 
       {loading ? (
@@ -227,7 +236,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
                         <td className="px-3 py-2">
                           <div className="text-white font-semibold">{c.camperName || "(no player name)"}{qty > 1 && <span className="ml-2 text-[11px] text-amber-300">x{qty} players</span>}</div>
                           {c.inHillsboroBoundary === "no" && <div className="text-[11px] text-red-400">Outside Hillsboro HS boundary</div>}
-                          {!paid && !free && <div className="text-[11px] text-amber-400">NOT PAID - {c.paymentStatus || "pending"}</div>}
+                          {!paid && !free && <div className="text-[11px] text-amber-400">NOT PAID - {c.paymentStatus || "pending"}{canEmail(c) && <button type="button" onClick={() => setReminderTo([c])} className="ml-2 underline hover:text-amber-200">&#9993; Send reminder</button>}</div>}
                         </td>
                         <td className="px-3 py-2 text-gray-300">
                           <div>{c.name}</div>

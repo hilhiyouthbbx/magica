@@ -1,0 +1,87 @@
+--- a/app/admin/tryout-checkin.tsx
++++ b/app/admin/tryout-checkin.tsx
+@@ -22,0 +23,4 @@
++type Day = 1 | 2;
++// Day 1 is stored in tryoutCheckedIn (as before), Day 2 in tryoutCheckedIn2.
++const inOn = (c: Contact, d: Day) => !!(d === 1 ? c.tryoutCheckedIn : c.tryoutCheckedIn2);
++
+@@ -29,0 +34,2 @@
++  const [day, setDay] = useState<Day>(1);
++  const [dayLabels, setDayLabels] = useState<[string, string]>(["Day 1", "Day 2"]);
+@@ -39,0 +46,7 @@
++  useEffect(() => {
++    fetch("/api/content", { cache: "no-store" }).then(r => r.json()).then(d => {
++      const s = d?.tryout?.sessions;
++      if (Array.isArray(s) && s.length) setDayLabels([s[0]?.label || "Day 1", s[1]?.label || "Day 2"]);
++    }).catch(() => { /* keep defaults */ });
++  }, []);
++
+@@ -75,6 +88,7 @@
+-  async function toggleCheckIn(c: Contact) {
+-    const was = !!c.tryoutCheckedIn;
+-    const next = was ? "" : new Date().toISOString();
+-    patchContact(c.id, { tryoutCheckedIn: next });
+-    try { await save(c.id, { tryoutCheckedIn: next }); }
+-    catch { patchContact(c.id, { tryoutCheckedIn: c.tryoutCheckedIn || "" }); say("Couldn't save that check-in. Please try again.", true); }
++  async function toggleCheckIn(c: Contact, d: Day) {
++    const key = d === 1 ? "tryoutCheckedIn" : "tryoutCheckedIn2";
++    const prev = c[key] || "";
++    const next = prev ? "" : new Date().toISOString();
++    patchContact(c.id, { [key]: next });
++    try { await save(c.id, { [key]: next }); }
++    catch { patchContact(c.id, { [key]: prev }); say("Couldn't save that check-in. Please try again.", true); }
+@@ -110 +124 @@
+-      e.total++; if (c.tryoutCheckedIn) e.in++;
++      e.total++; if (inOn(c, day)) e.in++;
+@@ -114 +128 @@
+-  }, [tryouts]);
++  }, [tryouts, day]);
+@@ -120 +134 @@
+-      .filter(c => view === "all" ? true : view === "notin" ? !c.tryoutCheckedIn : view === "in" ? !!c.tryoutCheckedIn : (!isPaid(c) && !isFree(c)))
++      .filter(c => view === "all" ? true : view === "notin" ? !inOn(c, day) : view === "in" ? inOn(c, day) : (!isPaid(c) && !isFree(c)))
+@@ -123 +137 @@
+-  }, [tryouts, grade, view, q]);
++  }, [tryouts, grade, view, q, day]);
+@@ -133 +147,3 @@
+-    checkedIn: tryouts.filter(c => c.tryoutCheckedIn).length,
++    checkedIn: tryouts.filter(c => inOn(c, day)).length,
++    in1: tryouts.filter(c => inOn(c, 1)).length,
++    in2: tryouts.filter(c => inOn(c, 2)).length,
+@@ -136 +152 @@
+-  }), [tryouts]);
++  }), [tryouts, day]);
+@@ -145 +161 @@
+-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
++      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+@@ -148 +164,2 @@
+-          ["Checked in", `${totals.checkedIn} / ${totals.total}`, "text-emerald-400"],
++          [`${dayLabels[0]} in`, `${totals.in1} / ${totals.total}`, "text-emerald-400"],
++          [`${dayLabels[1]} in`, `${totals.in2} / ${totals.total}`, "text-emerald-400"],
+@@ -165,0 +183,7 @@
++      <div className="flex flex-wrap items-center gap-2">
++        <span className="text-gray-400 text-xs font-semibold">Counts and filters for:</span>
++        {([1, 2] as Day[]).map(d => (
++          <button key={d} onClick={() => setDay(d)} className={pill(day === d)}>{dayLabels[d - 1]}</button>
++        ))}
++      </div>
++
+@@ -213 +237 @@
+-              <span className="text-gray-400 text-xs">{list.filter(c => c.tryoutCheckedIn).length} of {list.length} checked in</span>
++              <span className="text-gray-400 text-xs">{list.filter(c => inOn(c, day)).length} of {list.length} checked in ({dayLabels[day - 1]})</span>
+@@ -219 +243,2 @@
+-                    <th className="text-center px-3 py-2 w-20">Checked in</th>
++                    <th className="text-center px-3 py-2 w-24">{dayLabels[0]}</th>
++                    <th className="text-center px-3 py-2 w-24">{dayLabels[1]}</th>
+@@ -231,5 +256,7 @@
+-                      <tr key={c.id} className={`border-t border-white/5 ${c.tryoutCheckedIn ? "bg-emerald-500/5" : ""}`}>
+-                        <td className="text-center px-3 py-2">
+-                          <input type="checkbox" checked={!!c.tryoutCheckedIn} onChange={() => toggleCheckIn(c)}
+-                            className="w-6 h-6 accent-emerald-500 cursor-pointer" aria-label={`Check in ${c.camperName || c.name}`} />
+-                        </td>
++                      <tr key={c.id} className={`border-t border-white/5 ${inOn(c, day) ? "bg-emerald-500/5" : ""}`}>
++                        {([1, 2] as Day[]).map(d => (
++                          <td key={d} className="text-center px-3 py-2">
++                            <input type="checkbox" checked={inOn(c, d)} onChange={() => toggleCheckIn(c, d)}
++                              className="w-6 h-6 accent-emerald-500 cursor-pointer" aria-label={`Check in ${c.camperName || c.name} - ${dayLabels[d - 1]}`} />
++                          </td>
++                        ))}

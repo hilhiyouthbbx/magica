@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
       c.name, c.email, c.phone,
       c.emergencyContact||"", c.emergencyPhone||"",
       c.amountPaid||"", c.paymentStatus||"",
-      c.tryoutCheckedIn ? "Yes" : ((() => { const _v=(c.checkedIn||"").trim().toLowerCase(); return (_v===""||_v==="no"||_v==="false") ? "" : (c.checkedIn||""); })()),
+      (c.tryoutCheckedIn && c.tryoutCheckedIn2) ? "Day 1 & Day 2" : c.tryoutCheckedIn ? "Day 1" : c.tryoutCheckedIn2 ? "Day 2" : ((() => { const _v=(c.checkedIn||"").trim().toLowerCase(); return (_v===""||_v==="no"||_v==="false") ? "" : (c.checkedIn||""); })()),
       c.notes||"", c.date ? new Date(c.date).toLocaleDateString() : "",
     ].map(esc).join(","));
     filename = `${slug(SOURCE_LABELS[sourceFilter] || sourceFilter)}-${today}.csv`;

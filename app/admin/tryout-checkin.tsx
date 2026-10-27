@@ -20,6 +20,10 @@ const methodOf = (c: Contact) => {
 };
 const canEmail = (c: Contact) => !!(c.email && c.email.includes("@") && !c.email.includes("noemail"));
 
+type Day = 1 | 2;
+// Day 1 is stored in tryoutCheckedIn (as before), Day 2 in tryoutCheckedIn2.
+const inOn = (c: Contact, d: Day) => !!(d === 1 ? c.tryoutCheckedIn : c.tryoutCheckedIn2);
+
 type View = "all" | "notin" | "in" | "unpaid";
 
 export function TryoutCheckin({ adminKey }: { adminKey: string }) {
@@ -27,6 +31,8 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
   const [loading, setLoading] = useState(true);
   const [grade, setGrade] = useState<number | "all">("all");
   const [view, setView] = useState<View>("all");
+  const [day, setDay] = useState<Day>(1);
+  const [dayLabels, setDayLabels] = useState<[string, string]>(["Day 1", "Day 2"]);
   const [q, setQ] = useState("");
   const [emailReceipts, setEmailReceipts] = useState(true);
   const [reminderTo, setReminderTo] = useState<Contact[] | null>(null);
@@ -35,6 +41,13 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
 
   useEffect(() => {
     try { const v = localStorage.getItem("hilhi_tryout_email_receipts"); if (v !== null) setEmailReceipts(v === "1"); } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/content", { cache: "no-store" }).then(r => r.json()).then(d => {
+      const s = d?.tryout?.sessions;
+      if (Array.isArray(s) && s.length) setDayLabels([s[0]?.label || "Day 1", s[1]?.label || "Day 2"]);
+    }).catch(() => { /* keep defaults */ });
   }, []);
 
   const load = useCallback(async () => {
@@ -72,12 +85,13 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
     } finally { busy.current--; }
   }
 
-  async function toggleCheckIn(c: Contact) {
-    const was = !!c.tryoutCheckedIn;
-    const next = was ? "" : new Date().toISOString();
-    patchContact(c.id, { tryoutCheckedIn: next });
-    try { await save(c.id, { tryoutCheckedIn: next }); }
-    catch { patchContact(c.id, { tryoutCheckedIn: c.tryoutCheckedIn || "" }); say("Couldn't save that check-in. Please try again.", true); }
+  async function toggleCheckIn(c: Contact, d: Day) {
+    const key = d === 1 ? "tryoutCheckedIn" : "tryoutCheckedIn2";
+    const prev = c[key] || "";
+    const next = prev ? "" : new Date().toISOString();
+    patchContact(c.id, { [key]: next });
+    try { await save(c.id, { [key]: next }); }
+    catch { patchContact(c.id, { [key]: prev }); say("Couldn't save that check-in. Please try again.", true); }
   }
 
   async function togglePaid(c: Contact) {
@@ -107,20 +121,20 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
     tryouts.forEach(c => {
       const g = gradeNum(c.grade);
       const e = m.get(g) || { total: 0, in: 0 };
-      e.total++; if (c.tryoutCheckedIn) e.in++;
+      e.total++; if (inOn(c, day)) e.in++;
       m.set(g, e);
     });
     return m;
-  }, [tryouts]);
+  }, [tryouts, day]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return tryouts
       .filter(c => grade === "all" || gradeNum(c.grade) === grade)
-      .filter(c => view === "all" ? true : view === "notin" ? !c.tryoutCheckedIn : view === "in" ? !!c.tryoutCheckedIn : (!isPaid(c) && !isFree(c)))
+      .filter(c => view === "all" ? true : view === "notin" ? !inOn(c, day) : view === "in" ? inOn(c, day) : (!isPaid(c) && !isFree(c)))
       .filter(c => !needle || [c.camperName, c.name, c.email, c.phone].some(v => (v || "").toLowerCase().includes(needle)))
       .sort((a, b) => gradeNum(a.grade) - gradeNum(b.grade) || (a.camperName || "").localeCompare(b.camperName || ""));
-  }, [tryouts, grade, view, q]);
+  }, [tryouts, grade, view, q, day]);
 
   const groups = useMemo(() => {
     const m = new Map<number, Contact[]>();
@@ -130,10 +144,12 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
 
   const totals = useMemo(() => ({
     total: tryouts.length,
-    checkedIn: tryouts.filter(c => c.tryoutCheckedIn).length,
+    checkedIn: tryouts.filter(c => inOn(c, day)).length,
+    in1: tryouts.filter(c => inOn(c, 1)).length,
+    in2: tryouts.filter(c => inOn(c, 2)).length,
     paid: tryouts.filter(c => isPaid(c) || isFree(c)).length,
     unpaid: tryouts.filter(c => !isPaid(c) && !isFree(c)).length,
-  }), [tryouts]);
+  }), [tryouts, day]);
 
   const pill = (active: boolean) =>
     `px-3 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${active ? "bg-blue-600 text-white" : "bg-white/10 text-gray-300 hover:bg-white/20"}`;
@@ -142,10 +158,11 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           ["Registered", totals.total, "text-white"],
-          ["Checked in", `${totals.checkedIn} / ${totals.total}`, "text-emerald-400"],
+          [`${dayLabels[0]} in`, `${totals.in1} / ${totals.total}`, "text-emerald-400"],
+          [`${dayLabels[1]} in`, `${totals.in2} / ${totals.total}`, "text-emerald-400"],
           ["Paid / Free", totals.paid, "text-emerald-400"],
           ["Not paid yet", totals.unpaid, totals.unpaid ? "text-amber-400" : "text-gray-400"],
         ].map(([label, val, color]) => (
@@ -162,6 +179,13 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
           &#9993; Email the {totals.unpaid} unpaid registration{totals.unpaid !== 1 ? "s" : ""} a payment reminder
         </button>
       )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-gray-400 text-xs font-semibold">Counts and filters for:</span>
+        {([1, 2] as Day[]).map(d => (
+          <button key={d} onClick={() => setDay(d)} className={pill(day === d)}>{dayLabels[d - 1]}</button>
+        ))}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setGrade("all")} className={pill(grade === "all")}>All grades ({totals.checkedIn}/{totals.total})</button>
@@ -210,13 +234,14 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
           <div key={g} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
             <div className="px-4 py-2 bg-white/5 flex items-center justify-between">
               <span className="text-white font-bold text-sm">{gradeName(g)}</span>
-              <span className="text-gray-400 text-xs">{list.filter(c => c.tryoutCheckedIn).length} of {list.length} checked in</span>
+              <span className="text-gray-400 text-xs">{list.filter(c => inOn(c, day)).length} of {list.length} checked in ({dayLabels[day - 1]})</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-gray-500 text-[11px] uppercase tracking-wide">
-                    <th className="text-center px-3 py-2 w-20">Checked in</th>
+                    <th className="text-center px-3 py-2 w-24">{dayLabels[0]}</th>
+                    <th className="text-center px-3 py-2 w-24">{dayLabels[1]}</th>
                     <th className="text-left px-3 py-2">Player</th>
                     <th className="text-left px-3 py-2">Parent</th>
                     <th className="text-left px-3 py-2">Uniform</th>
@@ -228,11 +253,13 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
                   {list.map(c => {
                     const paid = isPaid(c), free = isFree(c), qty = qtyOf(c);
                     return (
-                      <tr key={c.id} className={`border-t border-white/5 ${c.tryoutCheckedIn ? "bg-emerald-500/5" : ""}`}>
-                        <td className="text-center px-3 py-2">
-                          <input type="checkbox" checked={!!c.tryoutCheckedIn} onChange={() => toggleCheckIn(c)}
-                            className="w-6 h-6 accent-emerald-500 cursor-pointer" aria-label={`Check in ${c.camperName || c.name}`} />
-                        </td>
+                      <tr key={c.id} className={`border-t border-white/5 ${inOn(c, day) ? "bg-emerald-500/5" : ""}`}>
+                        {([1, 2] as Day[]).map(d => (
+                          <td key={d} className="text-center px-3 py-2">
+                            <input type="checkbox" checked={inOn(c, d)} onChange={() => toggleCheckIn(c, d)}
+                              className="w-6 h-6 accent-emerald-500 cursor-pointer" aria-label={`Check in ${c.camperName || c.name} - ${dayLabels[d - 1]}`} />
+                          </td>
+                        ))}
                         <td className="px-3 py-2">
                           <div className="text-white font-semibold">{c.camperName || "(no player name)"}{qty > 1 && <span className="ml-2 text-[11px] text-amber-300">x{qty} players</span>}</div>
                           {c.inHillsboroBoundary === "no" && <div className="text-[11px] text-red-400">Outside Hillsboro HS boundary</div>}

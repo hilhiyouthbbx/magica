@@ -12,14 +12,37 @@ const hasEmail = (c: Contact) => !!(c.email && c.email.includes("@") && !c.email
 
 interface Session { label: string; time: string }
 
+// First tryout day (Sunday, November 1, 2026). The countdown below is worked out from today's date each
+// time the reminder window opens, so it always says the right number (3 days, 2 days, tomorrow, today).
+const TRYOUT_START = new Date(2026, 10, 1);
+function daysUntilTryout(): number {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((TRYOUT_START.getTime() - today.getTime()) / 86400000);
+}
+function countdownPhrase(d: number): string {
+  if (d > 1) return `only ${d} days left`;
+  if (d === 1) return "only 1 day left (tryouts start tomorrow)";
+  return "tryouts start today";
+}
+function subjectLine(): string {
+  const d = daysUntilTryout();
+  return d >= 0 ? `Reminder: ${countdownPhrase(d)} until tryouts (Nov 1 & 2) - payment needed` : "Reminder: Tryouts are Nov 1 & 2 - payment still needed";
+}
+
 function defaultMessage(sessions: Session[], location: string, address: string): string {
   const list = sessions.length
     ? `<ul>${sessions.map(s => `<li><strong>${esc(s.label)}</strong> - ${esc(s.time)}</li>`).join("")}</ul>`
     : "";
   const where = location ? `<p><strong>Where:</strong> ${esc(location)}${address ? `<br>${esc(address)}` : ""}</p>` : "";
+  const d = daysUntilTryout();
+  const urgent = d >= 0
+    ? `<p><strong>We have ${countdownPhrase(d)} before tryout. Payment, or a payment arrangement, must be settled before tryout.</strong> If you cannot pay the full amount, please reply to this email right away so we can set up a payment arrangement before then.</p>`
+    : "";
   return [
     `<p>Hi {{name}},</p>`,
     `<p>This is a friendly reminder that <strong>tryouts are coming up on Sunday, November 1 and Monday, November 2</strong>.</p>`,
+    urgent,
     list,
     where,
     `<p>We have <strong>not received payment yet</strong> for <strong>{{player}}</strong>'s tryout registration. Amount due: <strong>{{amount}}</strong>. You can pay by Venmo to <strong>@hilhiyouthbbx</strong> (reply to this email if you would like a PayPal link instead).</p>`,
@@ -30,7 +53,7 @@ function defaultMessage(sessions: Session[], location: string, address: string):
 }
 
 export function TryoutReminderModal({ adminKey, unpaid, onClose }: { adminKey: string; unpaid: Contact[]; onClose: () => void }) {
-  const [subject, setSubject] = useState("Reminder: Tryouts are Nov 1 & 2 - payment still needed");
+  const [subject, setSubject] = useState(subjectLine);
   const [message, setMessage] = useState("");
   const [ready, setReady] = useState(false);
   const [testEmail, setTestEmail] = useState("");

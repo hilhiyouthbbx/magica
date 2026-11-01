@@ -36,6 +36,10 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
   const [q, setQ] = useState("");
   const [emailReceipts, setEmailReceipts] = useState(true);
   const [reminderTo, setReminderTo] = useState<Contact[] | null>(null);
+  const [dlOpen, setDlOpen] = useState(false);
+  const [dlGrade, setDlGrade] = useState<number | "all">("all");
+  const [dlSimple, setDlSimple] = useState(true);
+  const [dlTitles, setDlTitles] = useState(true);
   const [toast, setToast] = useState<{ msg: string; bad?: boolean } | null>(null);
   const [editAmt, setEditAmt] = useState<{ id: string; val: string } | null>(null);
   const busy = useRef(0);
@@ -169,6 +173,45 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
     unpaid: tryouts.filter(c => !isPaid(c) && !isFree(c)).length,
   }), [tryouts, day]);
 
+  // Download the tryout list as a spreadsheet (CSV opens directly in Excel), sorted by grade then player.
+  // "Simple" = only player name, grade, parent name, email. Uses everyone registered, not the on-screen filters.
+  function downloadList() {
+    const esc = (v: string) => `"${(v || "").replace(/"/g, '""')}"`;
+    const list = tryouts
+      .filter(c => dlGrade === "all" || gradeNum(c.grade) === dlGrade)
+      .sort((a, b) => gradeNum(a.grade) - gradeNum(b.grade) || (a.camperName || "").localeCompare(b.camperName || ""));
+    if (list.length === 0) { say("Nobody to download for that grade.", true); return; }
+    const head = dlSimple
+      ? ["Player", "Grade", "Parent", "Email"]
+      : ["Player", "Grade", "Parent", "Email", "Phone", "Uniform", "Amount", "Payment", "Day 1 check-in", "Day 2 check-in"];
+    const rowOf = (c: Contact) => {
+      const base = [c.camperName || "", gradeNum(c.grade) ? `${gradeNum(c.grade)}${ordinal(gradeNum(c.grade))}` : "", c.name || "", c.email || ""];
+      if (dlSimple) return base;
+      return [...base, c.phone || "", c.shirtSize || "", c.amountPaid ? `$${Number(c.amountPaid).toFixed(2)}` : "", c.paymentStatus || "",
+        c.tryoutCheckedIn ? "Yes" : "", c.tryoutCheckedIn2 ? "Yes" : ""];
+    };
+    const lines: string[] = [head.map(esc).join(",")];
+    let last = -1;
+    list.forEach(c => {
+      const g = gradeNum(c.grade);
+      if (dlTitles && g !== last) {
+        if (last !== -1) lines.push("");
+        lines.push([esc(`${gradeName(g).toUpperCase()}`), ...head.slice(1).map(() => "")].join(","));
+      }
+      last = g;
+      lines.push(rowOf(c).map(esc).join(","));
+    });
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    a.href = URL.createObjectURL(blob);
+    a.download = `tryout-list-${dlGrade === "all" ? "all-grades" : `grade-${dlGrade}`}-${stamp}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    say(`Downloaded ${list.length} player${list.length !== 1 ? "s" : ""}.`);
+  }
+
   const pill = (active: boolean) =>
     `px-3 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${active ? "bg-blue-600 text-white" : "bg-white/10 text-gray-300 hover:bg-white/20"}`;
 
@@ -226,6 +269,35 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
           onChange={e => { setEmailReceipts(e.target.checked); try { localStorage.setItem("hilhi_tryout_email_receipts", e.target.checked ? "1" : "0"); } catch { /* ignore */ } }} />
         Email the parent a receipt when I tick Paid
       </label>
+
+      <div className="space-y-2">
+        <button type="button" onClick={() => setDlOpen(v => !v)}
+          className="px-4 py-2 rounded-xl bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30 text-emerald-200 text-sm font-bold">
+          &#11015; Download tryout list (Excel)
+        </button>
+        {dlOpen && (
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-gray-400 text-xs font-semibold">Which grades:</label>
+              <select value={String(dlGrade)} onChange={e => setDlGrade(e.target.value === "all" ? "all" : Number(e.target.value))}
+                className="px-3 py-1.5 rounded-lg bg-gray-800 border border-white/15 text-white text-sm">
+                <option value="all">All grades ({tryouts.length})</option>
+                {gradeKeys.map(g => <option key={g} value={g}>{gradeName(g)} ({gradeCounts.get(g)!.total})</option>)}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-gray-300 cursor-pointer w-fit">
+              <input type="checkbox" checked={dlSimple} onChange={e => setDlSimple(e.target.checked)} />
+              Only player name, grade, parent name and email
+            </label>
+            <label className="flex items-center gap-2 text-gray-300 cursor-pointer w-fit">
+              <input type="checkbox" checked={dlTitles} onChange={e => setDlTitles(e.target.checked)} />
+              Put a title row and a blank line between each grade
+            </label>
+            <button type="button" onClick={downloadList}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm">Download</button>
+          </div>
+        )}
+      </div>
 
       {toast && <div className={`rounded-xl px-4 py-2 text-sm border ${toast.bad ? "bg-red-500/10 border-red-500/20 text-red-300" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"}`}>{toast.msg}</div>}
 

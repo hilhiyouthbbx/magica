@@ -182,12 +182,12 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
       .sort((a, b) => gradeNum(a.grade) - gradeNum(b.grade) || (a.camperName || "").localeCompare(b.camperName || ""));
     if (list.length === 0) { say("Nobody to download for that grade.", true); return; }
     const head = dlSimple
-      ? ["Player", "Grade", "Parent", "Email"]
-      : ["Player", "Grade", "Parent", "Email", "Phone", "Uniform", "Amount", "Payment", "Day 1 check-in", "Day 2 check-in"];
+      ? ["Player", "Grade", "Parent", "Email", "Parent phone"]
+      : ["Player", "Grade", "Parent", "Email", "Parent phone", "Uniform", "Amount", "Payment", "Day 1 check-in", "Day 2 check-in"];
     const rowOf = (c: Contact) => {
-      const base = [c.camperName || "", gradeNum(c.grade) ? `${gradeNum(c.grade)}${ordinal(gradeNum(c.grade))}` : "", c.name || "", c.email || ""];
+      const base = [c.camperName || "", gradeNum(c.grade) ? `${gradeNum(c.grade)}${ordinal(gradeNum(c.grade))}` : "", c.name || "", c.email || "", c.phone || ""];
       if (dlSimple) return base;
-      return [...base, c.phone || "", c.shirtSize || "", c.amountPaid ? `$${Number(c.amountPaid).toFixed(2)}` : "", c.paymentStatus || "",
+      return [...base, c.shirtSize || "", c.amountPaid ? `$${Number(c.amountPaid).toFixed(2)}` : "", c.paymentStatus || "",
         c.tryoutCheckedIn ? "Yes" : "", c.tryoutCheckedIn2 ? "Yes" : ""];
     };
     const lines: string[] = [head.map(esc).join(",")];
@@ -287,7 +287,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
             </div>
             <label className="flex items-center gap-2 text-gray-300 cursor-pointer w-fit">
               <input type="checkbox" checked={dlSimple} onChange={e => setDlSimple(e.target.checked)} />
-              Only player name, grade, parent name and email
+              Only player name, grade, parent name, email and phone
             </label>
             <label className="flex items-center gap-2 text-gray-300 cursor-pointer w-fit">
               <input type="checkbox" checked={dlTitles} onChange={e => setDlTitles(e.target.checked)} />

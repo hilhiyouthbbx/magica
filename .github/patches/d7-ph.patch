@@ -1,0 +1,22 @@
+diff --git a/app/admin/tryout-checkin.tsx b/app/admin/tryout-checkin.tsx
+index 2a68fcf..d1128e3 100644
+--- a/app/admin/tryout-checkin.tsx
++++ b/app/admin/tryout-checkin.tsx
+@@ -184,8 +184,8 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
+     const head = dlSimple
+-      ? ["Player", "Grade", "Parent", "Email"]
+-      : ["Player", "Grade", "Parent", "Email", "Phone", "Uniform", "Amount", "Payment", "Day 1 check-in", "Day 2 check-in"];
++      ? ["Player", "Grade", "Parent", "Email", "Parent phone"]
++      : ["Player", "Grade", "Parent", "Email", "Parent phone", "Uniform", "Amount", "Payment", "Day 1 check-in", "Day 2 check-in"];
+     const rowOf = (c: Contact) => {
+-      const base = [c.camperName || "", gradeNum(c.grade) ? `${gradeNum(c.grade)}${ordinal(gradeNum(c.grade))}` : "", c.name || "", c.email || ""];
++      const base = [c.camperName || "", gradeNum(c.grade) ? `${gradeNum(c.grade)}${ordinal(gradeNum(c.grade))}` : "", c.name || "", c.email || "", c.phone || ""];
+       if (dlSimple) return base;
+-      return [...base, c.phone || "", c.shirtSize || "", c.amountPaid ? `$${Number(c.amountPaid).toFixed(2)}` : "", c.paymentStatus || "",
++      return [...base, c.shirtSize || "", c.amountPaid ? `$${Number(c.amountPaid).toFixed(2)}` : "", c.paymentStatus || "",
+         c.tryoutCheckedIn ? "Yes" : "", c.tryoutCheckedIn2 ? "Yes" : ""];
+@@ -289,3 +289,3 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
+               <input type="checkbox" checked={dlSimple} onChange={e => setDlSimple(e.target.checked)} />
+-              Only player name, grade, parent name and email
++              Only player name, grade, parent name, email and phone
+             </label>

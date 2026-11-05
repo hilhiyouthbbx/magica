@@ -20,6 +20,16 @@ const methodOf = (c: Contact) => {
 };
 const canEmail = (c: Contact) => !!(c.email && c.email.includes("@") && !c.email.includes("noemail"));
 
+// Count of each uniform size in a list of registrations, smallest to largest (one count per registration).
+const SIZE_ORDER = ["YS", "YM", "YL", "YXL", "AS", "AM", "AL", "AXL", "A2XL", "A3XL"];
+const sizeKey = (c: Contact) => (c.shirtSize || "").trim() || "No size given";
+const sizeRank = (k: string) => { const i = SIZE_ORDER.indexOf(k.split(/\s*\(/)[0].trim().toUpperCase()); return i === -1 ? 99 : i; };
+function sizeTotals(list: Contact[]): [string, number][] {
+  const m = new Map<string, number>();
+  list.forEach(c => m.set(sizeKey(c), (m.get(sizeKey(c)) || 0) + 1));
+  return [...m.entries()].sort((a, b) => sizeRank(a[0]) - sizeRank(b[0]) || a[0].localeCompare(b[0]));
+}
+
 type Day = 1 | 2;
 // Day 1 is stored in tryoutCheckedIn (as before), Day 2 in tryoutCheckedIn2.
 const inOn = (c: Contact, d: Day) => !!(d === 1 ? c.tryoutCheckedIn : c.tryoutCheckedIn2);
@@ -41,6 +51,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
   const [dlSimple, setDlSimple] = useState(true);
   const [dlTitles, setDlTitles] = useState(true);
   const [dlUniform, setDlUniform] = useState(true);
+  const [dlTotals, setDlTotals] = useState(true);
   const [toast, setToast] = useState<{ msg: string; bad?: boolean } | null>(null);
   const [editAmt, setEditAmt] = useState<{ id: string; val: string } | null>(null);
   const busy = useRef(0);
@@ -192,16 +203,23 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
         c.tryoutCheckedIn ? "Yes" : "", c.tryoutCheckedIn2 ? "Yes" : ""];
     };
     const lines: string[] = [head.map(esc).join(",")];
-    let last = -1;
-    list.forEach(c => {
-      const g = gradeNum(c.grade);
-      if (dlTitles && g !== last) {
-        if (last !== -1) lines.push("");
-        lines.push([esc(`${gradeName(g).toUpperCase()}`), ...head.slice(1).map(() => "")].join(","));
-      }
-      last = g;
-      lines.push(rowOf(c).map(esc).join(","));
+    const withSizes = dlTotals && (!dlSimple || dlUniform);
+    const totalsRows = (label: string, rows: Contact[]) => {
+      lines.push([esc(`${label} - UNIFORM SIZE TOTALS`), ...head.slice(1).map(() => "")].join(","));
+      sizeTotals(rows).forEach(([k, n]) => lines.push([esc(`${k}: ${n}`), ...head.slice(1).map(() => "")].join(",")));
+      lines.push([esc(`Total players: ${rows.length}`), ...head.slice(1).map(() => "")].join(","));
+    };
+    const byGrade = new Map<number, Contact[]>();
+    list.forEach(c => { const g = gradeNum(c.grade); byGrade.set(g, [...(byGrade.get(g) || []), c]); });
+    let first = true;
+    byGrade.forEach((rows, g) => {
+      if (!first && (dlTitles || withSizes)) lines.push("");
+      first = false;
+      if (dlTitles) lines.push([esc(`${gradeName(g).toUpperCase()}`), ...head.slice(1).map(() => "")].join(","));
+      rows.forEach(c => lines.push(rowOf(c).map(esc).join(",")));
+      if (withSizes) totalsRows(gradeName(g).toUpperCase(), rows);
     });
+    if (withSizes && byGrade.size > 1) { lines.push(""); totalsRows("ALL GRADES", list); }
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     const d = new Date();
@@ -295,6 +313,10 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
               Include uniform size {!dlSimple && <span className="text-gray-500 text-xs">(always included in the full version)</span>}
             </label>
             <label className="flex items-center gap-2 text-gray-300 cursor-pointer w-fit">
+              <input type="checkbox" checked={dlTotals} disabled={dlSimple && !dlUniform} onChange={e => setDlTotals(e.target.checked)} />
+              Add the total of each uniform size under each grade
+            </label>
+            <label className="flex items-center gap-2 text-gray-300 cursor-pointer w-fit">
               <input type="checkbox" checked={dlTitles} onChange={e => setDlTitles(e.target.checked)} />
               Put a title row and a blank line between each grade
             </label>
@@ -328,7 +350,11 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
         groups.map(([g, list]) => (
           <div key={g} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
             <div className="px-4 py-2 bg-white/5 flex items-center justify-between">
-              <span className="text-white font-bold text-sm">{gradeName(g)}</span>
+              <span className="text-white font-bold text-sm">{gradeName(g)}
+                <span className="ml-3 text-[11px] font-semibold text-sky-300">
+                  {sizeTotals(list).map(([k, n]) => `${k.split(/\s*\(/)[0].trim()}: ${n}`).join("  ·  ")}
+                </span>
+              </span>
               <span className="text-gray-400 text-xs">{list.filter(c => inOn(c, day)).length} of {list.length} checked in ({dayLabels[day - 1]})</span>
             </div>
             <div className="overflow-x-auto">

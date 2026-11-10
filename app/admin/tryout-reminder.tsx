@@ -58,7 +58,7 @@ const UNIFORM_SUBJECT = "Action needed: payment or arrangement before uniforms &
 function uniformMessage(): string {
   return [
     `<p>Hi {{name}},</p>`,
-    `<p>Next week we are handing out <strong>uniforms, fundraising information and all the team details</strong>. Our records show we have <strong>not received payment yet</strong> for <strong>{{player}}</strong>. Amount due: <strong>{{amount}}</strong>.</p>`,
+    `<p>Next week we are handing out <strong>uniforms, fundraising information and all the team details</strong>. Our records show <strong>you have not made payment arrangements</strong> for <strong>{{player}}</strong>. Amount due: <strong>{{amount}}</strong>.</p>`,
     `<p><strong>Payment, or a payment arrangement, must be settled before then. Without it, uniforms will not be handed out for {{player}}.</strong></p>`,
     `<p><strong>Picture day is November 21.</strong> Players who do not have a uniform will not be able to take pictures with the team.</p>`,
     `<p>If you cannot pay the full amount, please <strong>reply to this email right away</strong> so we can set up a payment arrangement. You can pay by Venmo to <strong>@hilhiyouthbbx</strong> (reply to this email if you would like a PayPal link instead).</p>`,

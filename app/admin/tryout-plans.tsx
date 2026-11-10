@@ -63,6 +63,8 @@ export function PlanCell({ c, onSave }: { c: Contact; onSave: (patch: Partial<Co
 interface Group { key: string; kind: "inst" | "raffle"; due?: string; amount?: number; label: string; contacts: Contact[] }
 
 const FOOT_RECEIPT = `<p><strong>If you believe you have already paid</strong>, a payment may have slipped past me. Please reply to this email with a copy of your receipt (a screenshot of your PayPal or Venmo confirmation works great) and I will get you marked as paid right away.</p>`;
+// Venmo pay link with the amount and a note already filled in (opens the Venmo app or venmo.com).
+const venmoLink = (amount: number) => `https://venmo.com/hilhiyouthbbx?txn=pay&amp;amount=${amount}&amp;note=Hilhi%20Youth%20Basketball%20installment`;
 const SIGN = `<p>Thank you for your understanding and continued support of Hilhi Youth Basketball.</p><p><strong>Coach KEM</strong><br>Hilhi Youth Basketball</p>`;
 
 function build(g: Group): { subject: string; html: string } {
@@ -89,7 +91,8 @@ function build(g: Group): { subject: string; html: string } {
         ? `<p>This is a friendly reminder that the installment on your payment plan for <strong>{{player}}</strong> was due on <strong>${when}</strong> and we have not marked it as received yet.</p>`
         : `<p>This is a friendly reminder that the next installment on your payment plan for <strong>{{player}}</strong> is due on <strong>${when}</strong>.</p>`,
       `<p><strong>Amount due: $${g.amount} per player.</strong></p>`,
-      `<p>As a reminder, the remaining $250 balance is paid in two installments of $125, due December 1, 2026, and January 1, 2027. You can pay by Venmo to <strong>@hilhiyouthbbx</strong> (reply to this email if you would like a PayPal link instead).</p>`,
+      `<p>As a reminder, the remaining $250 balance is paid in two installments of $125, due December 1, 2026, and January 1, 2027.</p>`,
+      `<p><strong>Pay with Venmo:</strong> <a href="${venmoLink(g.amount || 125)}">Pay $${g.amount} on Venmo to @hilhiyouthbbx</a><br>If you have more than one player, just change the amount in Venmo. Prefer PayPal? Reply to this email and I will send you a PayPal link.</p>`,
       `<p>If you are also selling additional raffle tickets toward your balance, please let me know so I can update your account. If you need a longer payment plan or smaller monthly payments, please email me directly so we can work out an arrangement.</p>`,
       FOOT_RECEIPT, SIGN,
     ].join(""),

@@ -1,0 +1,9 @@
+diff --git a/app/admin/tryout-reminder.tsx b/app/admin/tryout-reminder.tsx
+index f1b90c4..a1ef7cc 100644
+--- a/app/admin/tryout-reminder.tsx
++++ b/app/admin/tryout-reminder.tsx
+@@ -60,3 +60,3 @@ function uniformMessage(): string {
+     `<p>Hi {{name}},</p>`,
+-    `<p>Next week we are handing out <strong>uniforms, fundraising information and all the team details</strong>. Our records show we have <strong>not received payment yet</strong> for <strong>{{player}}</strong>. Amount due: <strong>{{amount}}</strong>.</p>`,
++    `<p>Next week we are handing out <strong>uniforms, fundraising information and all the team details</strong>. Our records show <strong>you have not made payment arrangements</strong> for <strong>{{player}}</strong>. Amount due: <strong>{{amount}}</strong>.</p>`,
+     `<p><strong>Payment, or a payment arrangement, must be settled before then. Without it, uniforms will not be handed out for {{player}}.</strong></p>`,

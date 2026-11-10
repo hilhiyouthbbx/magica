@@ -17,6 +17,27 @@ type Inst = NonNullable<Contact["planInstallments"]>[number];
 const DEFAULT_INSTALLMENTS: Inst[] = [{ due: "2026-12-01", amount: 125 }, { due: "2027-01-01", amount: 125 }];
 export const defaultInstallments = (): Inst[] => DEFAULT_INSTALLMENTS.map(i => ({ ...i }));
 
+export const hasRaffle = (c: Contact) => c.planOption === "raffle" || c.planOption === "combo";
+export const RAFFLE_TICKET_PRICE = 20;
+
+// Number box for "how many additional raffle tickets am I giving this family". Saves when you leave the box.
+function TicketsInput({ value, name, onCommit }: { value?: number; name: string; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState(value ? String(value) : "");
+  const commit = () => {
+    const n = Math.max(0, Math.floor(Number(draft) || 0));
+    setDraft(n ? String(n) : "");
+    if (n !== (value || 0)) onCommit(n);
+  };
+  return (
+    <label className="flex items-center gap-2 text-[11px] text-gray-300">
+      Raffle tickets
+      <input type="number" min="0" step="1" inputMode="numeric" value={draft} placeholder="0" aria-label={`Additional raffle tickets for ${name}`}
+        onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        className="w-16 px-2 py-1 rounded-lg bg-gray-800 border border-white/15 text-white text-xs text-right" />
+    </label>
+  );
+}
+
 export const hasInstallments = (c: Contact) => c.planOption === "monthly" || c.planOption === "combo";
 const canEmail = (c: Contact) => !!(c.email && c.email.includes("@") && !c.email.includes("noemail"));
 
@@ -45,6 +66,7 @@ export function PlanCell({ c, onSave }: { c: Contact; onSave: (patch: Partial<Co
         <option value="raffle">{PLAN_NAME.raffle}</option>
         <option value="combo">{PLAN_NAME.combo}</option>
       </select>
+      {hasRaffle(c) && <TicketsInput key={c.planRaffleTickets || 0} value={c.planRaffleTickets} name={c.camperName || c.name} onCommit={n => onSave({ planRaffleTickets: n })} />}
       {hasInstallments(c) && inst.map((it, i) => (
         <label key={`${it.due}-${i}`} className="flex flex-wrap items-center gap-x-2 text-[11px] cursor-pointer">
           <input type="checkbox" checked={!!it.paid} className="w-4 h-4 accent-emerald-500"
@@ -186,6 +208,7 @@ export function PlanReminderModal({ adminKey, tryouts, onClose, onSent }: {
 
   const planned = tryouts.filter(c => c.planOption);
   const count = (o: string) => planned.filter(c => c.planOption === o).length;
+  const tickets = planned.filter(hasRaffle).reduce((n, c) => n + (c.planRaffleTickets || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
@@ -206,7 +229,8 @@ export function PlanReminderModal({ adminKey, tryouts, onClose, onSent }: {
           <div className="p-5 space-y-4">
             <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-xs text-gray-300">
               Families on a plan: <strong className="text-white">{planned.length}</strong> (Monthly {count("monthly")} · Raffle tickets {count("raffle")} · Monthly + raffle {count("combo")}).
-              Choose each family&apos;s plan in the <strong>Payment plan</strong> column on the check-in sheet.
+              {tickets > 0 && <> Additional raffle tickets to hand out: <strong className="text-white">{tickets}</strong> (${tickets * RAFFLE_TICKET_PRICE} if all sell at ${RAFFLE_TICKET_PRICE}).</>}
+              {" "}Choose each family&apos;s plan in the <strong>Payment plan</strong> column on the check-in sheet.
             </div>
 
             {groups.length === 0 ? (

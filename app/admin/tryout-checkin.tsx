@@ -132,7 +132,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
 
   // Save a payment-plan change (plan choice or an installment ticked paid) with undo on failure.
   async function savePlan(c: Contact, patch: Partial<Contact>) {
-    const prev = { planOption: c.planOption, planInstallments: c.planInstallments };
+    const prev = { planOption: c.planOption, planInstallments: c.planInstallments, planRaffleTickets: c.planRaffleTickets };
     patchContact(c.id, patch);
     try { await save(c.id, patch); }
     catch { patchContact(c.id, prev); say("Couldn't save that payment plan change. Please try again.", true); }
@@ -205,6 +205,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
     unpaid: tryouts.filter(c => !isPaid(c) && !isFree(c)).length,
     unpaidNoPlan: tryouts.filter(c => !isPaid(c) && !isFree(c) && !c.planOption).length,
     onPlan: tryouts.filter(c => !!c.planOption).length,
+    tickets: tryouts.filter(c => c.planOption === "raffle" || c.planOption === "combo").reduce((n, c) => n + (c.planRaffleTickets || 0), 0),
   }), [tryouts, day]);
 
   // Download the tryout list as a spreadsheet (CSV opens directly in Excel), sorted by grade then player.
@@ -277,7 +278,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
 
       <button onClick={() => setPlanModal(true)}
         className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-500/15 border border-sky-400/30 hover:bg-sky-500/25 text-sky-200 text-sm font-bold transition-colors">
-        &#128197; Payment plan reminders ({totals.onPlan} on a plan)
+        &#128197; Payment plan reminders ({totals.onPlan} on a plan{totals.tickets > 0 ? ` · ${totals.tickets} raffle tickets to give out` : ""})
       </button>
 
       {totals.unpaidNoPlan > 0 && (

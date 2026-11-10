@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Contact } from "@/lib/contacts";
 import { TryoutReminderModal } from "./tryout-reminder";
+import { PlanCell, PlanReminderModal } from "./tryout-plans";
 
 const ordinal = (n: number) => (n % 100 >= 11 && n % 100 <= 13) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] || "th";
 const gradeNum = (g?: string) => { const m = /(\d+)/.exec(g || ""); return m ? Number(m[1]) : 0; };
@@ -46,6 +47,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
   const [q, setQ] = useState("");
   const [emailReceipts, setEmailReceipts] = useState(true);
   const [reminderTo, setReminderTo] = useState<Contact[] | null>(null);
+  const [planModal, setPlanModal] = useState(false);
   const [dlOpen, setDlOpen] = useState(false);
   const [dlGrade, setDlGrade] = useState<number | "all">("all");
   const [dlSimple, setDlSimple] = useState(true);
@@ -128,6 +130,24 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
     catch { patchContact(c.id, { amountPaid: c.amountPaid, notes: c.notes }); say("Couldn't save the new amount. Please try again.", true); }
   }
 
+  // Save a payment-plan change (plan choice or an installment ticked paid) with undo on failure.
+  async function savePlan(c: Contact, patch: Partial<Contact>) {
+    const prev = { planOption: c.planOption, planInstallments: c.planInstallments };
+    patchContact(c.id, patch);
+    try { await save(c.id, patch); }
+    catch { patchContact(c.id, prev); say("Couldn't save that payment plan change. Please try again.", true); }
+  }
+
+  // After a plan reminder goes out, remember the date on each family's installment so it shows "reminded".
+  async function markReminded(list: Contact[], due: string) {
+    const now = new Date().toISOString();
+    for (const c of list) {
+      const inst = (c.planInstallments || []).map(x => (x.due === due ? { ...x, reminded: now } : x));
+      patchContact(c.id, { planInstallments: inst });
+      try { await save(c.id, { planInstallments: inst }); } catch { /* the email was still sent */ }
+    }
+  }
+
   async function togglePaid(c: Contact) {
     if (isFree(c)) return;
     if (isPaid(c)) {
@@ -183,6 +203,8 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
     in2: tryouts.filter(c => inOn(c, 2)).length,
     paid: tryouts.filter(c => isPaid(c) || isFree(c)).length,
     unpaid: tryouts.filter(c => !isPaid(c) && !isFree(c)).length,
+    unpaidNoPlan: tryouts.filter(c => !isPaid(c) && !isFree(c) && !c.planOption).length,
+    onPlan: tryouts.filter(c => !!c.planOption).length,
   }), [tryouts, day]);
 
   // Download the tryout list as a spreadsheet (CSV opens directly in Excel), sorted by grade then player.
@@ -253,10 +275,15 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
         ))}
       </div>
 
-      {totals.unpaid > 0 && (
-        <button onClick={() => setReminderTo(tryouts.filter(c => !isPaid(c) && !isFree(c)))}
+      <button onClick={() => setPlanModal(true)}
+        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-500/15 border border-sky-400/30 hover:bg-sky-500/25 text-sky-200 text-sm font-bold transition-colors">
+        &#128197; Payment plan reminders ({totals.onPlan} on a plan)
+      </button>
+
+      {totals.unpaidNoPlan > 0 && (
+        <button onClick={() => setReminderTo(tryouts.filter(c => !isPaid(c) && !isFree(c) && !c.planOption))}
           className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-400/30 hover:bg-amber-500/25 text-amber-200 text-sm font-bold transition-colors">
-          &#9993; Email the {totals.unpaid} unpaid registration{totals.unpaid !== 1 ? "s" : ""} a payment reminder
+          &#9993; Email the {totals.unpaidNoPlan} unpaid registration{totals.unpaidNoPlan !== 1 ? "s" : ""} (no plan yet) a payment reminder
         </button>
       )}
 
@@ -331,11 +358,14 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
       {reminderTo && (
         <TryoutReminderModal adminKey={adminKey} onClose={() => setReminderTo(null)} unpaid={reminderTo} />
       )}
+      {planModal && (
+        <PlanReminderModal adminKey={adminKey} tryouts={tryouts} onClose={() => setPlanModal(false)} onSent={markReminded} />
+      )}
 
       {view === "unpaid" && rows.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">
           <span className="text-amber-200 text-sm">Showing <strong>{rows.length}</strong> not-paid registration{rows.length !== 1 ? "s" : ""}{grade !== "all" ? ` in ${gradeName(grade)}` : ""}.</span>
-          <button onClick={() => setReminderTo(rows)}
+          <button onClick={() => setReminderTo(rows.filter(c => !c.planOption))}
             className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-gray-900 text-sm font-bold transition-colors">
             &#9993; Send reminder to these {rows.length === 1 ? "parent" : "parents"}
           </button>
@@ -367,6 +397,7 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
                     <th className="text-left px-3 py-2">Parent</th>
                     <th className="text-left px-3 py-2">Uniform</th>
                     <th className="text-right px-3 py-2">Amount</th>
+                    <th className="text-left px-3 py-2">Payment plan</th>
                     <th className="text-center px-3 py-2 w-24">Paid</th>
                   </tr>
                 </thead>
@@ -409,6 +440,9 @@ export function TryoutCheckin({ adminKey }: { adminKey: string }) {
                               {/Amount changed by admin/i.test(c.notes || "") && <span className="block text-[10px] text-amber-300 no-underline">edited</span>}
                             </button>
                           )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {free ? <span className="text-xs text-gray-500">-</span> : <PlanCell c={c} onSave={patch => savePlan(c, patch)} />}
                         </td>
                         <td className="text-center px-3 py-2">
                           {free ? <span className="text-xs text-gray-400">Free</span> : (

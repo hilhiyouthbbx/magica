@@ -78,6 +78,10 @@ export interface Contact {
   tryoutCheckedIn?: string;
   /** ISO timestamp of the Day 2 (second tryout day) check-in. Day 1 is tryoutCheckedIn. */
   tryoutCheckedIn2?: string;
+  /** Payment plan chosen for the remaining registration balance: monthly installments, extra raffle tickets, or both. */
+  planOption?: "" | "monthly" | "raffle" | "combo";
+  /** Installments for the monthly / combo plan. `paid` and `reminded` are ISO timestamps (empty = not yet). */
+  planInstallments?: { due: string; amount: number; paid?: string; reminded?: string }[];
   /** School the player will attend for the upcoming season (may differ from their current school). */
   nextSeasonSchool?: string;
   /** Home address entered at tryout registration — used for the Hillsboro HS attendance-boundary check. */

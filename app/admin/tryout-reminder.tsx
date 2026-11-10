@@ -57,9 +57,9 @@ function defaultMessage(sessions: Session[], location: string, address: string):
 const UNIFORM_SUBJECT = "Action needed: payment or arrangement before uniforms & picture day (Nov 21)";
 function uniformMessage(): string {
   return [
-    `<p>Hello Hilhi Youth Basketball Families,</p>`,
+    `<p>Hello {{name}},</p>`,
     `<p>I hope everyone is doing well and looking forward to a great basketball season!</p>`,
-    `<p>I'm reaching out to families who still have an outstanding registration balance for the upcoming season.</p>`,
+    `<p>I'm reaching out because we still show an outstanding registration balance for <strong>{{player}}</strong> for the upcoming season. Balance due: <strong>{{amount}}</strong>.</p>`,
     `<p>We are expecting to distribute <strong>team uniforms, hoodies, and fundraising packages next week.</strong> We have also scheduled our <strong>Team Picture Day for Saturday, November 21, 2026.</strong></p>`,
     `<p>As we prepare for the season, it is important that all families either complete their registration payment or make payment arrangements with me.</p>`,
     `<p><strong>Registration Fee &amp; Payment Options</strong></p>`,
@@ -72,10 +72,10 @@ function uniformMessage(): string {
     `<p>If you need a different payment arrangement, please contact me directly. I am more than willing to work with families who communicate their situation.</p>`,
     `<p><strong>Important &ndash; Team Picture Day, November 21</strong></p>`,
     `<p>Please understand that <strong>any player whose registration fee has not been paid and whose family has not made an approved payment arrangement will not be allowed to participate in team pictures on November 21.</strong></p>`,
-    `<p>I would prefer not to have to exclude any player from team pictures, which is why I am reaching out ahead of time to give everyone an opportunity to take care of their account.</p>`,
+    `<p>I would prefer not to have to exclude {{player}} or any other player from team pictures, which is why I am reaching out ahead of time to give everyone an opportunity to take care of their account.</p>`,
     `<p><strong>Please reply to this email as soon as possible</strong> to confirm your payment or let me know what arrangement you would like to make. This will also help me update our bookkeeping records before uniforms and fundraising packages are distributed.</p>`,
     `<p>Our goal has always been to provide a positive basketball experience for every player. At the same time, we have financial obligations to meet in order to keep the program running successfully.</p>`,
-    `<p>Thank you for your understanding, cooperation, and continued support of Hilhi Youth Basketball.</p>`,
+    `<p>Thank you for your understanding, cooperation, and continued support of Hilhi Youth Basketball. We are excited to have {{player}} on the team!</p>`,
     `<p><strong>Coach KEM</strong><br>Hilhi Youth Basketball</p>`,
   ].join("");
 }

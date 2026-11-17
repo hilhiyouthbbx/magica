@@ -1,0 +1,93 @@
+diff --git a/app/api/admin/contacts/download/route.ts b/app/api/admin/contacts/download/route.ts
+index 886e3b5..61bb33d 100644
+--- a/app/api/admin/contacts/download/route.ts
++++ b/app/api/admin/contacts/download/route.ts
+@@ -158,4 +158,4 @@ export async function GET(req: NextRequest) {
+   } else if (sourceFilter === "merch-order") {
+-    headers = "Name,Email,Phone,Notes,Date";
+-    rows = contacts.map(c => [c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
++    headers = "Athlete,Team,Parent Name,Email,Phone,Notes,Date";
++    rows = contacts.map(c => [c.camperName||"",c.teamName||"",c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
+     filename = `merch-orders-${today}.csv`;
+diff --git a/app/api/square-payment/route.ts b/app/api/square-payment/route.ts
+index 526fdc5..ead10bb 100644
+--- a/app/api/square-payment/route.ts
++++ b/app/api/square-payment/route.ts
+@@ -92,2 +92,6 @@ export async function POST(req: NextRequest) {
+     // ── Save contact ───────────────────────────────────────────────────────
++    // Athlete + team (so gear can be sorted by team). Team must be one of the known options.
++    const TEAMS = ["3rd/4th Grade", "5th Grade", "6th Grade", "7th Grade", "8th Grade - A", "8th Grade - B", "Not on a team (parent / fan)"];
++    contact.athlete = String(contact.athlete || "").trim().slice(0, 80);
++    contact.team    = TEAMS.includes(contact.team) ? contact.team : "";
+     try {
+@@ -98,3 +102,5 @@ export async function POST(req: NextRequest) {
+         source: "merch-order",
+-        notes:  `Items: ${(cart as Array<{ name: string; size: string; qty: number; price: number }>)
++        camperName: contact.athlete || undefined,
++        teamName:   contact.team || undefined,
++        notes:  `${contact.athlete ? `Athlete: ${contact.athlete} | ` : ""}${contact.team ? `Team: ${contact.team} | ` : ""}Items: ${(cart as Array<{ name: string; size: string; qty: number; price: number }>)
+           .map(i => `${i.name} (${i.size}) ×${i.qty}`)
+@@ -122,4 +128,5 @@ export async function POST(req: NextRequest) {
+ // ── Email helpers ──────────────────────────────────────────────────────────
++const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+ async function sendEmails(
+-  contact: { name: string; email: string; phone?: string; notes?: string },
++  contact: { name: string; email: string; phone?: string; notes?: string; athlete?: string; team?: string },
+   cart:    Array<{ name: string; size: string; qty: number; price: number }>,
+@@ -177,2 +184,4 @@ async function sendEmails(
+           <p><strong>Phone:</strong> ${contact.phone || "—"}</p>
++          <p><strong>Athlete:</strong> ${esc(contact.athlete || "—")}</p>
++          <p><strong>Team:</strong> ${esc(contact.team || "—")}</p>
+           <p><strong>Notes:</strong> ${contact.notes || "—"}</p>
+@@ -191,2 +200,3 @@ async function sendEmails(
+           <p>Your payment of <strong>$${total.toFixed(2)}</strong> has been received. Here's your order summary:</p>
++          ${contact.athlete || contact.team ? `<p><strong>Athlete:</strong> ${esc(contact.athlete || "—")}<br><strong>Team:</strong> ${esc(contact.team || "—")}</p>` : ""}
+           ${tableHtml}
+diff --git a/app/merch/page.tsx b/app/merch/page.tsx
+index a4d6254..df66848 100644
+--- a/app/merch/page.tsx
++++ b/app/merch/page.tsx
+@@ -51,2 +51,6 @@ const SQ_STYLE = {
+ 
++// Teams the athlete made this season - printed on every merch order so gear can be sorted by team.
++const MERCH_TEAMS = ["3rd/4th Grade", "5th Grade", "6th Grade", "7th Grade", "8th Grade - A", "8th Grade - B"];
++const NO_TEAM = "Not on a team (parent / fan)";
++
+ export default function MerchPage() {
+@@ -61,2 +65,4 @@ export default function MerchPage() {
+   const [notes, setNotes] = useState("");
++  const [athlete, setAthlete] = useState("");
++  const [team, setTeam] = useState("");
+ 
+@@ -202,3 +208,3 @@ export default function MerchPage() {
+           cart: cart.map(i => ({ name:i.name, size:i.size, qty:i.qty, price:i.price })),
+-          contact: { name, email, phone, notes },
++          contact: { name, email, phone, notes, athlete, team },
+           voucherCode: appliedVoucher?.code ?? null,
+@@ -214,3 +220,3 @@ export default function MerchPage() {
+   function resetAll() {
+-    setCart([]); setSizes({}); setName(""); setEmail(""); setPhone(""); setNotes("");
++    setCart([]); setSizes({}); setName(""); setEmail(""); setPhone(""); setNotes(""); setAthlete(""); setTeam("");
+     setStep("browse"); setPaymentError(""); setSquareError(""); setPaymentId(""); setAppliedVoucher(null);
+@@ -428,2 +434,21 @@ export default function MerchPage() {
+                           ))}
++                          <div>
++                            <label className="block text-gray-400 text-xs font-semibold mb-1">
++                              Athlete Name{team !== NO_TEAM && <span className="text-red-400"> *</span>}
++                            </label>
++                            <input required={team !== NO_TEAM} type="text" value={athlete} onChange={e => setAthlete(e.target.value)}
++                              placeholder="First and last name of the player"
++                              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors" />
++                          </div>
++                          <div>
++                            <label className="block text-gray-400 text-xs font-semibold mb-1">
++                              Team <span className="text-red-400">*</span>
++                            </label>
++                            <select required value={team} onChange={e => setTeam(e.target.value)}
++                              className="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors">
++                              <option value="">Select the athlete&apos;s team…</option>
++                              {MERCH_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
++                              <option value={NO_TEAM}>{NO_TEAM}</option>
++                            </select>
++                          </div>
+                           <div>

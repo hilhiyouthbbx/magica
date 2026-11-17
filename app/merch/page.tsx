@@ -49,6 +49,10 @@ const SQ_STYLE = {
   ".message-icon":             { color: "#ef4444" },
 };
 
+// Teams the athlete made this season - printed on every merch order so gear can be sorted by team.
+const MERCH_TEAMS = ["3rd/4th Grade", "5th Grade", "6th Grade", "7th Grade", "8th Grade - A", "8th Grade - B"];
+const NO_TEAM = "Not on a team (parent / fan)";
+
 export default function MerchPage() {
   const [products, setProducts] = useState<MerchProduct[]>([]);
   const [cat,   setCat]   = useState("all");
@@ -59,6 +63,8 @@ export default function MerchPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [athlete, setAthlete] = useState("");
+  const [team, setTeam] = useState("");
 
   const [step,         setStep]         = useState<Step>("browse");
   const [cardLoading,  setCardLoading]  = useState(false);
@@ -200,7 +206,7 @@ export default function MerchPage() {
         body: JSON.stringify({
           sourceId, total,
           cart: cart.map(i => ({ name:i.name, size:i.size, qty:i.qty, price:i.price })),
-          contact: { name, email, phone, notes },
+          contact: { name, email, phone, notes, athlete, team },
           voucherCode: appliedVoucher?.code ?? null,
         }),
       });
@@ -212,7 +218,7 @@ export default function MerchPage() {
   }
 
   function resetAll() {
-    setCart([]); setSizes({}); setName(""); setEmail(""); setPhone(""); setNotes("");
+    setCart([]); setSizes({}); setName(""); setEmail(""); setPhone(""); setNotes(""); setAthlete(""); setTeam("");
     setStep("browse"); setPaymentError(""); setSquareError(""); setPaymentId(""); setAppliedVoucher(null);
   }
 
@@ -426,6 +432,25 @@ export default function MerchPage() {
                                 className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors" />
                             </div>
                           ))}
+                          <div>
+                            <label className="block text-gray-400 text-xs font-semibold mb-1">
+                              Athlete Name{team !== NO_TEAM && <span className="text-red-400"> *</span>}
+                            </label>
+                            <input required={team !== NO_TEAM} type="text" value={athlete} onChange={e => setAthlete(e.target.value)}
+                              placeholder="First and last name of the player"
+                              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-blue-500 transition-colors" />
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 text-xs font-semibold mb-1">
+                              Team <span className="text-red-400">*</span>
+                            </label>
+                            <select required value={team} onChange={e => setTeam(e.target.value)}
+                              className="w-full px-3 py-2.5 rounded-xl bg-gray-900 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                              <option value="">Select the athlete&apos;s team…</option>
+                              {MERCH_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                              <option value={NO_TEAM}>{NO_TEAM}</option>
+                            </select>
+                          </div>
                           <div>
                             <label className="block text-gray-400 text-xs font-semibold mb-1">Notes</label>
                             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}

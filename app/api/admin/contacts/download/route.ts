@@ -156,8 +156,8 @@ export async function GET(req: NextRequest) {
       : `tournament-registrations-${today}.csv`;
 
   } else if (sourceFilter === "merch-order") {
-    headers = "Name,Email,Phone,Notes,Date";
-    rows = contacts.map(c => [c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
+    headers = "Athlete,Team,Parent Name,Email,Phone,Notes,Date";
+    rows = contacts.map(c => [c.camperName||"",c.teamName||"",c.name,c.email,c.phone,c.notes||"",c.date].map(esc).join(","));
     filename = `merch-orders-${today}.csv`;
 
   } else if (sourceFilter !== "all") {

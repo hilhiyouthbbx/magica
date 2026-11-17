@@ -90,13 +90,19 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Save contact ───────────────────────────────────────────────────────
+    // Athlete + team (so gear can be sorted by team). Team must be one of the known options.
+    const TEAMS = ["3rd/4th Grade", "5th Grade", "6th Grade", "7th Grade", "8th Grade - A", "8th Grade - B", "Not on a team (parent / fan)"];
+    contact.athlete = String(contact.athlete || "").trim().slice(0, 80);
+    contact.team    = TEAMS.includes(contact.team) ? contact.team : "";
     try {
       await saveContact({
         name:   contact.name,
         email:  contact.email || "noemail@noemail.com",
         phone:  contact.phone || "",
         source: "merch-order",
-        notes:  `Items: ${(cart as Array<{ name: string; size: string; qty: number; price: number }>)
+        camperName: contact.athlete || undefined,
+        teamName:   contact.team || undefined,
+        notes:  `${contact.athlete ? `Athlete: ${contact.athlete} | ` : ""}${contact.team ? `Team: ${contact.team} | ` : ""}Items: ${(cart as Array<{ name: string; size: string; qty: number; price: number }>)
           .map(i => `${i.name} (${i.size}) ×${i.qty}`)
           .join(", ")} | Subtotal: $${subtotal.toFixed(2)}${voucherApplied ? ` | Promo: ${voucherCode}` : ""} | Total: $${total.toFixed(2)} | Square ID: ${paymentId ?? "n/a"}`,
       });
@@ -120,8 +126,9 @@ export async function POST(req: NextRequest) {
 }
 
 // ── Email helpers ──────────────────────────────────────────────────────────
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 async function sendEmails(
-  contact: { name: string; email: string; phone?: string; notes?: string },
+  contact: { name: string; email: string; phone?: string; notes?: string; athlete?: string; team?: string },
   cart:    Array<{ name: string; size: string; qty: number; price: number }>,
   total:   number,
   paymentId?: string,
@@ -175,6 +182,8 @@ async function sendEmails(
           <p><strong>Customer:</strong> ${contact.name}</p>
           <p><strong>Email:</strong> ${contact.email}</p>
           <p><strong>Phone:</strong> ${contact.phone || "—"}</p>
+          <p><strong>Athlete:</strong> ${esc(contact.athlete || "—")}</p>
+          <p><strong>Team:</strong> ${esc(contact.team || "—")}</p>
           <p><strong>Notes:</strong> ${contact.notes || "—"}</p>
           ${tableHtml}
         </div>`,
@@ -189,6 +198,7 @@ async function sendEmails(
           <h2 style="color:#1e40af">Order Confirmed! 🏀</h2>
           <p>Hi ${contact.name.split(" ")[0]},</p>
           <p>Your payment of <strong>$${total.toFixed(2)}</strong> has been received. Here's your order summary:</p>
+          ${contact.athlete || contact.team ? `<p><strong>Athlete:</strong> ${esc(contact.athlete || "—")}<br><strong>Team:</strong> ${esc(contact.team || "—")}</p>` : ""}
           ${tableHtml}
           <p style="color:#6b7280;font-size:14px">
             Questions? Email <a href="mailto:info@hilhiyouthbbx.com">info@hilhiyouthbbx.com</a>

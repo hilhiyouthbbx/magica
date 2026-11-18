@@ -1,44 +1,34 @@
 diff --git a/app/admin/page.tsx b/app/admin/page.tsx
-index 53d8c3e..f4371e5 100644
+index 53d8c3e..b5dd28c 100644
 --- a/app/admin/page.tsx
 +++ b/app/admin/page.tsx
-@@ -632,2 +632,3 @@ import { ExportSourcesModal } from "./export-sources-modal";
- import { TryoutCheckin } from "./tryout-checkin";
+@@ -632,0 +633 @@ import { TryoutCheckin } from "./tryout-checkin";
 +import { RosterEditor } from "./roster-editor";
- import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
-@@ -1831,2 +1832,8 @@ function PagesTab({ adminKey }: { adminKey: string }) {
- 
-+      {/* ── HS Team Roster ──────────────────────────────────────────────────────────────── */}
+@@ -1831,0 +1833,5 @@ function PagesTab({ adminKey }: { adminKey: string }) {
 +      <Section openId={section} setOpenId={setSection} id="hsRoster" title="🏀 High School Team Roster" badge={content.hsRoster.enabled ? "Live" : "Hidden"}>
 +        <RosterEditor roster={content.hsRoster} onChange={r => setContent(p => p ? { ...p, hsRoster: r } : p)} />
 +        <div className="flex justify-end mt-2"><SaveBtn k="hsRoster" save={save} saving={saving} saved={saved} /></div>
 +      </Section>
 +
-       {/* ── HS Coaches ─────────────────────────────────────────────────────────────── */}
 diff --git a/app/high-school-coaches/page.tsx b/app/high-school-coaches/page.tsx
 index aee707c..454e8e9 100644
 --- a/app/high-school-coaches/page.tsx
 +++ b/app/high-school-coaches/page.tsx
-@@ -155,2 +155,5 @@ export default function HighSchoolCoachesPage() {
-             <p className="text-gray-500 text-sm max-w-2xl mx-auto mt-3">{intro}</p>
+@@ -155,0 +156,3 @@ export default function HighSchoolCoachesPage() {
 +            <a href="/high-school-roster" className="inline-block mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-[#006aff] to-[#00aaff] text-white font-black text-sm hover:brightness-110 transition-all">
 +              View the Team Roster
 +            </a>
-           </motion.div>
 diff --git a/components/footer.tsx b/components/footer.tsx
 index 79d36d7..ea4af6a 100644
 --- a/components/footer.tsx
 +++ b/components/footer.tsx
-@@ -19,2 +19,3 @@ export function Footer() {
-               ["HS Coaches","/high-school-coaches"],
+@@ -19,0 +20 @@ export function Footer() {
 +              ["HS Roster","/high-school-roster"],
-               ["Merch","/merch"],
 diff --git a/lib/content.ts b/lib/content.ts
 index a736f02..c919c83 100644
 --- a/lib/content.ts
 +++ b/lib/content.ts
-@@ -89,2 +89,16 @@ export interface ProgramCard {
- 
+@@ -89,0 +90,14 @@ export interface ProgramCard {
 +export interface RosterPlayer {
 +  id:     string;
 +  name:   string;
@@ -53,9 +43,7 @@ index a736f02..c919c83 100644
 +  swingPlayers: RosterPlayer[];
 +}
 +
- export interface TryoutSession {
-@@ -202,2 +216,10 @@ export interface SiteContent {
-   };
+@@ -202,0 +217,8 @@ export interface SiteContent {
 +  /* ── High school team roster page ── */
 +  hsRoster: {
 +    enabled:  boolean;
@@ -64,9 +52,7 @@ index a736f02..c919c83 100644
 +    footer:   string;
 +    teams:    RosterTeam[];
 +  };
-   /* ── Film Room (private, password-protected) ── */
-@@ -366,2 +388,51 @@ export const DEFAULTS: SiteContent = {
-   },
+@@ -366,0 +389,49 @@ export const DEFAULTS: SiteContent = {
 +  hsRoster: {
 +    enabled:  true,
 +    title:    "Hilhi Spartans",
@@ -116,12 +102,9 @@ index a736f02..c919c83 100644
 +      ], swingPlayers: [] },
 +    ],
 +  },
-   hsCoaches: {
-@@ -491,2 +562,7 @@ function mergeContent(saved: Partial<SiteContent>): SiteContent {
-     },
+@@ -491,0 +563,5 @@ function mergeContent(saved: Partial<SiteContent>): SiteContent {
 +    hsRoster: {
 +      ...DEFAULTS.hsRoster,
 +      ...saved.hsRoster,
 +      teams: saved.hsRoster?.teams ?? DEFAULTS.hsRoster.teams,
 +    },
-     videoRoom: { ...DEFAULTS.videoRoom, ...saved.videoRoom,

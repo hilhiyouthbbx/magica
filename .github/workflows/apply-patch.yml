@@ -14,11 +14,12 @@ jobs:
         run: |
           set -e
           for p in .github/patches/*.patch; do
-            git apply --whitespace=nowarn "$p"
+            git apply --unidiff-zero --whitespace=nowarn "$p"
           done
           git rm -rf -q .github/patches
           git config user.name "patch-bot"
           git config user.email "patch-bot@users.noreply.github.com"
           git add -A
-          git commit -m "High school roster: apply edits"
+          git commit -m "High school roster: apply wiring"
+          git pull --rebase origin main
           git push

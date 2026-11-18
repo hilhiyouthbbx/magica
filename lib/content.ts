@@ -135,6 +135,7 @@ export interface SiteContent {
     showYouthCoaches: boolean;
     showHSCoaches:    boolean;
     showHSSchedule:   boolean;
+    showHSRoster:     boolean;
     showMerch:        boolean;
     showFilmRoom:     boolean;
     showContact:      boolean;
@@ -266,6 +267,7 @@ export const DEFAULTS: SiteContent = {
     showYouthCoaches: true,
     showHSCoaches:    true,
     showHSSchedule:   true,
+    showHSRoster:     true,
     showMerch:        true,
     showFilmRoom:     true,
     showContact:      true,

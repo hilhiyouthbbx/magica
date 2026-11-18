@@ -1547,6 +1547,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             <Toggle label="Youth Coaches"  checked={n.showYouthCoaches ?? true} onChange={v => { setN("showYouthCoaches")(v); save("navbar", { navbar: { ...n, showYouthCoaches: v } }); }} />
             <Toggle label="HS Coaches"     checked={n.showHSCoaches    ?? true} onChange={v => { setN("showHSCoaches")(v);    save("navbar", { navbar: { ...n, showHSCoaches: v } }); }} />
             <Toggle label="HS Schedule"    checked={n.showHSSchedule   ?? true} onChange={v => { setN("showHSSchedule")(v);   save("navbar", { navbar: { ...n, showHSSchedule: v } }); }} />
+            <Toggle label="HS Roster"      checked={n.showHSRoster     ?? true} onChange={v => { setN("showHSRoster")(v);     save("navbar", { navbar: { ...n, showHSRoster: v } }); }} />
             <Toggle label="Merch"          checked={n.showMerch        ?? true} onChange={v => { setN("showMerch")(v);        save("navbar", { navbar: { ...n, showMerch: v } }); }} />
             <Toggle label="Film Room"      checked={n.showFilmRoom     ?? true} onChange={v => { setN("showFilmRoom")(v);     save("navbar", { navbar: { ...n, showFilmRoom: v } }); }} />
             <Toggle label="Contact"        checked={n.showContact      ?? true} onChange={v => { setN("showContact")(v);      save("navbar", { navbar: { ...n, showContact: v } }); }} />

@@ -28,6 +28,7 @@ interface NavConfig {
   showYouthCoaches:  boolean;
   showHSCoaches:     boolean;
   showHSSchedule:    boolean;
+  showHSRoster:      boolean;
   showMerch:         boolean;
   showFilmRoom:      boolean;
   showContact:       boolean;
@@ -58,7 +59,7 @@ export function Navbar() {
     showTryouts:  true,
     showHome: true, showAbout: true, showPrograms: true, showCamps: true,
     showTournaments: true, showYouthCoaches: true, showHSCoaches: true,
-    showHSSchedule: true, showMerch: true, showFilmRoom: true, showContact: true,
+    showHSSchedule: true, showHSRoster: true, showMerch: true, showFilmRoom: true, showContact: true,
     showRegisterCta: true,
     labelHome: "", labelAbout: "", labelPrograms: "", labelCamps: "",
     labelTournaments: "", labelTryout: "", labelYouthCoaches: "",
@@ -104,6 +105,7 @@ export function Navbar() {
             showYouthCoaches:  nb.showYouthCoaches  !== false,
             showHSCoaches:     nb.showHSCoaches     !== false,
             showHSSchedule:    nb.showHSSchedule    !== false,
+            showHSRoster:      nb.showHSRoster      !== false,
             showMerch:         nb.showMerch         !== false,
             showFilmRoom:      nb.showFilmRoom      !== false,
             showContact:       nb.showContact       !== false,
@@ -141,6 +143,7 @@ export function Navbar() {
     ...(navConfig.showTryouts      ? [{ label: lbl(navConfig, "labelTryout"),      href: "/tryout" }] : []),
     ...(navConfig.showYouthCoaches ? [{ label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" }] : []),
     ...(navConfig.showHSCoaches    ? [{ label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" }] : []),
+    ...(navConfig.showHSRoster     ? [{ label: "HS Roster",                         href: "/high-school-roster" }] : []),
     ...(navConfig.showHSSchedule   ? [{ label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" }] : []),
     ...(navConfig.showMerch        ? [{ label: lbl(navConfig, "labelMerch"),        href: "/merch" }] : []),
     ...(navConfig.showFilmRoom     ? [{ label: lbl(navConfig, "labelFilmRoom"),     href: "/film-room" }] : []),

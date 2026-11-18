@@ -630,6 +630,7 @@ import { TourneyTab } from "./tourney-tab";
 import { RaffleSwitch } from "./raffle-switch";
 import { ExportSourcesModal } from "./export-sources-modal";
 import { TryoutCheckin } from "./tryout-checkin";
+import { RosterEditor } from "./roster-editor";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
 import { AiWriter } from "./ai-writer";
 
@@ -1827,6 +1828,11 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           <Plus className="w-4 h-4" /> Add Youth Coach
         </button>
         <div className="flex justify-end mt-2"><SaveBtn k="youthCoaches" save={save} saving={saving} saved={saved} /></div>
+      </Section>
+
+      <Section openId={section} setOpenId={setSection} id="hsRoster" title="🏀 High School Team Roster" badge={content.hsRoster.enabled ? "Live" : "Hidden"}>
+        <RosterEditor roster={content.hsRoster} onChange={r => setContent(p => p ? { ...p, hsRoster: r } : p)} />
+        <div className="flex justify-end mt-2"><SaveBtn k="hsRoster" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       {/* ── HS Coaches ───────────────────────────────────────────────────── */}

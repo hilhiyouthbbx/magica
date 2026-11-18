@@ -153,6 +153,9 @@ export default function HighSchoolCoachesPage() {
             </h1>
             <p className="text-gray-300 text-xl max-w-2xl mx-auto">Dedication. Expertise. Passion.</p>
             <p className="text-gray-500 text-sm max-w-2xl mx-auto mt-3">{intro}</p>
+            <a href="/high-school-roster" className="inline-block mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-[#006aff] to-[#00aaff] text-white font-black text-sm hover:brightness-110 transition-all">
+              View the Team Roster
+            </a>
           </motion.div>
         </div>
       </section>

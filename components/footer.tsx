@@ -17,6 +17,7 @@ export function Footer() {
               ["Events","/events"],
               ["Youth Coaches","/youth-coaches"],
               ["HS Coaches","/high-school-coaches"],
+              ["HS Roster","/high-school-roster"],
               ["Merch","/merch"],
               ["Contact","/#contact"],
             ].map(([l,h]) => (

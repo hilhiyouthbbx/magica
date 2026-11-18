@@ -87,6 +87,20 @@ export interface ProgramCard {
   highlight: boolean;
 }
 
+export interface RosterPlayer {
+  id:     string;
+  name:   string;
+  grade:  string;
+  swing?: boolean;
+}
+
+export interface RosterTeam {
+  id:           string;
+  name:         string;
+  players:      RosterPlayer[];
+  swingPlayers: RosterPlayer[];
+}
+
 export interface TryoutSession {
   id:    string;
   label: string;
@@ -199,6 +213,14 @@ export interface SiteContent {
     intro:         string;
     coaches:       Coach[];
     featuredCoach: FeaturedCoach;
+  };
+  /* ── High school team roster page ── */
+  hsRoster: {
+    enabled:  boolean;
+    title:    string;
+    subtitle: string;
+    footer:   string;
+    teams:    RosterTeam[];
   };
   /* ── Film Room (private, password-protected) ── */
   videoRoom: {
@@ -364,6 +386,55 @@ export const DEFAULTS: SiteContent = {
       },
     ],
   },
+  hsRoster: {
+    enabled:  true,
+    title:    "Hilhi Spartans",
+    subtitle: "Boys Basketball · 2026–2027 Final Team Selections",
+    footer:   "Earned. Never given. · Hilhi Spartans Basketball",
+    teams: [
+      { id: "varsity", name: "Varsity", players: [
+        { id: "v-abraham-sadiq", name: "Abraham Sadiq", grade: "12" },
+        { id: "v-alejandro-juarez", name: "Alejandro Juarez", grade: "12" },
+        { id: "v-elias-nelson", name: "Elias Nelson", grade: "12" },
+        { id: "v-noah-henderson", name: "Noah Henderson", grade: "12" },
+        { id: "v-sorne-olson", name: "Sorne Olson", grade: "12" },
+        { id: "v-ayden-welch", name: "Ayden Welch", grade: "11" },
+        { id: "v-canaan-hall", name: "Canaan Hall", grade: "11" },
+        { id: "v-douglas-akyew-jr", name: "Douglas Akyew-Jr", grade: "10" },
+        { id: "v-landon-eischen", name: "Landon Eischen", grade: "10" },
+        { id: "v-cristian-miranda-camargo", name: "Cristian Miranda Camargo", grade: "9" },
+        { id: "v-william-taylor", name: "William Taylor", grade: "9" },
+      ], swingPlayers: [
+        { id: "v-jecari-tucker", name: "Jecari Tucker", grade: "10", swing: true },
+      ] },
+      { id: "jv", name: "JV", players: [
+        { id: "jv-jasper-phipps", name: "Jasper Phipps", grade: "11" },
+        { id: "jv-hayden-vaughan", name: "Hayden Vaughan", grade: "10" },
+        { id: "jv-jecari-tucker", name: "Jecari Tucker", grade: "10", swing: true },
+        { id: "jv-myles-gillespie", name: "Myles Gillespie", grade: "10" },
+        { id: "jv-amare-kent", name: "Amare Kent", grade: "9" },
+        { id: "jv-deon-rochester", name: "Deon Rochester", grade: "9" },
+        { id: "jv-joel-martinez", name: "Joel Martinez", grade: "9" },
+        { id: "jv-landen-williams", name: "Landen Williams", grade: "9" },
+        { id: "jv-quinn-akans", name: "Quinn Akans", grade: "9" },
+      ], swingPlayers: [
+        { id: "jv-wyatt-moody", name: "Wyatt Moody", grade: "9", swing: true },
+      ] },
+      { id: "fr", name: "Freshman/JV2", players: [
+        { id: "fr-amr-rios", name: "Amr Rios", grade: "10" },
+        { id: "fr-andres-arteaga", name: "Andres Arteaga", grade: "10" },
+        { id: "fr-hieu-nguyen", name: "Hieu Nguyen", grade: "10" },
+        { id: "fr-joel-alonso", name: "Joel Alonso", grade: "10" },
+        { id: "fr-caillou-davidson", name: "Caillou Davidson", grade: "9" },
+        { id: "fr-cordae-edwards", name: "Cordae Edwards", grade: "9" },
+        { id: "fr-ian-aguilar-g", name: "Ian Aguilar G", grade: "9" },
+        { id: "fr-levi-magee", name: "Levi Magee", grade: "9" },
+        { id: "fr-merritt-kolodge", name: "Merritt Kolodge", grade: "9" },
+        { id: "fr-nolan-hastings-callas", name: "Nolan Hastings-Callas", grade: "9" },
+        { id: "fr-wyatt-moody", name: "Wyatt Moody", grade: "9", swing: true },
+      ], swingPlayers: [] },
+    ],
+  },
   hsCoaches: {
     intro:   "Meet our experienced high school coaching staff.",
     coaches: [
@@ -488,6 +559,11 @@ function mergeContent(saved: Partial<SiteContent>): SiteContent {
                        ? saved.hsCoaches!.coaches
                        : DEFAULTS.hsCoaches.coaches,
       featuredCoach: { ...DEFAULTS.hsCoaches.featuredCoach, ...(saved.hsCoaches?.featuredCoach ?? {}) },
+    },
+    hsRoster: {
+      ...DEFAULTS.hsRoster,
+      ...saved.hsRoster,
+      teams: saved.hsRoster?.teams ?? DEFAULTS.hsRoster.teams,
     },
     videoRoom: { ...DEFAULTS.videoRoom, ...saved.videoRoom,
       password:      saved.videoRoom?.password      || DEFAULTS.videoRoom.password,

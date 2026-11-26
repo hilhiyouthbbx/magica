@@ -16,6 +16,9 @@ const DEFAULTS: Record<string, string> = {
   labelMerch:        "Merch",
   labelFilmRoom:     "Film Room",
   labelContact:      "Contact",
+  labelHSRoster:     "HS Roster",
+  labelConcessions:  "Concessions",
+  labelHSSchedule:   "HS Schedule",
 };
 
 interface NavConfig {
@@ -45,6 +48,28 @@ interface NavConfig {
   labelMerch:        string;
   labelFilmRoom:     string;
   labelContact:      string;
+  labelHSRoster:     string;
+  labelConcessions:  string;
+  labelHSSchedule:   string;
+  stackLabels:       boolean;
+}
+
+// Splits a multi-word tab name into two balanced lines ("Film Room" -> Film / Room). One word stays on one line.
+function splitLabel(label: string): [string, string] | null {
+  const w = label.trim().split(/\s+/);
+  if (w.length < 2) return null;
+  let best = 1, bestMax = Infinity;
+  for (let k = 1; k < w.length; k++) {
+    const m = Math.max(w.slice(0, k).join(" ").length, w.slice(k).join(" ").length);
+    if (m < bestMax) { bestMax = m; best = k; }
+  }
+  return [w.slice(0, best).join(" "), w.slice(best).join(" ")];
+}
+
+function NavText({ text, stack }: { text: string; stack: boolean }) {
+  const parts = stack ? splitLabel(text) : null;
+  if (!parts) return <>{text}</>;
+  return <span className="block text-center leading-[1.1] text-[12.5px]">{parts[0]}<br />{parts[1]}</span>;
 }
 
 function lbl(cfg: NavConfig, key: keyof NavConfig): string {
@@ -65,6 +90,7 @@ export function Navbar() {
     labelHome: "", labelAbout: "", labelPrograms: "", labelCamps: "",
     labelTournaments: "", labelTryout: "", labelYouthCoaches: "",
     labelHSCoaches: "", labelMerch: "", labelFilmRoom: "", labelContact: "",
+    labelHSRoster: "", labelConcessions: "", labelHSSchedule: "", stackLabels: true,
   });
   const [raffleOpen, setRaffleOpen] = useState(false);
   const campRef = useRef<HTMLDivElement>(null);
@@ -123,6 +149,10 @@ export function Navbar() {
             labelMerch:        nb.labelMerch        ?? "",
             labelFilmRoom:     nb.labelFilmRoom     ?? "",
             labelContact:      nb.labelContact      ?? "",
+            labelHSRoster:     nb.labelHSRoster     ?? "",
+            labelConcessions:  nb.labelConcessions  ?? "",
+            labelHSSchedule:   nb.labelHSSchedule   ?? "",
+            stackLabels:       nb.stackLabels       !== false,
           });
         }
       })
@@ -145,9 +175,9 @@ export function Navbar() {
     ...(navConfig.showTryouts      ? [{ label: lbl(navConfig, "labelTryout"),      href: "/tryout" }] : []),
     ...(navConfig.showYouthCoaches ? [{ label: lbl(navConfig, "labelYouthCoaches"), href: "/youth-coaches" }] : []),
     ...(navConfig.showHSCoaches    ? [{ label: lbl(navConfig, "labelHSCoaches"),    href: "/high-school-coaches" }] : []),
-    ...(navConfig.showHSRoster     ? [{ label: "HS Roster",                         href: "/high-school-roster" }] : []),
-    ...(navConfig.showConcessions  ? [{ label: "Concessions",                       href: "/concessions" }] : []),
-    ...(navConfig.showHSSchedule   ? [{ label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" }] : []),
+    ...(navConfig.showHSRoster     ? [{ label: lbl(navConfig, "labelHSRoster"),     href: "/high-school-roster" }] : []),
+    ...(navConfig.showConcessions  ? [{ label: lbl(navConfig, "labelConcessions"),  href: "/concessions" }] : []),
+    ...(navConfig.showHSSchedule   ? [{ label: lbl(navConfig, "labelHSSchedule"),   href: "https://www.osaa.org/teams/69010" }] : []),
     ...(navConfig.showMerch        ? [{ label: lbl(navConfig, "labelMerch"),        href: "/merch" }] : []),
     ...(navConfig.showFilmRoom     ? [{ label: lbl(navConfig, "labelFilmRoom"),     href: "/film-room" }] : []),
     ...(navConfig.showContact      ? [{ label: lbl(navConfig, "labelContact"),      href: "/#contact" }] : []),
@@ -166,7 +196,7 @@ export function Navbar() {
             if (l.href === "/film-room") {
               return (
                 <a key={l.label} href={l.href} className="px-1.5 py-2 text-[13.5px] font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all whitespace-nowrap flex items-center gap-1">
-                  🎬 {l.label}
+                  🎬 <NavText text={l.label} stack={navConfig.stackLabels} />
                 </a>
               );
             }
@@ -177,7 +207,7 @@ export function Navbar() {
                     onClick={() => setCampOpen(p => !p)}
                     className="flex items-center gap-1 px-1.5 py-2 text-[13.5px] font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
                   >
-                    {l.label}
+                    <NavText text={l.label} stack={navConfig.stackLabels} />
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${campOpen ? "rotate-180" : ""}`} />
                   </button>
                   {campOpen && (
@@ -202,7 +232,7 @@ export function Navbar() {
                 rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
                 className="px-1.5 py-2 text-[13.5px] font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
               >
-                {l.label}
+                <NavText text={l.label} stack={navConfig.stackLabels} />
               </a>
             );
           })}

@@ -1529,12 +1529,19 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             <IF label="Camps / Clinic" value={n.labelCamps        ?? ""} onChange={setN("labelCamps")        as (v:string)=>void} ph="Camps/Clinic" />
             <IF label="Tournaments"    value={n.labelTournaments  ?? ""} onChange={setN("labelTournaments")  as (v:string)=>void} ph="Tournaments" />
             <IF label="Youth Tryout"   value={n.labelTryout       ?? ""} onChange={setN("labelTryout")       as (v:string)=>void} ph="Youth Tryout" />
-            <IF label="Youth Coaches"  value={n.labelYouthCoaches ?? ""} onChange={setN("labelYouthCoaches") as (v:string)=>void} ph="Youth Coaches" />
+            <IF label="Youth Teams"    value={n.labelYouthCoaches ?? ""} onChange={setN("labelYouthCoaches") as (v:string)=>void} ph="2026-2027 Youth Teams" />
             <IF label="HS Coaches"     value={n.labelHSCoaches    ?? ""} onChange={setN("labelHSCoaches")    as (v:string)=>void} ph="HS Coaches" />
             <IF label="Merch"          value={n.labelMerch        ?? ""} onChange={setN("labelMerch")        as (v:string)=>void} ph="Merch" />
             <IF label="Film Room"      value={n.labelFilmRoom     ?? ""} onChange={setN("labelFilmRoom")     as (v:string)=>void} ph="Film Room" />
             <IF label="Contact"        value={n.labelContact      ?? ""} onChange={setN("labelContact")      as (v:string)=>void} ph="Contact" />
+            <IF label="HS Roster"      value={n.labelHSRoster     ?? ""} onChange={setN("labelHSRoster")     as (v:string)=>void} ph="HS Roster" />
+            <IF label="Concessions"    value={n.labelConcessions  ?? ""} onChange={setN("labelConcessions")  as (v:string)=>void} ph="Concessions" />
+            <IF label="HS Schedule"    value={n.labelHSSchedule   ?? ""} onChange={setN("labelHSSchedule")   as (v:string)=>void} ph="HS Schedule" />
           </div>
+          <label className="flex items-center gap-2 mt-3 text-sm text-gray-200 cursor-pointer w-fit">
+            <input type="checkbox" checked={n.stackLabels ?? true} onChange={e => setN("stackLabels")(e.target.checked)} />
+            Show names with two or more words on two lines (stacked) <span className="text-gray-500 text-xs">- keeps the menu from getting too wide</span>
+          </label>
         </div>
 
         <div>

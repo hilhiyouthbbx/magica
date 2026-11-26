@@ -156,6 +156,10 @@ export interface SiteContent {
     labelMerch:        string;
     labelFilmRoom:     string;
     labelContact:      string;
+    labelHSRoster:     string;
+    labelConcessions:  string;
+    labelHSSchedule:   string;
+    stackLabels:       boolean; // two-word tab names shown on two lines
   };
   /* ── Home page ── */
   home: {
@@ -290,6 +294,10 @@ export const DEFAULTS: SiteContent = {
     labelMerch:        "",
     labelFilmRoom:     "",
     labelContact:      "",
+    labelHSRoster:     "",
+    labelConcessions:  "",
+    labelHSSchedule:   "",
+    stackLabels:       true,
   },
   home: {
     heroBadge:     "Hillsboro Youth Basketball",

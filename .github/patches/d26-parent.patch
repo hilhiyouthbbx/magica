@@ -1,0 +1,98 @@
+diff --git a/app/admin/concessions-admin.tsx b/app/admin/concessions-admin.tsx
+index 787f496..74e0bc0 100644
+--- a/app/admin/concessions-admin.tsx
++++ b/app/admin/concessions-admin.tsx
+@@ -6 +6 @@
+-import { useCallback, useEffect, useState } from "react";
++import { useCallback, useEffect, useMemo, useState } from "react";
+@@ -22,0 +23,2 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
++  const [view, setView] = useState<"game" | "parent">("game");
++  const [q, setQ] = useState("");
+@@ -36,0 +39,42 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
++  const now = new Date();
++  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
++
++  // Everyone who signed up, grouped by name (capitals and extra spaces ignored), most shifts first.
++  const parents = useMemo(() => {
++    if (!d) return [];
++    const map = new Map<string, { name: string; shifts: { date: string; opp: string; time: string; teams: string }[] }>();
++    Object.entries(d.bookings).forEach(([id, arr]) => {
++      const date = id.slice(0, 10);
++      const tRaw = id.slice(11);
++      const g = d.games.find(x => x.date === date);
++      if (!g) return;
++      const m = tRaw === "null" ? null : Number(tRaw);
++      const teams = Object.entries(g.games).filter(([, t]) => mins(t) === m).map(([k]) => TEAMS[k]).join(" / ");
++      arr.forEach(n => {
++        const name = (n || "").trim();
++        if (!name) return;
++        const key = name.toLowerCase().replace(/\s+/g, " ");
++        const e = map.get(key) || { name, shifts: [] };
++        e.shifts.push({ date, opp: g.opp, time: fmt(m), teams });
++        map.set(key, e);
++      });
++    });
++    return [...map.values()]
++      .map(e => ({ ...e, shifts: e.shifts.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)) }))
++      .sort((a, b) => b.shifts.length - a.shifts.length || a.name.localeCompare(b.name));
++  }, [d]);
++
++  function exportParents() {
++    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
++    const lines = [["Volunteer", "Shifts signed up", "Past shifts", "Coming up", "Games"].map(esc).join(",")];
++    parents.forEach(p => {
++      const past = p.shifts.filter(x => x.date < todayStr).length;
++      const games = p.shifts.map(x => `${x.date} ${x.opp} ${x.time}`).join("; ");
++      lines.push([p.name, String(p.shifts.length), String(past), String(p.shifts.length - past), games].map(esc).join(","));
++    });
++    const a = document.createElement("a");
++    a.href = URL.createObjectURL(new Blob([String.fromCharCode(0xFEFF) + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
++    a.download = "concession-volunteers-by-parent.csv";
++    document.body.appendChild(a); a.click(); a.remove();
++  }
++
+@@ -108 +152,8 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
+-      <div className="space-y-3">
++      <div className="flex gap-2">
++        {([["game", "By game"], ["parent", "By parent"]] as const).map(([v, l]) => (
++          <button key={v} type="button" onClick={() => setView(v)}
++            className={`px-4 py-1.5 rounded-full text-xs font-semibold ${view === v ? "bg-blue-600 text-white" : "bg-white/10 text-gray-300 hover:bg-white/20"}`}>{l}</button>
++        ))}
++      </div>
++
++      {view === "game" && <div className="space-y-3">
+@@ -126,2 +177,32 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
+-      </div>
+-      <p className="text-gray-500 text-xs">Type in a box and click away to change a name. Empty a box to free that spot.</p>
++      </div>}
++      {view === "game" && <p className="text-gray-500 text-xs">Type in a box and click away to change a name. Empty a box to free that spot.</p>}
++
++      {view === "parent" && (
++        <div className="space-y-3">
++          <div className="flex flex-wrap items-center gap-2">
++            <input className={`${input} max-w-xs`} value={q} onChange={e => setQ(e.target.value)} placeholder="Search a parent's name" aria-label="Search a parent's name" />
++            <button type="button" onClick={exportParents} disabled={parents.length === 0}
++              className="px-3 py-1.5 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-emerald-200 text-xs font-bold disabled:opacity-30">Download by parent (Excel)</button>
++            <span className="text-gray-500 text-xs">{parents.length} {parents.length === 1 ? "person" : "people"} signed up. &quot;Past&quot; means the game date has gone by.</span>
++          </div>
++          {parents.filter(p => p.name.toLowerCase().includes(q.trim().toLowerCase())).map(p => {
++            const past = p.shifts.filter(x => x.date < todayStr).length;
++            return (
++              <div key={p.name.toLowerCase()} className="rounded-xl border border-white/10 p-3">
++                <div className="flex flex-wrap items-baseline justify-between gap-2">
++                  <strong className="text-white text-sm">{p.name}</strong>
++                  <span className="text-gray-400 text-xs">{p.shifts.length} {p.shifts.length === 1 ? "shift" : "shifts"} &middot; {past} past &middot; {p.shifts.length - past} coming up</span>
++                </div>
++                <ul className="mt-2 space-y-0.5">
++                  {p.shifts.map((x, i) => (
++                    <li key={i} className={`text-xs ${x.date < todayStr ? "text-gray-500" : "text-gray-300"}`}>
++                      {new Date(x.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} &middot; {x.opp} &middot; {x.time} &middot; {x.teams}
++                    </li>
++                  ))}
++                </ul>
++              </div>
++            );
++          })}
++          {parents.length === 0 && <p className="text-gray-500 text-sm py-4">Nobody has signed up yet.</p>}
++        </div>
++      )}

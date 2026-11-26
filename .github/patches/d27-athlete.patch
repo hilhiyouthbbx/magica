@@ -113,13 +113,12 @@ index 2aeb021..25cccdc 100644
 @@ -213 +223 @@ export default function ConcessionsPage() {
 -                    <Slot key={i} label={`Volunteer ${i + 1}`} value={(view.bookings[r.id] || [])[i] || ""} enabled={r.ok}
 +                    <Slot key={i} label={`Volunteer ${i + 1}`} value={(view.bookings[r.id] || [])[i] || ""} enabled={r.ok && athlete.trim().length > 0}
-@@ -222,0 +233,0 @@ export default function ConcessionsPage() {
 diff --git a/lib/concessions.ts b/lib/concessions.ts
 index 459b351..0f6cbc4 100644
 --- a/lib/concessions.ts
 +++ b/lib/concessions.ts
 @@ -33,0 +34 @@ export interface ConcessionData {
-+  athletes: Record<string, { athlete: string; teams: string }[]> // same shape: which athlete each volunteer signed up for (admin only)
++  athletes: Record<string, { athlete: string; teams: string }[]>; // same shape: which athlete each volunteer signed up for (admin only)
 @@ -60,0 +62 @@ export const DEFAULTS: ConcessionData = {
 +  athletes: {},
 @@ -73,0 +76 @@ export async function getConcessions(): Promise<ConcessionData> {

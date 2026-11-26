@@ -10,6 +10,7 @@ interface View { title: string; intro: string; games: Game[]; bookings: Record<s
 
 const PW_KEY = "hilhi-concession-pw";
 const TEAMS_KEY = "hilhi-concession-teams";
+const ATH_KEY = "hilhi-concession-athlete";
 
 const mins = (t: string) => (t === "TBD" ? null : Number(t.slice(0, 2)) * 60 + Number(t.slice(3)));
 const fmt = (m: number | null) => (m === null ? "TBD" : `${Math.floor(m / 60) % 12 || 12}:${String(m % 60).padStart(2, "0")} ${m >= 720 ? "PM" : "AM"}`);
@@ -53,6 +54,7 @@ export default function ConcessionsPage() {
   const [closed, setClosed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mine, setMine] = useState<string[]>([]);
+  const [athlete, setAthlete] = useState("");
   const [filter, setFilter] = useState<"all" | "eligible" | "double">("all");
 
   const load = useCallback(async (password: string, quiet = false) => {
@@ -69,6 +71,7 @@ export default function ConcessionsPage() {
 
   useEffect(() => {
     try { setMine(JSON.parse(localStorage.getItem(TEAMS_KEY) || "[]")); } catch { /* ignore */ }
+    try { setAthlete(localStorage.getItem(ATH_KEY) || ""); } catch { /* ignore */ }
     const saved = sessionStorage.getItem(PW_KEY);
     if (saved) load(saved, true); else fetch("/api/concessions").then(r => { if (r.status === 403) setClosed(true); }).catch(() => {});
   }, [load]);
@@ -88,7 +91,7 @@ export default function ConcessionsPage() {
 
   async function act(action: "claim" | "release", id: string, slot: number, name?: string) {
     setMsg("");
-    const r = await fetch("/api/concessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, id, slot, name, password: pw }) });
+    const r = await fetch("/api/concessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, id, slot, name, athlete, teams: mine, password: pw }) });
     const d = await r.json().catch(() => ({}));
     if (d.games) setView(d);
     if (!r.ok) setMsg(d.error || "Something went wrong. Please try again.");
@@ -165,7 +168,7 @@ export default function ConcessionsPage() {
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
         <div className="glass rounded-2xl border border-white/10 p-5 space-y-3 print:hidden">
           <p className="text-white font-semibold">Four volunteer spaces per game</p>
-          <p className="text-gray-400 text-sm">Pick your athlete&apos;s team(s), then type your name in an open space and press <strong>Sign up</strong>. Girls-only dates are not shown.</p>
+          <p className="text-gray-400 text-sm">Pick your athlete&apos;s team(s), enter your athlete&apos;s name, then type your name in an open space and press <strong>Sign up</strong>. Girls-only dates are not shown.</p>
           {view.intro && <p className="text-amber-300 text-sm font-semibold">{view.intro}</p>}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {Object.entries(view.teams).map(([k, v]) => (
@@ -173,6 +176,13 @@ export default function ConcessionsPage() {
                 <input type="checkbox" checked={mine.includes(k)} onChange={() => toggleTeam(k)} className="w-4 h-4" /> {v}
               </label>
             ))}
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Your athlete&apos;s name <span className="text-red-400">*</span></label>
+            <input value={athlete} onChange={e => { setAthlete(e.target.value); try { localStorage.setItem(ATH_KEY, e.target.value); } catch { /* ignore */ } }}
+              placeholder="First and last name of your player" aria-label="Your athlete's name"
+              className="w-full sm:w-80 px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500" />
+            <p className="text-gray-500 text-xs mt-1">Required to sign up. Only the volunteer coordinator sees it. If you sign up for a different athlete, change the name and team(s) first.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm text-gray-300">Show{" "}
@@ -210,7 +220,7 @@ export default function ConcessionsPage() {
                     </div>
                   </div>
                   {Array.from({ length: view.slots }).map((_, i) => (
-                    <Slot key={i} label={`Volunteer ${i + 1}`} value={(view.bookings[r.id] || [])[i] || ""} enabled={r.ok}
+                    <Slot key={i} label={`Volunteer ${i + 1}`} value={(view.bookings[r.id] || [])[i] || ""} enabled={r.ok && athlete.trim().length > 0}
                       onClaim={name => act("claim", r.id, i, name)} onRelease={() => act("release", r.id, i)} />
                   ))}
                 </div>

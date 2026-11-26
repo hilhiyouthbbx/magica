@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface Game { date: string; opp: string; games: Record<string, string> }
-interface Data { enabled: boolean; password: string; title: string; intro: string; games: Game[]; bookings: Record<string, string[]> }
+interface Data { enabled: boolean; password: string; title: string; intro: string; games: Game[]; bookings: Record<string, string[]>; athletes?: Record<string, { athlete: string; teams: string }[]> }
 
 const TEAMS: Record<string, string> = { bf: "Boys JV2", bj: "Boys JV", bv: "Boys Varsity", gj: "Girls JV", gv: "Girls Varsity" };
 const mins = (t: string) => (t === "TBD" ? null : Number(t.slice(0, 2)) * 60 + Number(t.slice(3)));
@@ -42,7 +42,7 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
   // Everyone who signed up, grouped by name (capitals and extra spaces ignored), most shifts first.
   const parents = useMemo(() => {
     if (!d) return [];
-    const map = new Map<string, { name: string; shifts: { date: string; opp: string; time: string; teams: string }[] }>();
+    const map = new Map<string, { name: string; shifts: { date: string; opp: string; time: string; teams: string; athlete: string }[] }>();
     Object.entries(d.bookings).forEach(([id, arr]) => {
       const date = id.slice(0, 10);
       const tRaw = id.slice(11);
@@ -50,12 +50,14 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
       if (!g) return;
       const m = tRaw === "null" ? null : Number(tRaw);
       const teams = Object.entries(g.games).filter(([, t]) => mins(t) === m).map(([k]) => TEAMS[k]).join(" / ");
-      arr.forEach(n => {
+      arr.forEach((n, si) => {
+        const a = d.athletes?.[id]?.[si];
+        const athlete = a && a.athlete ? `${a.athlete}${a.teams ? ` (${a.teams})` : ""}` : "";
         const name = (n || "").trim();
         if (!name) return;
         const key = name.toLowerCase().replace(/\s+/g, " ");
         const e = map.get(key) || { name, shifts: [] };
-        e.shifts.push({ date, opp: g.opp, time: fmt(m), teams });
+        e.shifts.push({ date, opp: g.opp, time: fmt(m), teams, athlete });
         map.set(key, e);
       });
     });
@@ -69,7 +71,7 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
     const lines = [["Volunteer", "Shifts signed up", "Past shifts", "Coming up", "Games"].map(esc).join(",")];
     parents.forEach(p => {
       const past = p.shifts.filter(x => x.date < todayStr).length;
-      const games = p.shifts.map(x => `${x.date} ${x.opp} ${x.time}`).join("; ");
+      const games = p.shifts.map(x => `${x.date} ${x.opp} ${x.time}${x.athlete ? ` [athlete: ${x.athlete}]` : ""}`).join("; ");
       lines.push([p.name, String(p.shifts.length), String(past), String(p.shifts.length - past), games].map(esc).join(","));
     });
     const a = document.createElement("a");
@@ -95,13 +97,14 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
   function exportCsv() {
     if (!d) return;
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const lines = [["Date", "Opponent", "Time", "Teams", "Volunteer 1", "Volunteer 2", "Volunteer 3", "Volunteer 4"].map(esc).join(",")];
+    const lines = [["Date", "Opponent", "Time", "Teams", "Volunteer 1", "Athlete 1", "Volunteer 2", "Athlete 2", "Volunteer 3", "Athlete 3", "Volunteer 4", "Athlete 4"].map(esc).join(",")];
     d.games.forEach(g => {
       [...new Set(Object.values(g.games))].forEach(t => {
         const m = mins(t); const id = `${g.date}-${m}`;
         const teams = Object.entries(g.games).filter(([, x]) => x === t).map(([k]) => TEAMS[k]).join(" / ");
         const b = d.bookings[id] || [];
-        lines.push([g.date, g.opp, fmt(m), teams, b[0] || "", b[1] || "", b[2] || "", b[3] || ""].map(esc).join(","));
+        const at = (i: number) => { const a = d.athletes?.[id]?.[i]; return a && a.athlete ? `${a.athlete}${a.teams ? ` (${a.teams})` : ""}` : ""; };
+        lines.push([g.date, g.opp, fmt(m), teams, b[0] || "", at(0), b[1] || "", at(1), b[2] || "", at(2), b[3] || "", at(3)].map(esc).join(","));
       });
     });
     const a = document.createElement("a");
@@ -162,12 +165,16 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
             <div className="text-white font-bold text-sm mb-2">{new Date(g.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} &middot; {g.opp}</div>
             {[...new Set(Object.values(g.games))].map(t => {
               const m = mins(t); const id = `${g.date}-${m}`; const b = d.bookings[id] || [];
+              const aths = d.athletes?.[id] || [];
               const teams = Object.entries(g.games).filter(([, x]) => x === t).map(([k]) => TEAMS[k]).join(" / ");
               return (
                 <div key={id} className="grid grid-cols-1 lg:grid-cols-[200px_repeat(4,minmax(0,1fr))] gap-2 py-2 border-t border-white/5 items-center">
                   <div className="text-gray-300 text-xs"><strong className="text-white">{fmt(m)}</strong> &middot; {teams}</div>
                   {[0, 1, 2, 3].map(i => (
-                    <SlotEdit key={`${id}-${i}-${b[i] || ""}`} value={b[i] || ""} label={`${g.opp} ${fmt(m)} volunteer ${i + 1}`} onSave={name => post({ action: "setSlot", id, slot: i, name })} />
+                    <div key={`${id}-${i}`} className="space-y-1">
+                      <SlotEdit key={`${id}-${i}-${b[i] || ""}`} value={b[i] || ""} label={`${g.opp} ${fmt(m)} volunteer ${i + 1}`} onSave={name => post({ action: "setSlot", id, slot: i, name })} />
+                      {b[i] && <AthleteEdit key={`${id}-${i}-${aths[i]?.athlete || ""}`} value={aths[i]?.athlete || ""} teams={aths[i]?.teams || ""} label={`${g.opp} ${fmt(m)} athlete ${i + 1}`} onSave={athlete => post({ action: "setAthlete", id, slot: i, athlete })} />}
+                    </div>
                   ))}
                 </div>
               );
@@ -196,7 +203,7 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
                 <ul className="mt-2 space-y-0.5">
                   {p.shifts.map((x, i) => (
                     <li key={i} className={`text-xs ${x.date < todayStr ? "text-gray-500" : "text-gray-300"}`}>
-                      {new Date(x.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} &middot; {x.opp} &middot; {x.time} &middot; {x.teams}
+                      {new Date(x.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} &middot; {x.opp} &middot; {x.time} &middot; {x.teams}{x.athlete && <> &middot; <strong className="text-blue-300">Athlete: {x.athlete}</strong></>}
                     </li>
                   ))}
                 </ul>
@@ -206,6 +213,16 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
           {parents.length === 0 && <p className="text-gray-500 text-sm py-4">Nobody has signed up yet.</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+function AthleteEdit({ value, teams, label, onSave }: { value: string; teams: string; label: string; onSave: (n: string) => void }) {
+  const [v, setV] = useState(value);
+  return (
+    <div>
+      <input className={`${input} text-xs`} value={v} placeholder="athlete name" aria-label={label} onChange={e => setV(e.target.value)} onBlur={() => { if (v.trim() !== value) onSave(v); }} />
+      {teams && <div className="text-[10px] text-gray-500 mt-0.5">{teams}</div>}
     </div>
   );
 }

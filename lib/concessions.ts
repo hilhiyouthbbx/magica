@@ -31,6 +31,7 @@ export interface ConcessionData {
   intro:    string;
   games:    ConcessionGame[];
   bookings: Record<string, string[]>; // "YYYY-MM-DD-<minutes|null>" -> 4 names
+  athletes: Record<string, { athlete: string; teams: string }[]>; // same shape: which athlete each volunteer signed up for (admin only)
 }
 
 export const TEAM_NAMES: Record<string, string> = {
@@ -58,6 +59,7 @@ export const DEFAULTS: ConcessionData = {
   intro:    "All volunteers must arrive 20 minutes before their scheduled game time.",
   games:    DEFAULT_GAMES,
   bookings: {},
+  athletes: {},
 };
 
 export async function getConcessions(): Promise<ConcessionData> {
@@ -71,6 +73,7 @@ export async function getConcessions(): Promise<ConcessionData> {
     ...(saved ?? {}),
     games:    saved?.games && saved.games.length ? saved.games : DEFAULTS.games,
     bookings: saved?.bookings ?? {},
+    athletes: saved?.athletes ?? {},
   };
 }
 

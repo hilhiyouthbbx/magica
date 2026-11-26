@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConcessions, saveConcessions, passwordOk, publicView, cleanName, SLOTS } from "@/lib/concessions";
+import { getConcessions, saveConcessions, passwordOk, publicView, cleanName, SLOTS, TEAM_NAMES } from "@/lib/concessions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,19 +31,27 @@ export async function POST(req: NextRequest) {
   const fresh = await getConcessions();
   const arr = [...(fresh.bookings[id] || [])];
   while (arr.length < SLOTS) arr.push("");
+  const ath = [...(fresh.athletes[id] || [])];
+  while (ath.length < SLOTS) ath.push({ athlete: "", teams: "" });
 
   if (body.action === "claim") {
     const name = cleanName(body.name);
     if (!name) return NextResponse.json({ error: "Please type a name." }, { status: 400 });
     if (arr[slot]) return NextResponse.json({ error: "That space was just taken. Please pick another.", ...publicView(fresh) }, { status: 409 });
+    const athlete = cleanName(body.athlete);
+    if (!athlete) return NextResponse.json({ error: "Please type your athlete's name." }, { status: 400 });
+    const teams = (Array.isArray(body.teams) ? body.teams : []).filter((k: unknown) => typeof k === "string" && k in TEAM_NAMES).map((k: string) => TEAM_NAMES[k]).join(", ");
     arr[slot] = name;
+    ath[slot] = { athlete, teams };
   } else if (body.action === "release") {
     arr[slot] = "";
+    ath[slot] = { athlete: "", teams: "" };
   } else {
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
 
   fresh.bookings = { ...fresh.bookings, [id]: arr };
+  fresh.athletes = { ...fresh.athletes, [id]: ath };
   await saveConcessions(fresh);
   return NextResponse.json(publicView(fresh), { headers: { "Cache-Control": "no-store" } });
 }

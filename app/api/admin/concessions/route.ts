@@ -27,8 +27,20 @@ export async function POST(req: NextRequest) {
     while (arr.length < SLOTS) arr.push("");
     arr[slot] = cleanName(body.name);
     d.bookings[id] = arr;
+    const ath = [...(d.athletes[id] || [])];
+    while (ath.length < SLOTS) ath.push({ athlete: "", teams: "" });
+    if (!arr[slot]) ath[slot] = { athlete: "", teams: "" };
+    d.athletes[id] = ath;
+  } else if (body.action === "setAthlete") {
+    const id = String(body.id || ""), slot = Number(body.slot);
+    if (!d.games.some(g => id.startsWith(g.date + "-")) || !(slot >= 0 && slot < SLOTS)) return NextResponse.json({ error: "Bad slot" }, { status: 400 });
+    const ath = [...(d.athletes[id] || [])];
+    while (ath.length < SLOTS) ath.push({ athlete: "", teams: "" });
+    ath[slot] = { athlete: cleanName(body.athlete), teams: ath[slot]?.teams || "" };
+    d.athletes[id] = ath;
   } else if (body.action === "clearAll") {
     d.bookings = {};
+    d.athletes = {};
   } else if (body.action === "games" && Array.isArray(body.games)) {
     d.games = body.games;
   } else {

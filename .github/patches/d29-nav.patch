@@ -1,0 +1,84 @@
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index dcd3539..e532933 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -1532 +1532 @@ function PagesTab({ adminKey }: { adminKey: string }) {
+-            <IF label="Youth Coaches"  value={n.labelYouthCoaches ?? ""} onChange={setN("labelYouthCoaches") as (v:string)=>void} ph="Youth Coaches" />
++            <IF label="Youth Teams"    value={n.labelYouthCoaches ?? ""} onChange={setN("labelYouthCoaches") as (v:string)=>void} ph="2026-2027 Youth Teams" />
+@@ -1536,0 +1537,3 @@ function PagesTab({ adminKey }: { adminKey: string }) {
++            <IF label="HS Roster"      value={n.labelHSRoster     ?? ""} onChange={setN("labelHSRoster")     as (v:string)=>void} ph="HS Roster" />
++            <IF label="Concessions"    value={n.labelConcessions  ?? ""} onChange={setN("labelConcessions")  as (v:string)=>void} ph="Concessions" />
++            <IF label="HS Schedule"    value={n.labelHSSchedule   ?? ""} onChange={setN("labelHSSchedule")   as (v:string)=>void} ph="HS Schedule" />
+@@ -1537,0 +1541,4 @@ function PagesTab({ adminKey }: { adminKey: string }) {
++          <label className="flex items-center gap-2 mt-3 text-sm text-gray-200 cursor-pointer w-fit">
++            <input type="checkbox" checked={n.stackLabels ?? true} onChange={e => setN("stackLabels")(e.target.checked)} />
++            Show names with two or more words on two lines (stacked) <span className="text-gray-500 text-xs">- keeps the menu from getting too wide</span>
++          </label>
+diff --git a/components/navbar.tsx b/components/navbar.tsx
+index db9752a..e1de8fe 100644
+--- a/components/navbar.tsx
++++ b/components/navbar.tsx
+@@ -18,0 +19,3 @@ const DEFAULTS: Record<string, string> = {
++  labelHSRoster:     "HS Roster",
++  labelConcessions:  "Concessions",
++  labelHSSchedule:   "HS Schedule",
+@@ -47,0 +51,22 @@ interface NavConfig {
++  labelHSRoster:     string;
++  labelConcessions:  string;
++  labelHSSchedule:   string;
++  stackLabels:       boolean;
++}
++
++// Splits a multi-word tab name into two balanced lines ("Film Room" -> Film / Room). One word stays on one line.
++function splitLabel(label: string): [string, string] | null {
++  const w = label.trim().split(/\s+/);
++  if (w.length < 2) return null;
++  let best = 1, bestMax = Infinity;
++  for (let k = 1; k < w.length; k++) {
++    const m = Math.max(w.slice(0, k).join(" ").length, w.slice(k).join(" ").length);
++    if (m < bestMax) { bestMax = m; best = k; }
++  }
++  return [w.slice(0, best).join(" "), w.slice(best).join(" ")];
++}
++
++function NavText({ text, stack }: { text: string; stack: boolean }) {
++  const parts = stack ? splitLabel(text) : null;
++  if (!parts) return <>{text}</>;
++  return <span className="block text-center leading-[1.1] text-[12.5px]">{parts[0]}<br />{parts[1]}</span>;
+@@ -67,0 +93 @@ export function Navbar() {
++    labelHSRoster: "", labelConcessions: "", labelHSSchedule: "", stackLabels: true,
+@@ -125,0 +152,4 @@ export function Navbar() {
++            labelHSRoster:     nb.labelHSRoster     ?? "",
++            labelConcessions:  nb.labelConcessions  ?? "",
++            labelHSSchedule:   nb.labelHSSchedule   ?? "",
++            stackLabels:       nb.stackLabels       !== false,
+@@ -148,3 +178,3 @@ export function Navbar() {
+-    ...(navConfig.showHSRoster     ? [{ label: "HS Roster",                         href: "/high-school-roster" }] : []),
+-    ...(navConfig.showConcessions  ? [{ label: "Concessions",                       href: "/concessions" }] : []),
+-    ...(navConfig.showHSSchedule   ? [{ label: "HS Schedule",                       href: "https://www.osaa.org/teams/69010" }] : []),
++    ...(navConfig.showHSRoster     ? [{ label: lbl(navConfig, "labelHSRoster"),     href: "/high-school-roster" }] : []),
++    ...(navConfig.showConcessions  ? [{ label: lbl(navConfig, "labelConcessions"),  href: "/concessions" }] : []),
++    ...(navConfig.showHSSchedule   ? [{ label: lbl(navConfig, "labelHSSchedule"),   href: "https://www.osaa.org/teams/69010" }] : []),
+@@ -169 +199 @@ export function Navbar() {
+-                  🎬 {l.label}
++                  🎬 <NavText text={l.label} stack={navConfig.stackLabels} />
+@@ -180 +210 @@ export function Navbar() {
+-                    {l.label}
++                    <NavText text={l.label} stack={navConfig.stackLabels} />
+@@ -205 +235 @@ export function Navbar() {
+-                {l.label}
++                <NavText text={l.label} stack={navConfig.stackLabels} />
+diff --git a/lib/content.ts b/lib/content.ts
+index d222af1..47dd67f 100644
+--- a/lib/content.ts
++++ b/lib/content.ts
+@@ -158,0 +159,4 @@ export interface SiteContent {
++    labelHSRoster:     string;
++    labelConcessions:  string;
++    labelHSSchedule:   string;
++    stackLabels:       boolean; // two-word tab names shown on two lines
+@@ -292,0 +297,4 @@ export const DEFAULTS: SiteContent = {
++    labelHSRoster:     "",
++    labelConcessions:  "",
++    labelHSSchedule:   "",
++    stackLabels:       true,

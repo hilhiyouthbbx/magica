@@ -632,6 +632,7 @@ import { ExportSourcesModal } from "./export-sources-modal";
 import { TryoutCheckin } from "./tryout-checkin";
 import { RosterEditor } from "./roster-editor";
 import { YouthTeamsEditor } from "./youth-teams-editor";
+import { ConcessionsAdmin } from "./concessions-admin";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
 import { AiWriter } from "./ai-writer";
 
@@ -1549,6 +1550,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             <Toggle label="HS Coaches"     checked={n.showHSCoaches    ?? true} onChange={v => { setN("showHSCoaches")(v);    save("navbar", { navbar: { ...n, showHSCoaches: v } }); }} />
             <Toggle label="HS Schedule"    checked={n.showHSSchedule   ?? true} onChange={v => { setN("showHSSchedule")(v);   save("navbar", { navbar: { ...n, showHSSchedule: v } }); }} />
             <Toggle label="HS Roster"      checked={n.showHSRoster     ?? true} onChange={v => { setN("showHSRoster")(v);     save("navbar", { navbar: { ...n, showHSRoster: v } }); }} />
+            <Toggle label="Concessions"    checked={n.showConcessions  ?? true} onChange={v => { setN("showConcessions")(v);  save("navbar", { navbar: { ...n, showConcessions: v } }); }} />
             <Toggle label="Merch"          checked={n.showMerch        ?? true} onChange={v => { setN("showMerch")(v);        save("navbar", { navbar: { ...n, showMerch: v } }); }} />
             <Toggle label="Film Room"      checked={n.showFilmRoom     ?? true} onChange={v => { setN("showFilmRoom")(v);     save("navbar", { navbar: { ...n, showFilmRoom: v } }); }} />
             <Toggle label="Contact"        checked={n.showContact      ?? true} onChange={v => { setN("showContact")(v);      save("navbar", { navbar: { ...n, showContact: v } }); }} />
@@ -1830,6 +1832,10 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           <Plus className="w-4 h-4" /> Add Youth Coach
         </button>
         <div className="flex justify-end mt-2"><SaveBtn k="youthCoaches" save={save} saving={saving} saved={saved} /></div>
+      </Section>
+
+      <Section openId={section} setOpenId={setSection} id="concessions" title="🍿 Concession Sign-Up (parent password)">
+        <ConcessionsAdmin adminKey={adminKey} />
       </Section>
 
       <Section openId={section} setOpenId={setSection} id="youthTeams" title="👟 2026-2027 Youth Teams" badge="Live">

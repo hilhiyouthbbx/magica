@@ -8,6 +8,8 @@ import { Footer } from "@/components/footer";
 interface Game { date: string; opp: string; games: Record<string, string> }
 interface View { title: string; intro: string; games: Game[]; bookings: Record<string, string[]>; slots: number; teams: Record<string, string> }
 
+interface RTeam { id: string; name: string; players: { id: string; name: string }[]; swingPlayers: { id: string; name: string }[] }
+
 const PW_KEY = "hilhi-concession-pw";
 const TEAMS_KEY = "hilhi-concession-teams";
 const ATH_KEY = "hilhi-concession-athlete";
@@ -55,6 +57,8 @@ export default function ConcessionsPage() {
   const [busy, setBusy] = useState(false);
   const [mine, setMine] = useState<string[]>([]);
   const [athlete, setAthlete] = useState("");
+  const [roster, setRoster] = useState<RTeam[]>([]);
+  const [other, setOther] = useState(false);
   const [filter, setFilter] = useState<"all" | "eligible" | "double">("all");
 
   const load = useCallback(async (password: string, quiet = false) => {
@@ -82,6 +86,14 @@ export default function ConcessionsPage() {
     const t = setInterval(() => load(pw, true), 30000);
     return () => clearInterval(t);
   }, [view, pw, load]);
+
+  const unlocked = view !== null;
+  useEffect(() => {
+    if (!unlocked) return;
+    fetch("/api/content", { cache: "no-store" }).then(r => r.json())
+      .then(d => setRoster(d?.hsRoster && d.hsRoster.enabled !== false ? (d.hsRoster.teams ?? []) : []))
+      .catch(() => setRoster([]));
+  }, [unlocked]);
 
   async function unlock(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setMsg("");
@@ -123,6 +135,36 @@ export default function ConcessionsPage() {
     }
     return out;
   }, [view, mine, filter]);
+
+  // Roster players, grouped by team (each name once), for the athlete picker.
+  const groups = useMemo(() => {
+    const seen = new Set<string>();
+    return roster.map(t => ({
+      label: t.name,
+      names: t.players.map(p => p.name).filter(n => { if (!n || seen.has(n)) return false; seen.add(n); return true; }),
+    })).filter(g => g.names.length > 0);
+  }, [roster]);
+  const rosterSet = useMemo(() => new Set(groups.flatMap(g => g.names)), [groups]);
+  const showTyped = roster.length === 0 || other || (athlete !== "" && !rosterSet.has(athlete));
+
+  // Which of the five concession teams a roster player plays on (swing players can be on two).
+  function codesFor(name: string): string[] {
+    const out: string[] = [];
+    roster.forEach(t => {
+      if (!t.players.some(p => p.name === name) && !t.swingPlayers.some(p => p.name === name)) return;
+      const c = /fresh|jv\s*2/i.test(t.name) ? "bf" : /^\s*(jv|junior)/i.test(t.name) ? "bj" : /varsity/i.test(t.name) ? "bv" : "";
+      if (c && !out.includes(c)) out.push(c);
+    });
+    return out;
+  }
+
+  function chooseAthlete(v: string) {
+    if (v === "__other__") { setOther(true); setAthlete(""); try { localStorage.setItem(ATH_KEY, ""); } catch { /* ignore */ } return; }
+    setOther(false); setAthlete(v);
+    try { localStorage.setItem(ATH_KEY, v); } catch { /* ignore */ }
+    const codes = v ? codesFor(v) : [];
+    if (codes.length) { setMine(codes); try { localStorage.setItem(TEAMS_KEY, JSON.stringify(codes)); } catch { /* ignore */ } }
+  }
 
   const shell = (children: React.ReactNode) => (
     <main className="min-h-screen bg-[#080D1A]">
@@ -168,7 +210,7 @@ export default function ConcessionsPage() {
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
         <div className="glass rounded-2xl border border-white/10 p-5 space-y-3 print:hidden">
           <p className="text-white font-semibold">Four volunteer spaces per game</p>
-          <p className="text-gray-400 text-sm">Pick your athlete&apos;s team(s), enter your athlete&apos;s name, then type your name in an open space and press <strong>Sign up</strong>. Girls-only dates are not shown.</p>
+          <p className="text-gray-400 text-sm">Choose your athlete from the roster, check the team(s) are right, then type your name in an open space and press <strong>Sign up</strong>. Girls-only dates are not shown.</p>
           {view.intro && <p className="text-amber-300 text-sm font-semibold">{view.intro}</p>}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {Object.entries(view.teams).map(([k, v]) => (
@@ -179,10 +221,20 @@ export default function ConcessionsPage() {
           </div>
           <div>
             <label className="block text-sm text-gray-300 mb-1">Your athlete&apos;s name <span className="text-red-400">*</span></label>
-            <input value={athlete} onChange={e => { setAthlete(e.target.value); try { localStorage.setItem(ATH_KEY, e.target.value); } catch { /* ignore */ } }}
-              placeholder="First and last name of your player" aria-label="Your athlete's name"
-              className="w-full sm:w-80 px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500" />
-            <p className="text-gray-500 text-xs mt-1">Required to sign up. Only the volunteer coordinator sees it. If you sign up for a different athlete, change the name and team(s) first.</p>
+            {roster.length > 0 && (
+              <select value={showTyped ? "__other__" : athlete} onChange={e => chooseAthlete(e.target.value)} aria-label="Choose your athlete from the roster"
+                className="w-full sm:w-80 mb-2 px-3 py-2 rounded-lg bg-gray-800 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="">Choose your athlete from the HS roster...</option>
+                {groups.map(g => <optgroup key={g.label} label={g.label}>{g.names.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>)}
+                <option value="__other__">My athlete is not on this list</option>
+              </select>
+            )}
+            {showTyped && (
+              <input value={athlete} onChange={e => { setAthlete(e.target.value); try { localStorage.setItem(ATH_KEY, e.target.value); } catch { /* ignore */ } }}
+                placeholder="First and last name of your player" aria-label="Your athlete's name"
+                className="w-full sm:w-80 px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500" />
+            )}
+            <p className="text-gray-500 text-xs mt-1">Required to sign up. Choosing a player also checks his team(s) above. Only the volunteer coordinator sees it. To sign up for a different athlete, choose him first.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm text-gray-300">Show{" "}

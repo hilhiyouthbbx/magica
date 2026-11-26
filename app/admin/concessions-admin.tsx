@@ -3,7 +3,7 @@
 // Admin controls for the Concession Sign-Up page (/concessions): set the parent password, open or close
 // the page, and see or fix who signed up. Saves on its own (does not use the Pages tab Save buttons).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface Game { date: string; opp: string; games: Record<string, string> }
 interface Data { enabled: boolean; password: string; title: string; intro: string; games: Game[]; bookings: Record<string, string[]> }
@@ -20,6 +20,8 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
   const [title, setTitle] = useState("");
   const [intro, setIntro] = useState("");
   const [show, setShow] = useState(false);
+  const [view, setView] = useState<"game" | "parent">("game");
+  const [q, setQ] = useState("");
   const [note, setNote] = useState<{ t: string; bad?: boolean } | null>(null);
   const url = `/api/admin/concessions?key=${encodeURIComponent(adminKey)}`;
 
@@ -33,6 +35,48 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
   useEffect(() => { load(); }, [load]);
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  // Everyone who signed up, grouped by name (capitals and extra spaces ignored), most shifts first.
+  const parents = useMemo(() => {
+    if (!d) return [];
+    const map = new Map<string, { name: string; shifts: { date: string; opp: string; time: string; teams: string }[] }>();
+    Object.entries(d.bookings).forEach(([id, arr]) => {
+      const date = id.slice(0, 10);
+      const tRaw = id.slice(11);
+      const g = d.games.find(x => x.date === date);
+      if (!g) return;
+      const m = tRaw === "null" ? null : Number(tRaw);
+      const teams = Object.entries(g.games).filter(([, t]) => mins(t) === m).map(([k]) => TEAMS[k]).join(" / ");
+      arr.forEach(n => {
+        const name = (n || "").trim();
+        if (!name) return;
+        const key = name.toLowerCase().replace(/\s+/g, " ");
+        const e = map.get(key) || { name, shifts: [] };
+        e.shifts.push({ date, opp: g.opp, time: fmt(m), teams });
+        map.set(key, e);
+      });
+    });
+    return [...map.values()]
+      .map(e => ({ ...e, shifts: e.shifts.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)) }))
+      .sort((a, b) => b.shifts.length - a.shifts.length || a.name.localeCompare(b.name));
+  }, [d]);
+
+  function exportParents() {
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = [["Volunteer", "Shifts signed up", "Past shifts", "Coming up", "Games"].map(esc).join(",")];
+    parents.forEach(p => {
+      const past = p.shifts.filter(x => x.date < todayStr).length;
+      const games = p.shifts.map(x => `${x.date} ${x.opp} ${x.time}`).join("; ");
+      lines.push([p.name, String(p.shifts.length), String(past), String(p.shifts.length - past), games].map(esc).join(","));
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([String.fromCharCode(0xFEFF) + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = "concession-volunteers-by-parent.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+  }
 
   async function post(body: Record<string, unknown>, ok?: string) {
     setNote(null);
@@ -105,7 +149,14 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
         <button type="button" onClick={load} className="px-3 py-1.5 rounded-lg bg-white/10 text-gray-300 text-xs font-semibold">Refresh</button>
       </div>
 
-      <div className="space-y-3">
+      <div className="flex gap-2">
+        {([["game", "By game"], ["parent", "By parent"]] as const).map(([v, l]) => (
+          <button key={v} type="button" onClick={() => setView(v)}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold ${view === v ? "bg-blue-600 text-white" : "bg-white/10 text-gray-300 hover:bg-white/20"}`}>{l}</button>
+        ))}
+      </div>
+
+      {view === "game" && <div className="space-y-3">
         {d.games.map(g => (
           <div key={g.date} className="rounded-xl border border-white/10 p-3">
             <div className="text-white font-bold text-sm mb-2">{new Date(g.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} &middot; {g.opp}</div>
@@ -123,8 +174,38 @@ export function ConcessionsAdmin({ adminKey }: { adminKey: string }) {
             })}
           </div>
         ))}
-      </div>
-      <p className="text-gray-500 text-xs">Type in a box and click away to change a name. Empty a box to free that spot.</p>
+      </div>}
+      {view === "game" && <p className="text-gray-500 text-xs">Type in a box and click away to change a name. Empty a box to free that spot.</p>}
+
+      {view === "parent" && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <input className={`${input} max-w-xs`} value={q} onChange={e => setQ(e.target.value)} placeholder="Search a parent's name" aria-label="Search a parent's name" />
+            <button type="button" onClick={exportParents} disabled={parents.length === 0}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-emerald-200 text-xs font-bold disabled:opacity-30">Download by parent (Excel)</button>
+            <span className="text-gray-500 text-xs">{parents.length} {parents.length === 1 ? "person" : "people"} signed up. &quot;Past&quot; means the game date has gone by.</span>
+          </div>
+          {parents.filter(p => p.name.toLowerCase().includes(q.trim().toLowerCase())).map(p => {
+            const past = p.shifts.filter(x => x.date < todayStr).length;
+            return (
+              <div key={p.name.toLowerCase()} className="rounded-xl border border-white/10 p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <strong className="text-white text-sm">{p.name}</strong>
+                  <span className="text-gray-400 text-xs">{p.shifts.length} {p.shifts.length === 1 ? "shift" : "shifts"} &middot; {past} past &middot; {p.shifts.length - past} coming up</span>
+                </div>
+                <ul className="mt-2 space-y-0.5">
+                  {p.shifts.map((x, i) => (
+                    <li key={i} className={`text-xs ${x.date < todayStr ? "text-gray-500" : "text-gray-300"}`}>
+                      {new Date(x.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} &middot; {x.opp} &middot; {x.time} &middot; {x.teams}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+          {parents.length === 0 && <p className="text-gray-500 text-sm py-4">Nobody has signed up yet.</p>}
+        </div>
+      )}
     </div>
   );
 }

@@ -631,6 +631,7 @@ import { RaffleSwitch } from "./raffle-switch";
 import { ExportSourcesModal } from "./export-sources-modal";
 import { TryoutCheckin } from "./tryout-checkin";
 import { RosterEditor } from "./roster-editor";
+import { YouthTeamsEditor } from "./youth-teams-editor";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
 import { AiWriter } from "./ai-writer";
 
@@ -1807,7 +1808,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
       </Section>
 
       {/* ── Youth Coaches ────────────────────────────────────────────────── */}
-      <Section openId={section} setOpenId={setSection} id="youthCoaches" title="🏀 Youth Coaches Page">
+      <Section openId={section} setOpenId={setSection} id="youthCoaches" title="🏀 Youth Coaches (old page content - no longer shown)">
         <TF label="Intro Text" value={content.youthCoaches.intro} onChange={v => setContent(p => p ? {...p, youthCoaches:{...p.youthCoaches,intro:v}} : p)} rows={2} />
         <div className="space-y-3 mb-3">
           {content.youthCoaches.coaches.map(coach => (
@@ -1829,6 +1830,12 @@ function PagesTab({ adminKey }: { adminKey: string }) {
           <Plus className="w-4 h-4" /> Add Youth Coach
         </button>
         <div className="flex justify-end mt-2"><SaveBtn k="youthCoaches" save={save} saving={saving} saved={saved} /></div>
+      </Section>
+
+      <Section openId={section} setOpenId={setSection} id="youthTeams" title="👟 2026-2027 Youth Teams" badge="Live">
+        <YouthTeamsEditor data={content.youthTeams} onChange={d => setContent(p => p ? { ...p, youthTeams: d } : p)}
+          renderImage={(label, value, onChange) => <ImageField label={label} value={value} onChange={onChange} adminKey={adminKey} />} />
+        <div className="flex justify-end mt-2"><SaveBtn k="youthTeams" save={save} saving={saving} saved={saved} /></div>
       </Section>
 
       <Section openId={section} setOpenId={setSection} id="hsRoster" title="🏀 High School Team Roster" badge={content.hsRoster.enabled ? "Live" : "Hidden"}>

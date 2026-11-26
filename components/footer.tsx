@@ -15,7 +15,7 @@ export function Footer() {
               ["About","/#about"],
               ["Programs","/#programs"],
               ["Events","/events"],
-              ["Youth Coaches","/youth-coaches"],
+              ["Youth Teams","/youth-coaches"],
               ["HS Coaches","/high-school-coaches"],
               ["HS Roster","/high-school-roster"],
               ["Merch","/merch"],

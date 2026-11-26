@@ -101,6 +101,9 @@ export interface RosterTeam {
   swingPlayers: RosterPlayer[];
 }
 
+import type { YouthTeamsContent } from "./youth-teams";
+import { DEFAULT_YOUTH_TEAMS } from "./youth-teams";
+
 export interface TryoutSession {
   id:    string;
   label: string;
@@ -210,6 +213,8 @@ export interface SiteContent {
   };
   /* ── Coaches ── */
   youthCoaches: { intro: string; coaches: Coach[]; };
+  /* ── 2026-2027 Youth Teams page (/youth-coaches) ──
+  youthTeams: YouthTeamsContent;
   hsCoaches: {
     intro:         string;
     coaches:       Coach[];
@@ -353,6 +358,7 @@ export const DEFAULTS: SiteContent = {
     serviceFee:       6.25,
     registrationOpen: true,
   },
+  youthTeams: DEFAULT_YOUTH_TEAMS,
   youthCoaches: {
     intro:   "The dedicated coaches behind every Hilhi Youth Basketball team — shaping players through leadership, discipline, and a genuine love of the game.",
     coaches: [
@@ -547,6 +553,11 @@ function mergeContent(saved: Partial<SiteContent>): SiteContent {
                : DEFAULTS.camps.items,
     },
     tryout:       { ...DEFAULTS.tryout,       ...saved.tryout },
+    youthTeams: {
+      ...DEFAULTS.youthTeams,
+      ...saved.youthTeams,
+      teams: saved.youthTeams?.teams ?? DEFAULTS.youthTeams.teams,
+    },
     youthCoaches: {
       ...DEFAULTS.youthCoaches,
       ...saved.youthCoaches,

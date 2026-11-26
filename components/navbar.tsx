@@ -11,7 +11,7 @@ const DEFAULTS: Record<string, string> = {
   labelCamps:        "Camps/Clinic",
   labelTournaments:  "Tournaments",
   labelTryout:       "Youth Tryout",
-  labelYouthCoaches: "Youth Coaches",
+  labelYouthCoaches: "2026-2027 Youth Teams",
   labelHSCoaches:    "HS Coaches",
   labelMerch:        "Merch",
   labelFilmRoom:     "Film Room",
@@ -162,7 +162,7 @@ export function Navbar() {
           {links.map(l => {
             if (l.href === "/film-room") {
               return (
-                <a key={l.label} href={l.href} className="px-2.5 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all whitespace-nowrap flex items-center gap-1">
+                <a key={l.label} href={l.href} className="px-1.5 py-2 text-[13.5px] font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all whitespace-nowrap flex items-center gap-1">
                   🎬 {l.label}
                 </a>
               );
@@ -172,7 +172,7 @@ export function Navbar() {
                 <div key={l.label} ref={campRef} className="relative">
                   <button
                     onClick={() => setCampOpen(p => !p)}
-                    className="flex items-center gap-1 px-2.5 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
+                    className="flex items-center gap-1 px-1.5 py-2 text-[13.5px] font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
                   >
                     {l.label}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${campOpen ? "rotate-180" : ""}`} />
@@ -197,7 +197,7 @@ export function Navbar() {
                 href={l.href}
                 target={l.href.startsWith("http") ? "_blank" : undefined}
                 rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="px-2.5 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
+                className="px-1.5 py-2 text-[13.5px] font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all whitespace-nowrap"
               >
                 {l.label}
               </a>

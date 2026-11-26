@@ -1,7 +1,0 @@
-diff --git a/lib/content.ts b/lib/content.ts
-index f21ef3c..4b2a163 100644
---- a/lib/content.ts
-+++ b/lib/content.ts
-@@ -216 +216 @@ export interface SiteContent {
--  /* ── 2026-2027 Youth Teams page (/youth-coaches) ──
-+  /* ── 2026-2027 Youth Teams page (/youth-coaches) ── */

@@ -213,7 +213,7 @@ export interface SiteContent {
   };
   /* ── Coaches ── */
   youthCoaches: { intro: string; coaches: Coach[]; };
-  /* ── 2026-2027 Youth Teams page (/youth-coaches) ──
+  /* ── 2026-2027 Youth Teams page (/youth-coaches) ── */
   youthTeams: YouthTeamsContent;
   hsCoaches: {
     intro:         string;

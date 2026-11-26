@@ -1,0 +1,34 @@
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index 776bdb5..dcd3539 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -634,0 +635 @@ import { YouthTeamsEditor } from "./youth-teams-editor";
++import { ConcessionsAdmin } from "./concessions-admin";
+@@ -1551,0 +1553 @@ function PagesTab({ adminKey }: { adminKey: string }) {
++            <Toggle label="Concessions"    checked={n.showConcessions  ?? true} onChange={v => { setN("showConcessions")(v);  save("navbar", { navbar: { ...n, showConcessions: v } }); }} />
+@@ -1834,0 +1837,4 @@ function PagesTab({ adminKey }: { adminKey: string }) {
++      <Section openId={section} setOpenId={setSection} id="concessions" title="🍿 Concession Sign-Up (parent password)">
++        <ConcessionsAdmin adminKey={adminKey} />
++      </Section>
++
+diff --git a/components/navbar.tsx b/components/navbar.tsx
+index 5d9963e..db9752a 100644
+--- a/components/navbar.tsx
++++ b/components/navbar.tsx
+@@ -31,0 +32 @@ interface NavConfig {
++  showConcessions:   boolean;
+@@ -62 +63 @@ export function Navbar() {
+-    showHSSchedule: true, showHSRoster: true, showMerch: true, showFilmRoom: true, showContact: true,
++    showHSSchedule: true, showHSRoster: true, showConcessions: true, showMerch: true, showFilmRoom: true, showContact: true,
+@@ -108,0 +110 @@ export function Navbar() {
++            showConcessions:   nb.showConcessions   !== false,
+@@ -146,0 +149 @@ export function Navbar() {
++    ...(navConfig.showConcessions  ? [{ label: "Concessions",                       href: "/concessions" }] : []),
+diff --git a/lib/content.ts b/lib/content.ts
+index 4b2a163..d222af1 100644
+--- a/lib/content.ts
++++ b/lib/content.ts
+@@ -141,0 +142 @@ export interface SiteContent {
++    showConcessions:  boolean;
+@@ -275,0 +277 @@ export const DEFAULTS: SiteContent = {
++    showConcessions:  true,

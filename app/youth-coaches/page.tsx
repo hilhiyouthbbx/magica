@@ -3,15 +3,11 @@
 export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Users, Trophy, Star } from "lucide-react";
+import { Users, Star } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import type { SiteContent, Coach } from "@/lib/content";
 import { DynamicTitle } from "@/components/dynamic-title";
-
-const BADGE  = "https://static.wixstatic.com/media/458ec6_d5ba4437af264a2196932023e209224e~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/badge.png";
-const TEAM_1 = "https://static.wixstatic.com/media/8bb438_3ae04589aef4480e89a24d7283c69798~mv2_d_2869_3586_s_4_2.jpg/v1/fill/w_1200,h_600,al_c,q_85,enc_auto/team1.jpg";
-const TEAM_2 = "https://static.wixstatic.com/media/458ec6_07208ccf6e6e4aa8ac95a7a251f226a3~mv2.jpg/v1/fill/w_1200,h_600,al_c,q_85,enc_auto/team2.jpg";
+import { DEFAULT_YOUTH_TEAMS, type YouthTeamsContent, type YouthTeam } from "@/lib/youth-teams";
 
 const GRADIENT_COLORS = [
   "from-blue-600 to-blue-800",
@@ -19,144 +15,115 @@ const GRADIENT_COLORS = [
   "from-indigo-600 to-indigo-800",
   "from-cyan-600 to-blue-700",
   "from-emerald-600 to-teal-800",
+  "from-violet-600 to-purple-800",
 ];
 
+const gradeOf = (team: string) => (/(\d+)/.exec(team) || [])[1] || "";
 
-// ── Unified coach card (CMS — supports photo + roster) ───────────────────────
-function CoachCard({ coach, index }: { coach: Coach; index: number }) {
-  const color   = GRADIENT_COLORS[index % GRADIENT_COLORS.length];
-  const roster  = coach.roster ?? [];
+// "Amir Kent" -> "Amir K." when full names are switched off
+function shown(name: string, full: boolean) {
+  if (full) return name;
+  const parts = name.trim().split(/\s+/);
+  return parts.length < 2 ? name : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
+function TeamCard({ team, index, full }: { team: YouthTeam; index: number; full: boolean }) {
+  const color = GRADIENT_COLORS[index % GRADIENT_COLORS.length];
+  const teamGrade = gradeOf(team.name);
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-      transition={{ duration: 0.6, delay: index * 0.07 }}
-      className="glass rounded-3xl border border-white/10 overflow-hidden">
-      <div className="flex flex-col lg:flex-row">
-        <div className={`relative flex-shrink-0 lg:w-72 flex flex-col items-center justify-center p-10 bg-gradient-to-br ${color}`}>
-          <div className="absolute inset-0 opacity-10" style={{ backgroundImage:"linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px)", backgroundSize:"24px 24px" }} />
-          <div className="relative w-36 h-36 rounded-full bg-white/10 border-4 border-white/20 flex items-center justify-center shadow-2xl overflow-hidden">
-            {coach.imageUrl
-              ? <img src={coach.imageUrl} alt={coach.name} className="w-full h-full object-cover" />
-              : <img src={BADGE} alt={coach.name} className="w-28 h-28 object-contain" />}
-          </div>
-          <div className="relative mt-4 text-center">
-            <div className="font-black text-white text-xl leading-tight">{coach.name}</div>
-            <div className="text-white/70 text-xs font-semibold uppercase tracking-widest mt-1">{coach.title}</div>
-          </div>
-          <div className="relative mt-4 flex items-center gap-1.5 bg-white/15 border border-white/30 rounded-full px-3 py-1">
-            <Star className="w-3 h-3 text-yellow-300 fill-yellow-300" />
-            <span className="text-white text-xs font-bold">Head Coach</span>
-          </div>
-        </div>
-        <div className="flex-1 p-8 lg:p-10 flex flex-col gap-6">
-          <div>
-            <h2 className="text-2xl font-black text-white mb-1">{coach.name}</h2>
-            <div className="text-blue-400 font-semibold text-sm">{coach.title}</div>
-            {coach.bio && <p className="text-gray-400 text-sm leading-relaxed mt-4">{coach.bio}</p>}
-          </div>
-          {roster.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Trophy className="w-4 h-4 text-blue-400" />
-                <span className="text-white font-bold text-sm uppercase tracking-wide">2025–26 Roster</span>
-                <span className="bg-blue-600/30 border border-blue-500/30 text-blue-300 text-xs font-bold px-2 py-0.5 rounded-full">{roster.length} players</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {roster.map(player => (
-                  <span key={player} className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-xs font-medium hover:bg-white/10 hover:text-white transition-colors">{player}</span>
-                ))}
-              </div>
-            </div>
-          )}
+    <motion.section
+      initial={{ opacity: 0, y: 32 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+      className="glass rounded-3xl border border-white/10 overflow-hidden break-inside-avoid">
+      <div className={`relative px-6 py-6 bg-gradient-to-br ${color}`}>
+        <h2 className="text-2xl sm:text-3xl font-black text-white">{team.name}</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-white/90 text-sm">
+          {team.coach && <span className="inline-flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" /> Head Coach: <strong>{team.coach}</strong></span>}
+          {team.assistant && <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Assistant: <strong>{team.assistant}</strong></span>}
         </div>
       </div>
-    </motion.div>
+
+      {team.photoUrl && (
+        <div className="bg-black/30">
+          <img src={team.photoUrl} alt={`${team.name} team picture`} className="w-full h-auto max-h-[640px] object-contain mx-auto" />
+        </div>
+      )}
+
+      <div className="p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-white font-bold text-sm uppercase tracking-wide">Roster</span>
+          <span className="bg-blue-600/30 border border-blue-500/30 text-blue-300 text-xs font-bold px-2 py-0.5 rounded-full">{team.players.length} players</span>
+        </div>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+          {team.players.map(p => (
+            <li key={p.id} className="flex items-baseline justify-between gap-3 py-2 border-b border-white/5">
+              <span className="text-white font-semibold text-sm">{shown(p.name, full)}</span>
+              {/* grade shown only when it differs from the team's grade, or for the combined 3rd/4th team */}
+              {(p.grade !== teamGrade || /\//.test(team.name)) && <span className="text-gray-500 text-xs whitespace-nowrap">Grade {p.grade}</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.section>
   );
 }
 
-
-// ── Main page ─────────────────────────────────────────────────────────────────
-export default function YouthCoachesPage() {
-  const [intro,   setIntro]   = useState("The dedicated coaches behind every Hilhi Youth Basketball team — shaping players through leadership, discipline, and a genuine love of the game.");
-  const [coaches, setCoaches] = useState<Coach[] | null>(null);
+export default function YouthTeamsPage() {
+  const [data, setData] = useState<YouthTeamsContent | null>(null);
 
   useEffect(() => {
-    fetch("/api/content")
+    fetch("/api/content", { cache: "no-store" })
       .then(r => r.json())
-      .then((data: SiteContent) => {
-        if (data?.youthCoaches?.intro) setIntro(data.youthCoaches.intro);
-        setCoaches(data?.youthCoaches?.coaches ?? []);
-      })
-      .catch(() => setCoaches([]));
+      .then(d => setData({ ...DEFAULT_YOUTH_TEAMS, ...(d?.youthTeams ?? {}), teams: d?.youthTeams?.teams ?? DEFAULT_YOUTH_TEAMS.teams }))
+      .catch(() => setData(DEFAULT_YOUTH_TEAMS));
   }, []);
 
-  const displayCoaches = coaches ?? [];
+  const teams = data?.teams ?? [];
+  const players = teams.reduce((n, t) => n + t.players.length, 0);
 
   return (
     <main className="min-h-screen bg-[#080D1A]">
-      <DynamicTitle pageKey="youthCoaches" fallback="Youth Coaches | Hilhi Youth Basketball" />
+      <DynamicTitle pageKey="youthCoaches" fallback="2026-2027 Youth Teams | Hilhi Youth Basketball" />
       <Navbar />
 
-      {/* Hero */}
-      <section className="relative pt-32 pb-16 overflow-hidden">
+      <section className="relative pt-32 pb-12 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(37,99,235,0.15),transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(220,38,38,0.08),transparent_55%)]" />
-        <div className="absolute inset-0 opacity-10">
-          <img src={TEAM_1} alt="" className="w-full h-full object-cover object-center" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#080D1A] via-transparent to-[#080D1A]" />
-        </div>
         <div className="relative max-w-7xl mx-auto px-4 text-center">
-          <motion.div initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.6 }}>
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-semibold uppercase tracking-widest mb-5">
-              <Users className="w-3.5 h-3.5" /> 2025–2026 Coaching Staff
+              <Users className="w-3.5 h-3.5" /> {data?.season || DEFAULT_YOUTH_TEAMS.season}
             </div>
-            <h1 className="text-5xl sm:text-6xl font-black text-white leading-tight mb-4">
-              Youth <span className="text-gradient">Coaches</span>
-            </h1>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">{intro}</p>
+            <h1 className="text-4xl sm:text-6xl font-black text-white leading-tight mb-4">{data?.title || DEFAULT_YOUTH_TEAMS.title}</h1>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">{data?.intro ?? DEFAULT_YOUTH_TEAMS.intro}</p>
           </motion.div>
-          <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.6, delay:0.2 }}
-            className="flex flex-wrap justify-center gap-6 mt-10">
-            {[
-              [String(displayCoaches.length), "Coaches"],
-              ["6",    "Teams"],
-              ["70+",  "Athletes"],
-              ["2025–26","Season"],
-            ].map(([v,l]) => (
-              <div key={l} className="glass rounded-2xl px-6 py-4 border border-white/15 text-center min-w-[100px]">
-                <div className="text-2xl font-black text-white">{v}</div>
-                <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mt-0.5">{l}</div>
-              </div>
-            ))}
-          </motion.div>
+          {data && (
+            <div className="flex flex-wrap justify-center gap-6 mt-10">
+              {[[String(teams.length), "Teams"], [String(players), "Athletes"]].map(([v, l]) => (
+                <div key={l} className="glass rounded-2xl px-6 py-4 border border-white/15 text-center min-w-[100px]">
+                  <div className="text-2xl font-black text-white">{v}</div>
+                  <div className="text-gray-500 text-xs font-medium uppercase tracking-wider mt-0.5">{l}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Coach cards */}
-      <section className="max-w-7xl mx-auto px-4 pb-24 space-y-10">
-        {coaches === null && (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          </div>
+      <section className="max-w-5xl mx-auto px-4 pb-24 space-y-10">
+        {data === null && (
+          <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
         )}
-        {coaches !== null && displayCoaches.map((c, i) => <CoachCard key={c.id} coach={c} index={i} />)}
+        {data && teams.map((t, i) => <TeamCard key={t.id} team={t} index={i} full={data.showFullNames} />)}
       </section>
 
-      {/* CTA banner */}
       <section className="relative overflow-hidden border-t border-white/10">
-        <div className="absolute inset-0 opacity-15">
-          <img src={TEAM_2} alt="" className="w-full h-full object-cover object-center" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#080D1A] via-blue-950/80 to-[#080D1A]" />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-4 py-20 text-center">
-          <motion.div initial={{ opacity:0, y:24 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }} transition={{ duration:0.6 }}>
-            <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">Ready to <span className="text-gradient">Join the Team?</span></h2>
-            <p className="text-gray-400 text-lg max-w-xl mx-auto mb-8">Our coaches are ready to help your player grow. Check out upcoming events and register today.</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/events" className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl transition-all hover:shadow-lg hover:shadow-blue-500/30 text-lg">View Events</a>
-              <a href="/register" className="px-8 py-4 glass border border-white/20 hover:bg-white/10 text-white font-black rounded-2xl transition-all text-lg">Register Now</a>
-            </div>
-          </motion.div>
+        <div className="relative max-w-7xl mx-auto px-4 py-16 text-center">
+          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Want to <span className="text-gradient">Join Us?</span></h2>
+          <p className="text-gray-400 max-w-xl mx-auto mb-8">Check out upcoming events and register today.</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/events" className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl transition-all text-lg">View Events</a>
+            <a href="/register" className="px-8 py-4 glass border border-white/20 hover:bg-white/10 text-white font-black rounded-2xl transition-all text-lg">Register Now</a>
+          </div>
         </div>
       </section>
 

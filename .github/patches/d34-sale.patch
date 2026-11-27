@@ -1,0 +1,150 @@
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index 0df1b19..5fdfd21 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -636,0 +637 @@ import { MerchStockAdmin } from "./merch-stock-admin";
++import { saleActive } from "@/lib/merch-sale";
+@@ -1733,0 +1735,29 @@ function PagesTab({ adminKey }: { adminKey: string }) {
++        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
++          <Toggle
++            label="Sale is ON"
++            desc="Takes a percentage off every item on the merch page. It turns itself off after the last day."
++            checked={!!m.saleOn}
++            onChange={v => { setM("saleOn")(v); save("merch", { merch: { ...m, saleOn: v } }); }}
++          />
++          <div className="grid sm:grid-cols-3 gap-3">
++            <div>
++              <label className="block text-gray-400 text-xs font-semibold mb-1">Percent off (1-90)</label>
++              <input type="number" min="1" max="90" value={m.salePercent ?? 30}
++                onChange={e => setM("salePercent")(Math.max(0, Math.min(90, Math.floor(Number(e.target.value) || 0))))}
++                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
++            </div>
++            <div>
++              <label className="block text-gray-400 text-xs font-semibold mb-1">Last day of the sale</label>
++              <input type="date" value={m.saleEnds ?? ""} onChange={e => setM("saleEnds")(e.target.value)}
++                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
++            </div>
++            <IF label="Sale name" value={m.saleLabel ?? ""} onChange={setM("saleLabel") as (v:string)=>void} ph="Holiday Sale" />
++          </div>
++          <div className="flex flex-wrap items-center gap-3">
++            <SaveBtn k="merch" save={save} saving={saving} saved={saved} />
++            <span className={`text-xs font-semibold ${saleActive(m) ? "text-emerald-300" : "text-gray-500"}`}>
++              {saleActive(m) ? `LIVE now: ${m.salePercent}% off everything${m.saleEnds ? ` through ${m.saleEnds}` : ""}` : m.saleOn ? "Switched on, but not running (check the percent and that the last day has not passed)" : "Sale is off"}
++            </span>
++          </div>
++          <p className="text-gray-500 text-xs">The switch saves right away. After changing the percent, date or name, click Save here.</p>
++        </div>
+diff --git a/app/api/square-payment/route.ts b/app/api/square-payment/route.ts
+index 495e847..6a1ff54 100644
+--- a/app/api/square-payment/route.ts
++++ b/app/api/square-payment/route.ts
+@@ -5,0 +6,2 @@ import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
++import { getContent } from "@/lib/content";
++import { saleActive, salePrice } from "@/lib/merch-sale";
+@@ -37,2 +39,16 @@ export async function POST(req: NextRequest) {
+-    const subtotal: number = (cart as Array<{ price: number; qty: number }>)
+-      .reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
++    // Prices come from the product catalog on the server (with any active sale), never from the browser.
++    const content = await getContent();
++    const catalog = new Map(content.merch.products.map(p => [p.id, p]));
++    const saleOn = saleActive(content.merch);
++    let subtotal = 0;
++    for (const i of cart as Array<{ productId?: unknown; qty?: unknown; price?: number }>) {
++      const prod = catalog.get(String(i.productId || ""));
++      const qty = Math.floor(Number(i.qty) || 0);
++      if (!prod || qty < 1 || qty > 50) {
++        return NextResponse.json({ success: false, error: "Your cart is out of date. Please refresh the page and try again.", refresh: true }, { status: 409 });
++      }
++      const unit = saleOn ? salePrice(prod.price, content.merch.salePercent) : prod.price;
++      i.price = unit; // receipts and order notes use the real price
++      subtotal += unit * qty;
++    }
++    subtotal = Math.round(subtotal * 100) / 100;
+@@ -52 +68,2 @@ export async function POST(req: NextRequest) {
+-    let total = clientTotal;
++    // The total is worked out here: subtotal plus the 3% fee, or the voucher's discounted total (fee waived).
++    let total = Math.round((subtotal + Math.round(subtotal * 0.03 * 100) / 100) * 100) / 100;
+@@ -57 +74 @@ export async function POST(req: NextRequest) {
+-        total = check.finalTotal!;
++        total = Math.round(check.finalTotal! * 100) / 100;
+@@ -60,0 +78,7 @@ export async function POST(req: NextRequest) {
++    // If this differs from what the customer was shown (a sale started or ended, a price changed), do not charge.
++    if (Math.abs(total - clientTotal) > 0.011) {
++      return NextResponse.json({ success: false, error: "Prices have just changed (for example a sale started or ended). Please refresh the page to see the current prices.", refresh: true }, { status: 409 });
++    }
++    if (total > 0 && sourceId === "FREE") {
++      return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
++    }
+diff --git a/app/merch/page.tsx b/app/merch/page.tsx
+index 0b00cc8..c1ab179 100644
+--- a/app/merch/page.tsx
++++ b/app/merch/page.tsx
+@@ -15,0 +16 @@ import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
++import { saleActive, salePrice } from "@/lib/merch-sale";
+@@ -83,0 +85 @@ export default function MerchPage() {
++  const [sale, setSale] = useState<{ saleOn?: boolean; salePercent?: number; saleEnds?: string; saleLabel?: string }>({});
+@@ -86,9 +88,9 @@ export default function MerchPage() {
+-  // Load products from CMS
+-  useEffect(() => {
+-    fetch("/api/content")
+-      .then(r => r.json())
+-      .then((data: SiteContent) => {
+-        if (data?.merch?.products?.length) setProducts(data.merch.products);
+-      })
+-      .catch(() => {});
+-  }, []);
++  // Load products and sale settings from the CMS
++  async function loadCatalog() {
++    try {
++      const data: SiteContent = await (await fetch("/api/content", { cache: "no-store" })).json();
++      if (data?.merch?.products?.length) setProducts(data.merch.products);
++      if (data?.merch) setSale({ saleOn: data.merch.saleOn, salePercent: data.merch.salePercent, saleEnds: data.merch.saleEnds, saleLabel: data.merch.saleLabel });
++    } catch { /* keep what we have */ }
++  }
++  useEffect(() => { loadCatalog(); }, []);
+@@ -139 +141,3 @@ export default function MerchPage() {
+-  const subtotal  = cart.reduce((s,i) => s + i.price * i.qty, 0);
++  const onSale    = saleActive(sale);
++  const eff       = (n:number) => (onSale ? salePrice(n, Number(sale.salePercent)) : n);
++  const subtotal  = Math.round(cart.reduce((s,i) => s + eff(i.price) * i.qty, 0) * 100) / 100;
+@@ -262 +266 @@ export default function MerchPage() {
+-          cart: cart.map(i => ({ name: i.colorLabel ? `${i.name} (${i.colorLabel})` : i.name, size:i.size, qty:i.qty, price:i.price, color:i.color })),
++          cart: cart.map(i => ({ name: i.colorLabel ? `${i.name} (${i.colorLabel})` : i.name, size:i.size, qty:i.qty, price:eff(i.price), productId:i.productId, color:i.color })),
+@@ -269 +273 @@ export default function MerchPage() {
+-      else { setPaymentError(data.error || "Payment failed. Please try again."); loadStock(); }
++      else { setPaymentError(data.error || "Payment failed. Please try again."); loadStock(); if (data.refresh) { setAppliedVoucher(null); loadCatalog(); } }
+@@ -339,0 +344,6 @@ export default function MerchPage() {
++              {onSale && (
++                <div className="mb-5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-5 py-4">
++                  <div className="text-emerald-300 font-black text-lg">{sale.saleLabel || "SALE"}: {sale.salePercent}% off all merchandise</div>
++                  {sale.saleEnds && <div className="text-emerald-200/80 text-sm">Sale runs through {new Date(sale.saleEnds + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" })}. Prices shown already include the discount.</div>}
++                </div>
++              )}
+@@ -383 +393,9 @@ export default function MerchPage() {
+-                          <div className="text-blue-400 font-black text-base">${p.price}</div>
++                          {onSale ? (
++                            <div className="flex flex-wrap items-baseline gap-2">
++                              <span className="text-emerald-400 font-black text-base">${eff(p.price).toFixed(2)}</span>
++                              <span className="text-gray-500 text-xs line-through">${p.price}</span>
++                              <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded">{sale.salePercent}% OFF</span>
++                            </div>
++                          ) : (
++                            <div className="text-blue-400 font-black text-base">${p.price}</div>
++                          )}
+@@ -477 +495 @@ export default function MerchPage() {
+-                          <div className="text-blue-400 font-black text-sm flex-shrink-0">${(item.price*item.qty).toFixed(2)}</div>
++                          <div className="text-blue-400 font-black text-sm flex-shrink-0">${(eff(item.price)*item.qty).toFixed(2)}</div>
+diff --git a/lib/content.ts b/lib/content.ts
+index 7e72383..6c5900b 100644
+--- a/lib/content.ts
++++ b/lib/content.ts
+@@ -252,0 +253,4 @@ export interface SiteContent {
++    saleOn:           boolean; // percent-off sale on all merch
++    salePercent:      number;
++    saleEnds:         string;  // last day of the sale, YYYY-MM-DD
++    saleLabel:        string;  // e.g. "Holiday Sale"
+@@ -519,0 +524,4 @@ export const DEFAULTS: SiteContent = {
++    saleOn:           false,
++    salePercent:      30,
++    saleEnds:         "2026-12-11",
++    saleLabel:        "Holiday Sale",

@@ -1,0 +1,228 @@
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index d69ff53..534400d 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -638,0 +639 @@ import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
++import { EMAIL_THEMES, getEmailTheme } from "@/lib/email-themes";
+@@ -2271,0 +2273,4 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
++  const [theme, setTheme] = useState(() => {
++    if (typeof window === "undefined") return "standard";
++    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}").theme || "standard"; } catch { return "standard"; }
++  });
+@@ -2278 +2283 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
+-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, message }));
++    localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, message, theme }));
+@@ -2280 +2285 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
+-  }, [subject, message]);
++  }, [subject, message, theme]);
+@@ -2285 +2290 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
+-    setSubject(""); setMessage(""); setDraftSavedAt(null);
++    setSubject(""); setMessage(""); setTheme("standard"); setDraftSavedAt(null);
+@@ -2320 +2325 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
+-        body: JSON.stringify({ subject, messageHtml: message, testEmail: testEmail.trim() }),
++        body: JSON.stringify({ subject, messageHtml: message, testEmail: testEmail.trim(), theme }),
+@@ -2339 +2344 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
+-        body: JSON.stringify({ subject, messageHtml: message, contactIds: uniqueRecipients.map(c => c.id) }),
++        body: JSON.stringify({ subject, messageHtml: message, contactIds: uniqueRecipients.map(c => c.id), theme }),
+@@ -2421,0 +2427,25 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
++            <div>
++              <label className="block text-gray-400 text-xs font-semibold mb-1.5">Email look</label>
++              <div className="flex flex-wrap gap-1.5">
++                {EMAIL_THEMES.map(t => (
++                  <button key={t.id} type="button" onClick={() => setTheme(t.id)}
++                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${theme === t.id ? "bg-blue-600 border-blue-400 text-white" : "border-white/15 text-gray-300 hover:border-blue-400 hover:text-white"}`}>
++                    {t.icon} {t.label}
++                  </button>
++                ))}
++              </div>
++              {(() => { const t = getEmailTheme(theme); return (
++                <div className="mt-2 rounded-xl overflow-hidden border border-white/15" style={{ background: t.pageBg }}>
++                  {t.id !== "standard" && <div style={{ background: t.stripe, height: 6 }} />}
++                  <div style={{ background: t.headerBg }} className="px-4 py-2.5 text-white font-extrabold text-sm">Hilhi Youth Basketball</div>
++                  {t.id !== "standard" && (
++                    <div style={{ background: t.bannerBg, color: t.bannerFg }} className="px-3 py-2 text-center">
++                      <div className="font-extrabold text-sm">{t.banner}</div>
++                      <div className="text-sm tracking-widest">{t.strip}</div>
++                    </div>
++                  )}
++                  <div className="bg-white px-4 py-3 text-gray-500 text-xs">Your message goes here{t.id !== "standard" && t.icon ? ` \u00B7 subject starts with ${t.icon}` : ""}</div>
++                  {t.id !== "standard" && <div className="bg-white px-3 pb-3 text-center text-xs font-bold" style={{ color: t.accent }}>{t.closing}</div>}
++                </div>
++              ); })()}
++            </div>
+diff --git a/app/admin/rich-editor.tsx b/app/admin/rich-editor.tsx
+index 9efcc8f..be51cd9 100644
+--- a/app/admin/rich-editor.tsx
++++ b/app/admin/rich-editor.tsx
+@@ -25,0 +26,10 @@ export function isHtmlEmpty(html: string): boolean {
++const TEXT_COLORS: [string, string][] = [["Red", "#dc2626"], ["Orange", "#ea580c"], ["Green", "#16a34a"], ["Blue", "#2563eb"], ["Purple", "#7c3aed"], ["Black", "#111827"]];
++
++// Pasted text color, kept only when it is readable on a white email.
++function pastedColor(css: string): string {
++  const m = /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/.exec(css || "");
++  if (!m) return "";
++  const lum = (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) / 255;
++  return lum > 0.85 ? "" : `rgb(${m[1]}, ${m[2]}, ${m[3]})`;
++}
++
+@@ -76,0 +87,2 @@ function cleanPaste(html: string): string {
++    const pc = pastedColor(el.style?.color || "");
++    if (pc) c = `<span style="color:${pc}">${c}</span>`;
+@@ -116,0 +129,7 @@ export function RichEditor({ value, onChange, placeholder }: { value: string; on
++  function setColor(hex: string) {
++    ref.current?.focus();
++    try { document.execCommand("styleWithCSS", false, "true"); } catch { /* ignore */ }
++    document.execCommand("foreColor", false, hex);
++    emit();
++  }
++
+@@ -142,0 +162,8 @@ export function RichEditor({ value, onChange, placeholder }: { value: string; on
++        <div className="flex items-center gap-1 px-2 h-8 rounded-lg bg-white/10" title="Select some words in the message, then click a color">
++          <span className="text-gray-300 text-xs mr-1">Color</span>
++          {TEXT_COLORS.map(([n, hex]) => (
++            <button key={hex} type="button" aria-label={`${n} text`} title={`${n} text (select words first)`}
++              onMouseDown={e => e.preventDefault()} onClick={() => setColor(hex)}
++              className="w-5 h-5 rounded-full border-2 border-white/60 hover:scale-110 transition-transform" style={{ background: hex }} />
++          ))}
++        </div>
+diff --git a/app/api/admin/email-blast/route.ts b/app/api/admin/email-blast/route.ts
+index 49b97f2..e872ea7 100644
+--- a/app/api/admin/email-blast/route.ts
++++ b/app/api/admin/email-blast/route.ts
+@@ -4,0 +5 @@ import { sanitizeEmailHtml, plainToEmailHtml, escapeHtml, htmlIsEmpty } from "@/
++import { getEmailTheme, type EmailTheme } from "@/lib/email-themes";
+@@ -19 +20,3 @@ function checkAuth(req: NextRequest) {
+-function blastHtml(subject: string, contentHtml: string, firstName?: string, extra?: { player?: string; amount?: string }): string {
++function blastHtml(subject: string, contentHtml: string, firstName?: string, extra?: { player?: string; amount?: string }, theme?: EmailTheme): string {
++  const th = theme ?? getEmailTheme("standard");
++  const festive = th.id !== "standard";
+@@ -28,2 +31,2 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
+-<body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">
+-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f9fafb;">
++<body style="margin:0;padding:0;background:${th.pageBg};font-family:system-ui,sans-serif;">
++  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${th.pageBg};">
+@@ -31,0 +35 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
++        ${festive ? `<tr><td bgcolor="${th.stripe}" height="8" style="background-color:${th.stripe};font-size:0;line-height:0;height:8px;">&nbsp;</td></tr>` : ""}
+@@ -33 +37 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
+-          <td bgcolor="#1e3a8a" style="background-color:#1e3a8a;padding:24px 32px;">
++          <td bgcolor="${th.headerBg}" style="background-color:${th.headerBg};padding:24px 32px;">
+@@ -43,0 +48 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
++        ${festive ? `<tr><td align="center" bgcolor="${th.bannerBg}" style="background-color:${th.bannerBg};padding:16px 24px;text-align:center;"><span style="display:inline-block;color:${th.bannerFg} !important;font-size:22px;font-weight:800;line-height:1.3;font-family:system-ui,sans-serif;">${th.banner}</span><br/><span style="display:inline-block;font-size:20px;letter-spacing:4px;line-height:1.6;">${th.strip}</span></td></tr>` : ""}
+@@ -48,0 +54 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
++        ${festive && th.closing ? `<tr><td align="center" style="padding:0 32px 26px;text-align:center;"><span style="display:inline-block;color:${th.accent};font-size:16px;font-weight:700;line-height:1.5;font-family:system-ui,sans-serif;">${th.closing}</span></td></tr>` : ""}
+@@ -50 +56 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
+-          <td bgcolor="#f8fafc" style="background-color:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;">
++          <td bgcolor="${th.footerBg}" style="background-color:${th.footerBg};padding:20px 32px;border-top:1px solid #e5e7eb;">
+@@ -74,0 +81,2 @@ interface BlastBody {
++  /** Seasonal look (id from lib/email-themes.ts). Omitted / unknown = the classic blue email. */
++  theme?: string;
+@@ -135,0 +144,4 @@ export async function POST(req: NextRequest) {
++  const theme = getEmailTheme(body.theme);
++  // A festive email starts its subject with the theme's emoji so it stands out in the inbox.
++  const subjectLine = theme.id !== "standard" && !body.subject.trim().startsWith(theme.icon) ? `${theme.icon} ${body.subject.trim()}` : body.subject.trim();
++
+@@ -159 +171 @@ export async function POST(req: NextRequest) {
+-          subject: `[TEST] ${body.subject}`,
++          subject: `[TEST] ${subjectLine}`,
+@@ -161 +173 @@ export async function POST(req: NextRequest) {
+-          html:    blastHtml(body.subject, contentHtml, "Coach", { player: "Sample Player", amount: "$310.00" }),
++          html:    blastHtml(body.subject, contentHtml, "Coach", { player: "Sample Player", amount: "$310.00" }, theme),
+@@ -204 +216 @@ export async function POST(req: NextRequest) {
+-          subject: body.subject,
++          subject: subjectLine,
+@@ -206 +218 @@ export async function POST(req: NextRequest) {
+-          html:    blastHtml(body.subject, contentHtml, firstName, { player: joinNames(players), amount: total > 0 ? "$" + total.toFixed(2) : "" }),
++          html:    blastHtml(body.subject, contentHtml, firstName, { player: joinNames(players), amount: total > 0 ? "$" + total.toFixed(2) : "" }, theme),
+diff --git a/lib/email-html.ts b/lib/email-html.ts
+index e487da5..b03dcbd 100644
+--- a/lib/email-html.ts
++++ b/lib/email-html.ts
+@@ -16,0 +17,21 @@ type Entry = { src: string; open: string; close: string };
++const NAMED_COLORS: Record<string, string> = {
++  red: "#dc2626", orange: "#ea580c", green: "#16a34a", blue: "#2563eb", purple: "#7c3aed",
++  black: "#111827", navy: "#1e3a8a", maroon: "#991b1b", teal: "#0f766e", pink: "#db2777", brown: "#92400e", gray: "#6b7280", grey: "#6b7280",
++};
++
++/** Turns a CSS color (#hex, rgb(), or a basic name) into #rrggbb. Returns null for anything else,
++ *  and for colors too light to read on the white email body. */
++export function parseTextColor(raw: string): string | null {
++  const v = raw.trim().toLowerCase().replace(/\s*!important$/, "");
++  let r = -1, g = -1, b = -1;
++  let m = /^#([0-9a-f]{3})$/.exec(v);
++  if (m) { r = parseInt(m[1][0] + m[1][0], 16); g = parseInt(m[1][1] + m[1][1], 16); b = parseInt(m[1][2] + m[1][2], 16); }
++  else if ((m = /^#([0-9a-f]{6})$/.exec(v))) { r = parseInt(m[1].slice(0, 2), 16); g = parseInt(m[1].slice(2, 4), 16); b = parseInt(m[1].slice(4, 6), 16); }
++  else if ((m = /^rgba?\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})/.exec(v))) { r = +m[1]; g = +m[2]; b = +m[3]; }
++  else if (NAMED_COLORS[v]) return NAMED_COLORS[v];
++  if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) return null;
++  if ((0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.85) return null;
++  const hx = (n: number) => n.toString(16).padStart(2, "0");
++  return "#" + hx(r) + hx(g) + hx(b);
++}
++
+@@ -165,2 +186,5 @@ export function sanitizeEmailHtml(input: string): string {
+-        const opens = (bold ? "<strong>" : "") + (ital ? "<em>" : "") + (und ? "<u>" : "");
+-        const closes = (und ? "</u>" : "") + (ital ? "</em>" : "") + (bold ? "</strong>" : "");
++        const cm = /(?:^|[;\s])color\s*:\s*([^;]+)/i.exec(st);
++        const fa = /\bcolor\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
++        const col = tag === "font" && fa ? parseTextColor(fa[1] ?? fa[2] ?? fa[3] ?? "") : (cm ? parseTextColor(cm[1]) : null);
++        const opens = (col ? `<span style="color:${col};">` : "") + (bold ? "<strong>" : "") + (ital ? "<em>" : "") + (und ? "<u>" : "");
++        const closes = (und ? "</u>" : "") + (ital ? "</em>" : "") + (bold ? "</strong>" : "") + (col ? "</span>" : "");
+diff --git a/lib/email-themes.ts b/lib/email-themes.ts
+new file mode 100644
+index 0000000..5b97af3
+--- /dev/null
++++ b/lib/email-themes.ts
+@@ -0,0 +1,53 @@
++// Seasonal looks for the Email Blast. Pure data (no server code) so the admin picker and the
++// email template share one list. "standard" is the plain blue Hilhi email, unchanged.
++
++export interface EmailTheme {
++  id:        string;
++  label:     string;
++  icon:      string;   // shown on the picker button and at the start of the subject line
++  headerBg:  string;   // club-name bar at the top
++  stripe:    string;   // thin color bar above the header
++  bannerBg:  string;   // greeting banner under the header
++  bannerFg:  string;
++  banner:    string;   // greeting text
++  strip:     string;   // row of decorations under the greeting
++  pageBg:    string;   // color around the email card
++  accent:    string;   // closing line color
++  closing:   string;   // short sign-off above the footer
++  footerBg:  string;
++}
++
++export const EMAIL_THEMES: EmailTheme[] = [
++  { id: "standard", label: "Classic", icon: "\u{1F3C0}", headerBg: "#1e3a8a", stripe: "#1e3a8a", bannerBg: "", bannerFg: "", banner: "", strip: "", pageBg: "#f9fafb", accent: "#1e3a8a", closing: "", footerBg: "#f8fafc" },
++  { id: "christmas", label: "Holiday / Christmas", icon: "\u{1F384}", headerBg: "#991b1b", stripe: "#15803d", bannerBg: "#166534", bannerFg: "#ffffff",
++    banner: "\u{1F384} Happy Holidays from Hilhi Youth Basketball! \u{1F384}", strip: "\u2744\uFE0F \u{1F381} \u26C4 \u{1F381} \u2744\uFE0F \u{1F381} \u26C4 \u{1F381} \u2744\uFE0F",
++    pageBg: "#fef2f2", accent: "#991b1b", closing: "Wishing you and your family a joyful, healthy holiday season! \u{1F384}", footerBg: "#f0fdf4" },
++  { id: "thanksgiving", label: "Thanksgiving", icon: "\u{1F983}", headerBg: "#7c2d12", stripe: "#ea580c", bannerBg: "#c2410c", bannerFg: "#ffffff",
++    banner: "\u{1F983} Happy Thanksgiving! \u{1F342}", strip: "\u{1F341} \u{1F342} \u{1F383} \u{1F342} \u{1F341} \u{1F342} \u{1F383} \u{1F342} \u{1F341}",
++    pageBg: "#fff7ed", accent: "#9a3412", closing: "We are thankful for every player and family in our Spartan community! \u{1F342}", footerBg: "#fffbeb" },
++  { id: "newyear", label: "New Year", icon: "\u{1F386}", headerBg: "#0f172a", stripe: "#eab308", bannerBg: "#1e3a8a", bannerFg: "#fde047",
++    banner: "\u{1F386} Happy New Year! \u{1F3C0}", strip: "\u2B50 \u{1F389} \u2B50 \u{1F386} \u2B50 \u{1F389} \u2B50 \u{1F386} \u2B50",
++    pageBg: "#f1f5f9", accent: "#1e3a8a", closing: "Here is to a great new year on and off the court! \u{1F389}", footerBg: "#f8fafc" },
++  { id: "valentines", label: "Valentine's Day", icon: "\u2764\uFE0F", headerBg: "#9d174d", stripe: "#e11d48", bannerBg: "#be185d", bannerFg: "#ffffff",
++    banner: "\u{1F49D} Happy Valentine's Day! \u{1F49D}", strip: "\u2764\uFE0F \u{1F498} \u{1F495} \u{1F498} \u2764\uFE0F \u{1F498} \u{1F495} \u{1F498} \u2764\uFE0F",
++    pageBg: "#fdf2f8", accent: "#be185d", closing: "We love our Hilhi basketball family! \u2764\uFE0F", footerBg: "#fff1f2" },
++  { id: "spring", label: "Spring / Easter", icon: "\u{1F337}", headerBg: "#047857", stripe: "#f472b6", bannerBg: "#be185d", bannerFg: "#ffffff",
++    banner: "\u{1F337} Happy Spring! \u{1F423}", strip: "\u{1F337} \u{1F423} \u{1F33C} \u{1F430} \u{1F337} \u{1F423} \u{1F33C} \u{1F430} \u{1F337}",
++    pageBg: "#f0fdf4", accent: "#047857", closing: "Wishing you a bright, beautiful spring! \u{1F33C}", footerBg: "#fdf2f8" },
++  { id: "summer", label: "Summer", icon: "\u2600\uFE0F", headerBg: "#0369a1", stripe: "#facc15", bannerBg: "#f59e0b", bannerFg: "#1f2937",
++    banner: "\u2600\uFE0F Hello Summer! \u{1F334}", strip: "\u{1F334} \u2600\uFE0F \u{1F3C0} \u{1F30A} \u{1F334} \u2600\uFE0F \u{1F3C0} \u{1F30A} \u{1F334}",
++    pageBg: "#f0f9ff", accent: "#0369a1", closing: "Have a fun, safe summer! \u{1F30A}", footerBg: "#fefce8" },
++  { id: "fall", label: "Fall", icon: "\u{1F341}", headerBg: "#78350f", stripe: "#d97706", bannerBg: "#b45309", bannerFg: "#ffffff",
++    banner: "\u{1F341} Hello Fall! \u{1F342}", strip: "\u{1F341} \u{1F342} \u{1F3C0} \u{1F342} \u{1F341} \u{1F342} \u{1F3C0} \u{1F342} \u{1F341}",
++    pageBg: "#fffbeb", accent: "#92400e", closing: "Fall means basketball season is coming! \u{1F3C0}", footerBg: "#fff7ed" },
++  { id: "halloween", label: "Halloween", icon: "\u{1F383}", headerBg: "#111827", stripe: "#f97316", bannerBg: "#ea580c", bannerFg: "#ffffff",
++    banner: "\u{1F383} Happy Halloween! \u{1F47B}", strip: "\u{1F383} \u{1F987} \u{1F47B} \u{1F987} \u{1F383} \u{1F987} \u{1F47B} \u{1F987} \u{1F383}",
++    pageBg: "#fff7ed", accent: "#c2410c", closing: "Have a spooktacular night! \u{1F47B}", footerBg: "#f3f4f6" },
++  { id: "gameday", label: "Game Day / Hype", icon: "\u{1F3C6}", headerBg: "#1e3a8a", stripe: "#ef4444", bannerBg: "#dc2626", bannerFg: "#ffffff",
++    banner: "\u{1F3C0} GAME DAY \u2013 GO SPARTANS! \u{1F3C0}", strip: "\u{1F3C0} \u{1F525} \u{1F3C6} \u{1F525} \u{1F3C0} \u{1F525} \u{1F3C6} \u{1F525} \u{1F3C0}",
++    pageBg: "#eff6ff", accent: "#dc2626", closing: "Let's go, Spartans! \u{1F525}", footerBg: "#f8fafc" },
++];
++
++export function getEmailTheme(id?: string | null): EmailTheme {
++  return EMAIL_THEMES.find(t => t.id === id) ?? EMAIL_THEMES[0];
++}

@@ -1752,9 +1752,12 @@ function PagesTab({ adminKey }: { adminKey: string }) {
                 {prod.imageUrl && <img src={prod.imageUrl} alt={prod.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0 bg-white/5" />}
                 <div className="flex-1 min-w-0">
                   <div className="text-white text-sm font-semibold truncate">{prod.name}</div>
-                  <div className="text-gray-500 text-xs">${prod.price} · {prod.cat}</div>
+                  <div className="text-gray-500 text-xs">${prod.price} &middot; {prod.cat}{prod.addedAt ? ` - added ${prod.addedAt}` : ""}</div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
+                  <label className="flex items-center gap-1 text-[11px] text-gray-300 cursor-pointer mr-1" title="Show the NEW badge and include in the New button">
+                    <input type="checkbox" checked={!!prod.isNew} onChange={e => setContent(p => p ? {...p, merch:{...p.merch, products: p.merch.products.map((x, j) => j === i ? {...x, isNew: e.target.checked, addedAt: e.target.checked && !x.addedAt ? new Date().toISOString().slice(0, 10) : x.addedAt} : x)}} : p)} /> New
+                  </label>
                   <button onClick={() => setEditMerchProd(prod)} className="p-2 glass rounded-lg hover:border-blue-500/40 text-gray-400 hover:text-white transition-all border border-white/15"><Edit2 className="w-3.5 h-3.5" /></button>
                   <button onClick={() => {
                     const products = m.products.filter((_,j) => j !== i);
@@ -1764,7 +1767,7 @@ function PagesTab({ adminKey }: { adminKey: string }) {
               </div>
             ))}
           </div>
-          <button onClick={() => setEditMerchProd({ id:"", name:"", price:20, cat:"hoodie", imageUrl:"" })}
+          <button onClick={() => setEditMerchProd({ id:"", name:"", price:20, cat:"hoodie", imageUrl:"", isNew:true, addedAt:new Date().toISOString().slice(0, 10) })}
             className="w-full py-2.5 glass border border-dashed border-white/20 hover:border-blue-500/40 text-gray-400 hover:text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Add Product
           </button>
@@ -2092,6 +2095,16 @@ function PagesTab({ adminKey }: { adminKey: string }) {
               </div>
             </div>
             <ImageField label="Product Image" value={editMerchProd.imageUrl} onChange={v => setEditMerchProd(p => p ? {...p, imageUrl:v} : p)} adminKey={adminKey} />
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div>
+                <label className="block text-gray-400 text-xs font-semibold mb-1">Date added</label>
+                <input type="date" value={editMerchProd.addedAt || ""} onChange={e => setEditMerchProd(p => p ? {...p, addedAt:e.target.value} : p)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer pb-2.5">
+                <input type="checkbox" checked={!!editMerchProd.isNew} onChange={e => setEditMerchProd(p => p ? {...p, isNew:e.target.checked} : p)} /> Mark as NEW
+              </label>
+            </div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => {
                 if (!editMerchProd.name) return;

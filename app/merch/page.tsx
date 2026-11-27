@@ -30,6 +30,7 @@ const px = (h: string) => `${W}${h}~mv2.png${Q}`;
 const SIZES = ["YS","YM","YL","AS","AM","AL","AXL","AXXL"];
 const CATS  = [
   { key:"all",          label:"All Items" },
+  { key:"new",          label:"New" },
   { key:"hoodie",       label:"Hoodies" },
   { key:"long-sleeve",  label:"Long Sleeves" },
   { key:"short-sleeve", label:"Short Sleeves" },
@@ -60,6 +61,7 @@ const NO_TEAM = "Not on a team (parent / fan)";
 export default function MerchPage() {
   const [products, setProducts] = useState<MerchProduct[]>([]);
   const [cat,   setCat]   = useState("all");
+  const [sortNew, setSortNew] = useState(false);
   const [sizes, setSizes] = useState<Record<string,string>>({});
   const [cart,  setCart]  = useState<CartItem[]>([]);
 
@@ -113,7 +115,20 @@ export default function MerchPage() {
 
   const cardRef = useRef<any>(null);
 
-  const filtered  = useMemo(() => cat === "all" ? products : products.filter(p => p.cat === cat), [cat, products]);
+  const filtered  = useMemo(() => {
+    let list = cat === "all" ? products : cat === "new" ? products.filter(p => p.isNew) : products.filter(p => p.cat === cat);
+    if (sortNew) {
+      // Newest first by date added; products without a date keep their order after the dated ones.
+      list = list.map((p, i) => ({ p, i })).sort((a, b) => {
+        const da = a.p.addedAt || "", db = b.p.addedAt || "";
+        if (da && db) return db.localeCompare(da) || a.i - b.i;
+        if (da) return -1;
+        if (db) return 1;
+        return a.i - b.i;
+      }).map(x => x.p);
+    }
+    return list;
+  }, [cat, products, sortNew]);
   const subtotal  = cart.reduce((s,i) => s + i.price * i.qty, 0);
   // A voucher discounts the subtotal and waives the service fee (same treatment as camp/tournament/tryout
   // registrations) — the discounted total below is what actually gets charged and shown at checkout.
@@ -326,7 +341,16 @@ export default function MerchPage() {
                     {c.label}
                   </button>
                 ))}
+                <button onClick={() => setSortNew(v => !v)} aria-pressed={sortNew}
+                  className={`ml-auto px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    sortNew
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30"
+                      : "glass border border-white/15 text-gray-400 hover:text-white hover:border-white/30"
+                  }`}>
+                  Sort: {sortNew ? "Newest first" : "Featured"}
+                </button>
               </div>
+              {cat === "new" && filtered.length === 0 && <p className="text-gray-400 text-sm mb-6">No new items right now. Check back soon!</p>}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <AnimatePresence mode="popLayout">
@@ -343,7 +367,8 @@ export default function MerchPage() {
                         initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.95}}
                         transition={{duration:0.3, delay:i*0.04}}
                         className="glass rounded-2xl overflow-hidden border border-white/10 hover:border-blue-500/40 transition-all duration-300 flex flex-col">
-                        <div className="bg-white/95 aspect-square p-3 flex items-center justify-center">
+                        <div className="relative bg-white/95 aspect-square p-3 flex items-center justify-center">
+                          {p.isNew && <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black tracking-wider">NEW</span>}
                           <img src={p.imageUrl} alt={p.name} className="w-full h-full object-contain" />
                         </div>
                         <div className="p-3 flex flex-col gap-2 flex-1">

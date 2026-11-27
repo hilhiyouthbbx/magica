@@ -74,6 +74,8 @@ export interface MerchProduct {
   price:    number;
   cat:      string;
   imageUrl: string;
+  addedAt?: string;  // YYYY-MM-DD, used to sort "newest first"
+  isNew?:   boolean; // shows the NEW badge and appears under the New button
 }
 
 export interface ProgramCard {

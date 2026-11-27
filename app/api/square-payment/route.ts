@@ -3,6 +3,8 @@ import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
 import { getMerchStock, shortfall, takeStock } from "@/lib/merch-stock";
 import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
+import { getContent } from "@/lib/content";
+import { saleActive, salePrice } from "@/lib/merch-sale";
 
 const SQ_BASE =
   process.env.SQUARE_ENVIRONMENT === "production"
@@ -34,8 +36,22 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Recompute the subtotal server-side from the cart (never trust the client's total alone) ──
-    const subtotal: number = (cart as Array<{ price: number; qty: number }>)
-      .reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
+    // Prices come from the product catalog on the server (with any active sale), never from the browser.
+    const content = await getContent();
+    const catalog = new Map(content.merch.products.map(p => [p.id, p]));
+    const saleOn = saleActive(content.merch);
+    let subtotal = 0;
+    for (const i of cart as Array<{ productId?: unknown; qty?: unknown; price?: number }>) {
+      const prod = catalog.get(String(i.productId || ""));
+      const qty = Math.floor(Number(i.qty) || 0);
+      if (!prod || qty < 1 || qty > 50) {
+        return NextResponse.json({ success: false, error: "Your cart is out of date. Please refresh the page and try again.", refresh: true }, { status: 409 });
+      }
+      const unit = saleOn ? salePrice(prod.price, content.merch.salePercent) : prod.price;
+      i.price = unit; // receipts and order notes use the real price
+      subtotal += unit * qty;
+    }
+    subtotal = Math.round(subtotal * 100) / 100;
 
     // ── Server-side voucher validation — a voucher discounts the subtotal and waives the 3% fee ──
     // Hoodies carry a garment color: make sure that color and size are still in stock before charging.
@@ -49,14 +65,22 @@ export async function POST(req: NextRequest) {
       } catch { /* if stock can't be read, do not block the order */ }
     }
 
-    let total = clientTotal;
+    // The total is worked out here: subtotal plus the 3% fee, or the voucher's discounted total (fee waived).
+    let total = Math.round((subtotal + Math.round(subtotal * 0.03 * 100) / 100) * 100) / 100;
     let voucherApplied = false;
     if (voucherCode && subtotal > 0) {
       const check = await validateVoucher(voucherCode, "merch", subtotal);
       if (check.valid) {
-        total = check.finalTotal!;
+        total = Math.round(check.finalTotal! * 100) / 100;
         voucherApplied = true;
       }
+    }
+    // If this differs from what the customer was shown (a sale started or ended, a price changed), do not charge.
+    if (Math.abs(total - clientTotal) > 0.011) {
+      return NextResponse.json({ success: false, error: "Prices have just changed (for example a sale started or ended). Please refresh the page to see the current prices.", refresh: true }, { status: 409 });
+    }
+    if (total > 0 && sourceId === "FREE") {
+      return NextResponse.json({ success: false, error: "Invalid request. Please try again." }, { status: 400 });
     }
 
     let paymentId: string | undefined;

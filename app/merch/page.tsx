@@ -13,6 +13,7 @@ import { Footer }  from "@/components/footer";
 import type { SiteContent, MerchProduct } from "@/lib/content";
 import { DynamicTitle } from "@/components/dynamic-title";
 import { VoucherInput, type AppliedVoucher } from "@/components/voucher-input";
+import { saleActive, salePrice } from "@/lib/merch-sale";
 
 // ── Square config ─────────────────────────────────────────────────────────────
 const SQ_APP_ID = process.env.NEXT_PUBLIC_SQUARE_APP_ID ?? "";
@@ -81,17 +82,18 @@ export default function MerchPage() {
   const [retryCount,   setRetryCount]   = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
   const [stock, setStock] = useState<StockRow[] | null>(null);
+  const [sale, setSale] = useState<{ saleOn?: boolean; salePercent?: number; saleEnds?: string; saleLabel?: string }>({});
   const [colors, setColors] = useState<Record<string,string>>({});
 
-  // Load products from CMS
-  useEffect(() => {
-    fetch("/api/content")
-      .then(r => r.json())
-      .then((data: SiteContent) => {
-        if (data?.merch?.products?.length) setProducts(data.merch.products);
-      })
-      .catch(() => {});
-  }, []);
+  // Load products and sale settings from the CMS
+  async function loadCatalog() {
+    try {
+      const data: SiteContent = await (await fetch("/api/content", { cache: "no-store" })).json();
+      if (data?.merch?.products?.length) setProducts(data.merch.products);
+      if (data?.merch) setSale({ saleOn: data.merch.saleOn, salePercent: data.merch.salePercent, saleEnds: data.merch.saleEnds, saleLabel: data.merch.saleLabel });
+    } catch { /* keep what we have */ }
+  }
+  useEffect(() => { loadCatalog(); }, []);
 
   async function loadStock() {
     try {
@@ -136,7 +138,9 @@ export default function MerchPage() {
     }
     return list;
   }, [cat, products, sortNew]);
-  const subtotal  = cart.reduce((s,i) => s + i.price * i.qty, 0);
+  const onSale    = saleActive(sale);
+  const eff       = (n:number) => (onSale ? salePrice(n, Number(sale.salePercent)) : n);
+  const subtotal  = Math.round(cart.reduce((s,i) => s + eff(i.price) * i.qty, 0) * 100) / 100;
   // A voucher discounts the subtotal and waives the service fee (same treatment as camp/tournament/tryout
   // registrations) — the discounted total below is what actually gets charged and shown at checkout.
   const fee       = appliedVoucher ? 0 : Math.round(subtotal * 0.03 * 100) / 100;
@@ -259,14 +263,14 @@ export default function MerchPage() {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           sourceId, total,
-          cart: cart.map(i => ({ name: i.colorLabel ? `${i.name} (${i.colorLabel})` : i.name, size:i.size, qty:i.qty, price:i.price, color:i.color })),
+          cart: cart.map(i => ({ name: i.colorLabel ? `${i.name} (${i.colorLabel})` : i.name, size:i.size, qty:i.qty, price:eff(i.price), productId:i.productId, color:i.color })),
           contact: { name, email, phone, notes, athlete, team },
           voucherCode: appliedVoucher?.code ?? null,
         }),
       });
       const data = await res.json();
       if (data.success) { setPaymentId(data.paymentId ?? ""); setStep("done"); }
-      else { setPaymentError(data.error || "Payment failed. Please try again."); loadStock(); }
+      else { setPaymentError(data.error || "Payment failed. Please try again."); loadStock(); if (data.refresh) { setAppliedVoucher(null); loadCatalog(); } }
     } catch { setPaymentError("Network error. Please check your connection and try again."); }
     setPaying(false);
   }
@@ -337,6 +341,12 @@ export default function MerchPage() {
 
             {/* ── Product grid ── */}
             <div className="flex-1 min-w-0">
+              {onSale && (
+                <div className="mb-5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-5 py-4">
+                  <div className="text-emerald-300 font-black text-lg">{sale.saleLabel || "SALE"}: {sale.salePercent}% off all merchandise</div>
+                  {sale.saleEnds && <div className="text-emerald-200/80 text-sm">Sale runs through {new Date(sale.saleEnds + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" })}. Prices shown already include the discount.</div>}
+                </div>
+              )}
               <div className="flex flex-wrap gap-2 mb-8">
                 {CATS.map(c => (
                   <button key={c.key} onClick={() => setCat(c.key)}
@@ -380,7 +390,15 @@ export default function MerchPage() {
                         </div>
                         <div className="p-3 flex flex-col gap-2 flex-1">
                           <div className="text-white font-bold text-xs leading-snug line-clamp-2">{p.name}</div>
-                          <div className="text-blue-400 font-black text-base">${p.price}</div>
+                          {onSale ? (
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <span className="text-emerald-400 font-black text-base">${eff(p.price).toFixed(2)}</span>
+                              <span className="text-gray-500 text-xs line-through">${p.price}</span>
+                              <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded">{sale.salePercent}% OFF</span>
+                            </div>
+                          ) : (
+                            <div className="text-blue-400 font-black text-base">${p.price}</div>
+                          )}
                           {tracked && (
                             <div>
                               <div className={`text-[10px] font-semibold mb-1.5 ${colorReq ? "text-red-400" : "text-gray-500 uppercase tracking-wider"}`}>
@@ -474,7 +492,7 @@ export default function MerchPage() {
                               </button>
                             </div>
                           </div>
-                          <div className="text-blue-400 font-black text-sm flex-shrink-0">${(item.price*item.qty).toFixed(2)}</div>
+                          <div className="text-blue-400 font-black text-sm flex-shrink-0">${(eff(item.price)*item.qty).toFixed(2)}</div>
                         </div>
                       ))}
                       <div className="px-5 pt-3 pb-1 flex items-center justify-between">

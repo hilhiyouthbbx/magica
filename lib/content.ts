@@ -250,6 +250,10 @@ export interface SiteContent {
     announcementText: string;
     showAnnouncement: boolean;
     products:         MerchProduct[];
+    saleOn:           boolean; // percent-off sale on all merch
+    salePercent:      number;
+    saleEnds:         string;  // last day of the sale, YYYY-MM-DD
+    saleLabel:        string;  // e.g. "Holiday Sale"
   };
 }
 
@@ -517,6 +521,10 @@ export const DEFAULTS: SiteContent = {
     pageSubtitle:     "Rep your team with official Hilhi Youth Basketball apparel.",
     announcementText: "",
     showAnnouncement: false,
+    saleOn:           false,
+    salePercent:      30,
+    saleEnds:         "2026-12-11",
+    saleLabel:        "Holiday Sale",
     products: [
       { id:"wh-rb-hood",  name:"White Head – Royal Blue Hoodie",          price:30, cat:"hoodie",       imageUrl:"https://static.wixstatic.com/media/458ec6_9feb392cb05a400696ecda0f4aea25db~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png" },
       { id:"wh-rb-ls",    name:"White Head – Royal Blue Long Sleeve",     price:25, cat:"long-sleeve",  imageUrl:"https://static.wixstatic.com/media/458ec6_e8b6b5b5bf534b0ca373b6f6547ac58a~mv2.png/v1/fill/w_400,h_400,al_c,q_85,usm_0.66_1.00_0.01,enc_auto/img.png" },

@@ -634,6 +634,7 @@ import { RosterEditor } from "./roster-editor";
 import { YouthTeamsEditor } from "./youth-teams-editor";
 import { ConcessionsAdmin } from "./concessions-admin";
 import { MerchStockAdmin } from "./merch-stock-admin";
+import { saleActive } from "@/lib/merch-sale";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
 import { AiWriter } from "./ai-writer";
 
@@ -1730,6 +1731,35 @@ function PagesTab({ adminKey }: { adminKey: string }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <IF label="Page Title"    value={m.pageTitle}    onChange={setM("pageTitle")    as (v:string)=>void} ph="Official Merchandise" />
           <IF label="Page Subtitle" value={m.pageSubtitle} onChange={setM("pageSubtitle") as (v:string)=>void} ph="Rep your team with official apparel." />
+        </div>
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+          <Toggle
+            label="Sale is ON"
+            desc="Takes a percentage off every item on the merch page. It turns itself off after the last day."
+            checked={!!m.saleOn}
+            onChange={v => { setM("saleOn")(v); save("merch", { merch: { ...m, saleOn: v } }); }}
+          />
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1">Percent off (1-90)</label>
+              <input type="number" min="1" max="90" value={m.salePercent ?? 30}
+                onChange={e => setM("salePercent")(Math.max(0, Math.min(90, Math.floor(Number(e.target.value) || 0))))}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1">Last day of the sale</label>
+              <input type="date" value={m.saleEnds ?? ""} onChange={e => setM("saleEnds")(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+            <IF label="Sale name" value={m.saleLabel ?? ""} onChange={setM("saleLabel") as (v:string)=>void} ph="Holiday Sale" />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <SaveBtn k="merch" save={save} saving={saving} saved={saved} />
+            <span className={`text-xs font-semibold ${saleActive(m) ? "text-emerald-300" : "text-gray-500"}`}>
+              {saleActive(m) ? `LIVE now: ${m.salePercent}% off everything${m.saleEnds ? ` through ${m.saleEnds}` : ""}` : m.saleOn ? "Switched on, but not running (check the percent and that the last day has not passed)" : "Sale is off"}
+            </span>
+          </div>
+          <p className="text-gray-500 text-xs">The switch saves right away. After changing the percent, date or name, click Save here.</p>
         </div>
         <Toggle
           label="Show Announcement Banner"

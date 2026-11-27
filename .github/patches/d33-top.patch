@@ -1,0 +1,14 @@
+diff --git a/app/merch/page.tsx b/app/merch/page.tsx
+index 9cb8c74..0b00cc8 100644
+--- a/app/merch/page.tsx
++++ b/app/merch/page.tsx
+@@ -120 +120,8 @@ export default function MerchPage() {
+-    if (sortNew) {
++    if (!sortNew) {
++      // Default order: products marked NEW come first (most recently added first), then everything else as listed.
++      list = list.map((p, i) => ({ p, i })).sort((a, b) => {
++        if (!!a.p.isNew !== !!b.p.isNew) return a.p.isNew ? -1 : 1;
++        if (a.p.isNew && b.p.isNew) return (b.p.addedAt || "").localeCompare(a.p.addedAt || "") || a.i - b.i;
++        return a.i - b.i;
++      }).map(x => x.p);
++    } else {

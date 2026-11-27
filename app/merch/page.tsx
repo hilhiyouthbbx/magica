@@ -117,7 +117,14 @@ export default function MerchPage() {
 
   const filtered  = useMemo(() => {
     let list = cat === "all" ? products : cat === "new" ? products.filter(p => p.isNew) : products.filter(p => p.cat === cat);
-    if (sortNew) {
+    if (!sortNew) {
+      // Default order: products marked NEW come first (most recently added first), then everything else as listed.
+      list = list.map((p, i) => ({ p, i })).sort((a, b) => {
+        if (!!a.p.isNew !== !!b.p.isNew) return a.p.isNew ? -1 : 1;
+        if (a.p.isNew && b.p.isNew) return (b.p.addedAt || "").localeCompare(a.p.addedAt || "") || a.i - b.i;
+        return a.i - b.i;
+      }).map(x => x.p);
+    } else {
       // Newest first by date added; products without a date keep their order after the dated ones.
       list = list.map((p, i) => ({ p, i })).sort((a, b) => {
         const da = a.p.addedAt || "", db = b.p.addedAt || "";

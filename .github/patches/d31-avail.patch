@@ -1,0 +1,209 @@
+diff --git a/app/admin/merch-stock-admin.tsx b/app/admin/merch-stock-admin.tsx
+index f4fc289..0e76cb2 100644
+--- a/app/admin/merch-stock-admin.tsx
++++ b/app/admin/merch-stock-admin.tsx
+@@ -52 +52 @@ export function MerchStockAdmin({ adminKey }: { adminKey: string }) {
+-      <p className="text-gray-400 text-sm">Blank garments left, by color and size. Any design can go on any garment, so this is counted by garment, not by design. This is for your records and does not change what customers can order.</p>
++      <p className="text-gray-400 text-sm">Blank garments left, by color and size. Any design can go on any garment, so this is counted by garment, not by design. On the merch page, a hoodie color or size that reaches zero shows "Not available," and each hoodie order lowers these counts automatically.</p>
+@@ -92 +92 @@ export function MerchStockAdmin({ adminKey }: { adminKey: string }) {
+-      <p className="text-gray-500 text-xs">A blank box means none left. Counts only change when you edit them here.</p>
++      <p className="text-gray-500 text-xs">A blank box means none left. Counts go down when a hoodie is bought, and you can change them here any time.</p>
+diff --git a/app/api/square-payment/route.ts b/app/api/square-payment/route.ts
+index ead10bb..495e847 100644
+--- a/app/api/square-payment/route.ts
++++ b/app/api/square-payment/route.ts
+@@ -3,0 +4 @@ import { saveContact } from "@/lib/contacts";
++import { getMerchStock, shortfall, takeStock } from "@/lib/merch-stock";
+@@ -39,0 +41,11 @@ export async function POST(req: NextRequest) {
++    // Hoodies carry a garment color: make sure that color and size are still in stock before charging.
++    const stockLines = (cart as Array<{ color?: unknown; size?: unknown; qty?: unknown }>)
++      .filter(i => typeof i.color === "string" && i.color)
++      .map(i => ({ color: String(i.color), size: String(i.size || ""), qty: Math.max(0, Math.floor(Number(i.qty) || 0)) }));
++    if (stockLines.length) {
++      try {
++        const short = shortfall(await getMerchStock(), stockLines);
++        if (short) return NextResponse.json({ success: false, error: `Sorry, the ${short} is not available any more. Please remove it from your cart.` }, { status: 409 });
++      } catch { /* if stock can't be read, do not block the order */ }
++    }
++
+@@ -87,0 +100,3 @@ export async function POST(req: NextRequest) {
++    if (stockLines.length) {
++      try { await takeStock(stockLines); } catch (e) { console.error("Stock update failed:", e); }
++    }
+diff --git a/app/merch/page.tsx b/app/merch/page.tsx
+index df66848..2d21d79 100644
+--- a/app/merch/page.tsx
++++ b/app/merch/page.tsx
+@@ -38 +38,5 @@ const CATS  = [
+-interface CartItem { productId:string; name:string; price:number; size:string; qty:number; imageUrl:string; }
++interface CartItem { productId:string; name:string; price:number; size:string; qty:number; imageUrl:string; color?:string; colorLabel?:string; }
++interface StockRow { id:string; label:string; counts:Record<string,number> }
++// Hoodies are sold from blank-garment inventory (color + size). Other items are not tracked.
++const HOODIE_SIZES = ["YS","YM","YL","AXS","AS","AM","AL","AXL","A2XL","A3XL"];
++const colorName = (label:string) => label.replace(/\s*hoodies?\s*$/i, "").trim() || label;
+@@ -76,0 +81,2 @@ export default function MerchPage() {
++  const [stock, setStock] = useState<StockRow[] | null>(null);
++  const [colors, setColors] = useState<Record<string,string>>({});
+@@ -87,0 +94,20 @@ export default function MerchPage() {
++  async function loadStock() {
++    try {
++      const r = await fetch("/api/merch-stock", { cache: "no-store" });
++      const d = await r.json();
++      setStock(Array.isArray(d?.rows) ? d.rows : null);
++    } catch { /* keep going without stock tracking */ }
++  }
++  useEffect(() => { loadStock(); }, []);
++
++  const hoodieRows = (stock ?? []).filter(r => /hood/i.test(r.label));
++  const isTracked = (p: MerchProduct) => p.cat === "hoodie" && hoodieRows.length > 0;
++  // How many of this color + size are still free after what is already in the cart.
++  const leftOf = (rowId:string, size:string) => {
++    const row = hoodieRows.find(r => r.id === rowId);
++    const inCart = cart.filter(i => i.color === rowId && i.size === size).reduce((n,i) => n + i.qty, 0);
++    return Math.max(0, (row?.counts[size] || 0) - inCart);
++  };
++  const colorLeft = (rowId:string) => HOODIE_SIZES.reduce((n, sz) => n + leftOf(rowId, sz), 0);
++  const sizeLeftAny = (size:string) => hoodieRows.reduce((n, r) => n + leftOf(r.id, size), 0);
++
+@@ -172 +198,6 @@ export default function MerchPage() {
+-    if (!size) { setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
++    const tracked = isTracked(p);
++    const color = tracked ? colors[p.id] : undefined;
++    if (tracked && (!color || color === "__REQUIRED__")) { setColors(c => ({ ...c, [p.id]: "__REQUIRED__" })); if (!size) setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
++    if (!size || size === "__REQUIRED__") { setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
++    if (tracked && color && leftOf(color, size) <= 0) return;
++    const colorLabel = tracked && color ? colorName(hoodieRows.find(r => r.id === color)?.label || "") : undefined;
+@@ -174,3 +205,3 @@ export default function MerchPage() {
+-      const ex = prev.find(i => i.productId === p.id && i.size === size);
+-      if (ex) return prev.map(i => i.productId===p.id && i.size===size ? {...i, qty:i.qty+1} : i);
+-      return [...prev, { productId:p.id, name:p.name, price:p.price, size, qty:1, imageUrl:p.imageUrl }];
++      const ex = prev.find(i => i.productId === p.id && i.size === size && i.color === color);
++      if (ex) return prev.map(i => (i.productId===p.id && i.size===size && i.color===color) ? {...i, qty:i.qty+1} : i);
++      return [...prev, { productId:p.id, name:p.name, price:p.price, size, qty:1, imageUrl:p.imageUrl, color, colorLabel }];
+@@ -180,2 +211,3 @@ export default function MerchPage() {
+-  function updateQty(productId:string, size:string, delta:number) {
+-    setCart(prev => prev.map(i => i.productId===productId && i.size===size ? {...i, qty:i.qty+delta} : i).filter(i=>i.qty>0));
++  function updateQty(productId:string, size:string, color:string|undefined, delta:number) {
++    if (delta > 0 && color && leftOf(color, size) <= 0) return;
++    setCart(prev => prev.map(i => i.productId===productId && i.size===size && i.color===color ? {...i, qty:i.qty+delta} : i).filter(i=>i.qty>0));
+@@ -208 +240 @@ export default function MerchPage() {
+-          cart: cart.map(i => ({ name:i.name, size:i.size, qty:i.qty, price:i.price })),
++          cart: cart.map(i => ({ name: i.colorLabel ? `${i.name} (${i.colorLabel})` : i.name, size:i.size, qty:i.qty, price:i.price, color:i.color })),
+@@ -215 +247 @@ export default function MerchPage() {
+-      else setPaymentError(data.error || "Payment failed. Please try again.");
++      else { setPaymentError(data.error || "Payment failed. Please try again."); loadStock(); }
+@@ -303,0 +336,5 @@ export default function MerchPage() {
++                    const tracked = isTracked(p);
++                    const selColor = tracked ? colors[p.id] : undefined;
++                    const colorReq = selColor === "__REQUIRED__";
++                    const allGone = tracked && hoodieRows.every(r => colorLeft(r.id) <= 0);
++                    const comboGone = tracked && !!selColor && !colorReq && !!sel && sel !== "__REQUIRED__" && leftOf(selColor, sel) <= 0;
+@@ -314,0 +352,24 @@ export default function MerchPage() {
++                          {tracked && (
++                            <div>
++                              <div className={`text-[10px] font-semibold mb-1.5 ${colorReq ? "text-red-400" : "text-gray-500 uppercase tracking-wider"}`}>
++                                {colorReq ? "⚠ Please select a hoodie color" : "Hoodie color"}
++                              </div>
++                              <div className="flex flex-wrap gap-1">
++                                {hoodieRows.map(r => {
++                                  const gone = colorLeft(r.id) <= 0;
++                                  return (
++                                    <button key={r.id} disabled={gone} title={gone ? "Not available" : colorName(r.label)}
++                                      onClick={() => {
++                                        setColors(c => ({...c,[p.id]:r.id}));
++                                        if (sel && sel !== "__REQUIRED__" && leftOf(r.id, sel) <= 0) setSizes(s => { const n = {...s}; delete n[p.id]; return n; });
++                                      }}
++                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
++                                        gone ? "border-white/10 text-gray-600 line-through cursor-not-allowed"
++                                          : selColor === r.id ? "bg-blue-600 border-blue-500 text-white"
++                                          : "border-white/20 text-gray-400 hover:border-blue-400 hover:text-white"
++                                      }`}>{colorName(r.label)}{gone ? " (not available)" : ""}</button>
++                                  );
++                                })}
++                              </div>
++                            </div>
++                          )}
+@@ -320,8 +381,12 @@ export default function MerchPage() {
+-                              {SIZES.map(sz => (
+-                                <button key={sz} onClick={() => setSizes(s => ({...s,[p.id]:sz}))}
+-                                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+-                                    sel === sz && sz !== "__REQUIRED__"
+-                                      ? "bg-blue-600 border-blue-500 text-white"
+-                                      : "border-white/20 text-gray-400 hover:border-blue-400 hover:text-white"
+-                                  }`}>{sz}</button>
+-                              ))}
++                              {(tracked ? HOODIE_SIZES : SIZES).map(sz => {
++                                const gone = tracked && (selColor && selColor !== "__REQUIRED__" ? leftOf(selColor, sz) <= 0 : sizeLeftAny(sz) <= 0);
++                                return (
++                                  <button key={sz} disabled={gone} title={gone ? "Not available" : sz} onClick={() => setSizes(s => ({...s,[p.id]:sz}))}
++                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
++                                      gone ? "border-white/10 text-gray-600 line-through cursor-not-allowed"
++                                        : sel === sz && sz !== "__REQUIRED__"
++                                        ? "bg-blue-600 border-blue-500 text-white"
++                                        : "border-white/20 text-gray-400 hover:border-blue-400 hover:text-white"
++                                    }`}>{sz}</button>
++                                );
++                              })}
+@@ -328,0 +394 @@ export default function MerchPage() {
++                            {(allGone || comboGone) && <div className="text-red-400 text-[11px] font-bold mt-1.5">Not available</div>}
+@@ -330,3 +396,3 @@ export default function MerchPage() {
+-                          <button onClick={() => addToCart(p)}
+-                            className="mt-auto w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-1.5">
+-                            <ShoppingCart className="w-3.5 h-3.5" /> Add to Cart
++                          <button onClick={() => addToCart(p)} disabled={allGone || comboGone}
++                            className="mt-auto w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-1.5">
++                            <ShoppingCart className="w-3.5 h-3.5" /> {allGone || comboGone ? "Not available" : "Add to Cart"}
+@@ -360 +426 @@ export default function MerchPage() {
+-                        <div key={`${item.productId}__${item.size}`} className="px-4 py-3 flex items-start gap-3">
++                        <div key={`${item.productId}__${item.size}__${item.color || ""}`} className="px-4 py-3 flex items-start gap-3">
+@@ -366 +432 @@ export default function MerchPage() {
+-                            <div className="text-gray-500 text-[10px] mt-0.5">Size: <span className="text-blue-400 font-bold">{item.size}</span></div>
++                            <div className="text-gray-500 text-[10px] mt-0.5">{item.colorLabel ? <>Color: <span className="text-blue-400 font-bold">{item.colorLabel}</span> &middot; </> : null}Size: <span className="text-blue-400 font-bold">{item.size}</span></div>
+@@ -368 +434 @@ export default function MerchPage() {
+-                              <button onClick={() => updateQty(item.productId,item.size,-1)}
++                              <button onClick={() => updateQty(item.productId,item.size,item.color,-1)}
+@@ -373 +439 @@ export default function MerchPage() {
+-                              <button onClick={() => updateQty(item.productId,item.size,1)}
++                              <button onClick={() => updateQty(item.productId,item.size,item.color,1)}
+diff --git a/lib/merch-stock.ts b/lib/merch-stock.ts
+index f64cac3..1bb68a2 100644
+--- a/lib/merch-stock.ts
++++ b/lib/merch-stock.ts
+@@ -60,0 +61,37 @@ export async function saveMerchStock(s: MerchStock): Promise<void> {
++export interface StockLine { color: string; size: string; qty: number }
++
++function aggregate(lines: StockLine[]): StockLine[] {
++  const m = new Map<string, StockLine>();
++  lines.forEach(l => {
++    if (!l.color || !l.size || l.qty <= 0) return;
++    const k = `${l.color}|${l.size}`;
++    const e = m.get(k) || { color: l.color, size: l.size, qty: 0 };
++    e.qty += l.qty;
++    m.set(k, e);
++  });
++  return [...m.values()];
++}
++
++/** Returns a plain-words description of the first line the stock can't cover, or null if everything is in stock. */
++export function shortfall(stock: MerchStock, lines: StockLine[]): string | null {
++  for (const l of aggregate(lines)) {
++    const row = stock.rows.find(r => r.id === l.color);
++    if (!row) continue;
++    if ((row.counts[l.size] || 0) < l.qty) return `${row.label.replace(/\s*hoodies?\s*$/i, "").trim() || row.label} hoodie in size ${l.size}`;
++  }
++  return null;
++}
++
++/** Lowers the counts for a paid order (never below zero). */
++export async function takeStock(lines: StockLine[]): Promise<void> {
++  const s = await getMerchStock();
++  const rows = s.rows.map(r => ({ ...r, counts: { ...r.counts } }));
++  aggregate(lines).forEach(l => {
++    const row = rows.find(r => r.id === l.color);
++    if (!row) return;
++    const left = Math.max(0, (row.counts[l.size] || 0) - l.qty);
++    if (left > 0) row.counts[l.size] = left; else delete row.counts[l.size];
++  });
++  await saveMerchStock({ rows, updatedAt: new Date().toISOString() });
++}
++

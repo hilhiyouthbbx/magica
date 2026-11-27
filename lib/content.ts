@@ -76,6 +76,8 @@ export interface MerchProduct {
   imageUrl: string;
   addedAt?: string;  // YYYY-MM-DD, used to sort "newest first"
   isNew?:   boolean; // shows the NEW badge and appears under the New button
+  // Garment colors for this one logo/style. Picking a color swaps the picture.
+  variants?: { color: string; label: string; imageUrl: string }[];
 }
 
 export interface ProgramCard {

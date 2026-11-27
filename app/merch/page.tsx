@@ -37,7 +37,7 @@ const CATS  = [
   { key:"short-sleeve", label:"Short Sleeves" },
 ];
 
-interface CartItem { productId:string; name:string; price:number; size:string; qty:number; imageUrl:string; color?:string; colorLabel?:string; }
+interface CartItem { productId:string; name:string; price:number; size:string; qty:number; imageUrl:string; color?:string; colorLabel?:string; variant?:string; variantLabel?:string; }
 interface StockRow { id:string; label:string; counts:Record<string,number> }
 // Hoodies are sold from blank-garment inventory (color + size). Other items are not tracked.
 const HOODIE_SIZES = ["YS","YM","YL","AXS","AS","AM","AL","AXL","A2XL","A3XL"];
@@ -84,6 +84,7 @@ export default function MerchPage() {
   const [stock, setStock] = useState<StockRow[] | null>(null);
   const [sale, setSale] = useState<{ saleOn?: boolean; salePercent?: number; saleEnds?: string; saleLabel?: string }>({});
   const [colors, setColors] = useState<Record<string,string>>({});
+  const [vsel, setVsel] = useState<Record<string,string>>({});
 
   // Load products and sale settings from the CMS
   async function loadCatalog() {
@@ -105,7 +106,7 @@ export default function MerchPage() {
   useEffect(() => { loadStock(); }, []);
 
   const hoodieRows = (stock ?? []).filter(r => /hood/i.test(r.label));
-  const isTracked = (p: MerchProduct) => p.cat === "hoodie" && hoodieRows.length > 0;
+  const isTracked = (p: MerchProduct) => p.cat === "hoodie" && !(p.variants && p.variants.length) && hoodieRows.length > 0;
   // How many of this color + size are still free after what is already in the cart.
   const leftOf = (rowId:string, size:string) => {
     const row = hoodieRows.find(r => r.id === rowId);
@@ -222,21 +223,25 @@ export default function MerchPage() {
   function addToCart(p: MerchProduct) {
     const size = sizes[p.id];
     const tracked = isTracked(p);
+    const hasVar = !!(p.variants && p.variants.length);
+    const vchosen = hasVar ? p.variants!.find(v => v.color === vsel[p.id]) : undefined;
+    if (hasVar && !vchosen) { setVsel(v => ({ ...v, [p.id]: "__REQUIRED__" })); if (!size) setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
+    const variant = vchosen?.color;
     const color = tracked ? colors[p.id] : undefined;
     if (tracked && (!color || color === "__REQUIRED__")) { setColors(c => ({ ...c, [p.id]: "__REQUIRED__" })); if (!size) setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
     if (!size || size === "__REQUIRED__") { setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
     if (tracked && color && leftOf(color, size) <= 0) return;
     const colorLabel = tracked && color ? colorName(hoodieRows.find(r => r.id === color)?.label || "") : undefined;
     setCart(prev => {
-      const ex = prev.find(i => i.productId === p.id && i.size === size && i.color === color);
-      if (ex) return prev.map(i => (i.productId===p.id && i.size===size && i.color===color) ? {...i, qty:i.qty+1} : i);
-      return [...prev, { productId:p.id, name:p.name, price:p.price, size, qty:1, imageUrl:p.imageUrl, color, colorLabel }];
+      const ex = prev.find(i => i.productId === p.id && i.size === size && i.color === color && i.variant === variant);
+      if (ex) return prev.map(i => (i.productId===p.id && i.size===size && i.color===color && i.variant===variant) ? {...i, qty:i.qty+1} : i);
+      return [...prev, { productId:p.id, name:p.name, price:p.price, size, qty:1, imageUrl:vchosen?.imageUrl || p.imageUrl, color, colorLabel, variant, variantLabel:vchosen?.label }];
     });
   }
 
-  function updateQty(productId:string, size:string, color:string|undefined, delta:number) {
+  function updateQty(productId:string, size:string, color:string|undefined, delta:number, variant?:string) {
     if (delta > 0 && color && leftOf(color, size) <= 0) return;
-    setCart(prev => prev.map(i => i.productId===productId && i.size===size && i.color===color ? {...i, qty:i.qty+delta} : i).filter(i=>i.qty>0));
+    setCart(prev => prev.map(i => i.productId===productId && i.size===size && i.color===color && i.variant===variant ? {...i, qty:i.qty+delta} : i).filter(i=>i.qty>0));
   }
 
   function handleContactNext(e: React.FormEvent) {
@@ -263,7 +268,7 @@ export default function MerchPage() {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           sourceId, total,
-          cart: cart.map(i => ({ name: i.colorLabel ? `${i.name} (${i.colorLabel})` : i.name, size:i.size, qty:i.qty, price:eff(i.price), productId:i.productId, color:i.color })),
+          cart: cart.map(i => ({ name: (i.colorLabel || i.variantLabel) ? `${i.name} (${i.colorLabel || i.variantLabel})` : i.name, size:i.size, qty:i.qty, price:eff(i.price), productId:i.productId, color:i.color })),
           contact: { name, email, phone, notes, athlete, team },
           voucherCode: appliedVoucher?.code ?? null,
         }),
@@ -378,6 +383,9 @@ export default function MerchPage() {
                     const selColor = tracked ? colors[p.id] : undefined;
                     const colorReq = selColor === "__REQUIRED__";
                     const allGone = tracked && hoodieRows.every(r => colorLeft(r.id) <= 0);
+                    const hasVar = !!(p.variants && p.variants.length);
+                    const selVar = hasVar ? p.variants!.find(v => v.color === vsel[p.id]) : undefined;
+                    const varReq = vsel[p.id] === "__REQUIRED__";
                     const comboGone = tracked && !!selColor && !colorReq && !!sel && sel !== "__REQUIRED__" && leftOf(selColor, sel) <= 0;
                     return (
                       <motion.div key={p.id} layout
@@ -386,7 +394,7 @@ export default function MerchPage() {
                         className="glass rounded-2xl overflow-hidden border border-white/10 hover:border-blue-500/40 transition-all duration-300 flex flex-col">
                         <div className="relative bg-white/95 aspect-square p-3 flex items-center justify-center">
                           {p.isNew && <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black tracking-wider">NEW</span>}
-                          <img src={p.imageUrl} alt={p.name} className="w-full h-full object-contain" />
+                          <img src={selVar?.imageUrl || p.imageUrl} alt={selVar ? `${p.name} - ${selVar.label}` : p.name} className="w-full h-full object-contain" />
                         </div>
                         <div className="p-3 flex flex-col gap-2 flex-1">
                           <div className="text-white font-bold text-xs leading-snug line-clamp-2">{p.name}</div>
@@ -398,6 +406,21 @@ export default function MerchPage() {
                             </div>
                           ) : (
                             <div className="text-blue-400 font-black text-base">${p.price}</div>
+                          )}
+                          {hasVar && (
+                            <div>
+                              <div className={`text-[10px] font-semibold mb-1.5 ${varReq ? "text-red-400" : "text-gray-500 uppercase tracking-wider"}`}>
+                                {varReq ? "\u26A0 Please select a color" : "Color"}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {p.variants!.map(v => (
+                                  <button key={v.color} title={v.label} onClick={() => setVsel(x => ({ ...x, [p.id]: v.color }))}
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                                      vsel[p.id] === v.color ? "bg-blue-600 border-blue-500 text-white" : "border-white/20 text-gray-400 hover:border-blue-400 hover:text-white"
+                                    }`}>{v.label}</button>
+                                ))}
+                              </div>
+                            </div>
                           )}
                           {tracked && (
                             <div>
@@ -473,20 +496,20 @@ export default function MerchPage() {
                   ) : (
                     <div className="divide-y divide-white/5">
                       {cart.map(item => (
-                        <div key={`${item.productId}__${item.size}__${item.color || ""}`} className="px-4 py-3 flex items-start gap-3">
+                        <div key={`${item.productId}__${item.size}__${item.color || ""}__${item.variant || ""}`} className="px-4 py-3 flex items-start gap-3">
                           <div className="w-12 h-12 rounded-lg bg-white/90 flex-shrink-0 overflow-hidden">
                             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain p-1" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-white text-xs font-semibold leading-tight line-clamp-2">{item.name}</div>
-                            <div className="text-gray-500 text-[10px] mt-0.5">{item.colorLabel ? <>Color: <span className="text-blue-400 font-bold">{item.colorLabel}</span> &middot; </> : null}Size: <span className="text-blue-400 font-bold">{item.size}</span></div>
+                            <div className="text-gray-500 text-[10px] mt-0.5">{(item.colorLabel || item.variantLabel) ? <>Color: <span className="text-blue-400 font-bold">{item.colorLabel || item.variantLabel}</span> &middot; </> : null}Size: <span className="text-blue-400 font-bold">{item.size}</span></div>
                             <div className="flex items-center gap-2 mt-1.5">
-                              <button onClick={() => updateQty(item.productId,item.size,item.color,-1)}
+                              <button onClick={() => updateQty(item.productId,item.size,item.color,-1,item.variant)}
                                 className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
                                 {item.qty===1 ? <Trash2 className="w-3 h-3 text-red-400"/> : <Minus className="w-3 h-3 text-gray-400"/>}
                               </button>
                               <span className="text-white font-bold text-sm w-4 text-center">{item.qty}</span>
-                              <button onClick={() => updateQty(item.productId,item.size,item.color,1)}
+                              <button onClick={() => updateQty(item.productId,item.size,item.color,1,item.variant)}
                                 className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
                                 <Plus className="w-3 h-3 text-gray-400"/>
                               </button>

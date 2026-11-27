@@ -2125,6 +2125,31 @@ function PagesTab({ adminKey }: { adminKey: string }) {
               </div>
             </div>
             <ImageField label="Product Image" value={editMerchProd.imageUrl} onChange={v => setEditMerchProd(p => p ? {...p, imageUrl:v} : p)} adminKey={adminKey} />
+            <div className="rounded-xl border border-white/10 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-gray-300 text-xs font-bold">Color options (optional)</div>
+                  <div className="text-gray-500 text-[11px]">Add one picture per garment color. Shoppers pick a color and the picture changes.</div>
+                </div>
+                <button type="button" onClick={() => setEditMerchProd(p => p ? {...p, variants:[...(p.variants||[]), {color:"", label:"", imageUrl:""}]} : p)}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold whitespace-nowrap">+ Add color</button>
+              </div>
+              {(editMerchProd.variants||[]).map((v, vi) => (
+                <div key={vi} className="rounded-lg bg-white/5 p-3 space-y-2">
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="block text-gray-400 text-xs font-semibold mb-1">Color name</label>
+                      <input value={v.label} placeholder="White"
+                        onChange={e => { const val = e.target.value; setEditMerchProd(p => p ? {...p, variants:(p.variants||[]).map((x,xi) => xi===vi ? {...x, label:val} : x)} : p); }}
+                        className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <button type="button" onClick={() => setEditMerchProd(p => p ? {...p, variants:(p.variants||[]).filter((_,xi) => xi!==vi)} : p)}
+                      className="px-3 py-2 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-bold">Remove</button>
+                  </div>
+                  <ImageField label="Picture in this color" value={v.imageUrl} onChange={url => setEditMerchProd(p => p ? {...p, variants:(p.variants||[]).map((x,xi) => xi===vi ? {...x, imageUrl:url} : x)} : p)} adminKey={adminKey} />
+                </div>
+              ))}
+            </div>
             <div className="grid grid-cols-2 gap-3 items-end">
               <div>
                 <label className="block text-gray-400 text-xs font-semibold mb-1">Date added</label>
@@ -2138,7 +2163,10 @@ function PagesTab({ adminKey }: { adminKey: string }) {
             <div className="flex gap-3 pt-2">
               <button onClick={() => {
                 if (!editMerchProd.name) return;
-                const prod = { ...editMerchProd, id: editMerchProd.id || makeId() };
+                const vlist = (editMerchProd.variants || []).filter(v => v.label.trim() && v.imageUrl)
+                  .map(v => ({ color: v.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "color", label: v.label.trim(), imageUrl: v.imageUrl }));
+                const prod = { ...editMerchProd, id: editMerchProd.id || makeId(), variants: vlist.length ? vlist : undefined,
+                  imageUrl: editMerchProd.imageUrl || (vlist[0] ? vlist[0].imageUrl : "") };
                 const products = [...content.merch.products.filter(p => p.id !== prod.id), prod];
                 save("merch", { merch: { ...content.merch, products } });
                 setEditMerchProd(null);

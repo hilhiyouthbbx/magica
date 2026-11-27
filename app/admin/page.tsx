@@ -633,6 +633,7 @@ import { TryoutCheckin } from "./tryout-checkin";
 import { RosterEditor } from "./roster-editor";
 import { YouthTeamsEditor } from "./youth-teams-editor";
 import { ConcessionsAdmin } from "./concessions-admin";
+import { MerchStockAdmin } from "./merch-stock-admin";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
 import { AiWriter } from "./ai-writer";
 
@@ -1721,6 +1722,10 @@ function PagesTab({ adminKey }: { adminKey: string }) {
       </Section>
 
       {/* ── Merch Page ───────────────────────────────────────────────────── */}
+      <Section openId={section} setOpenId={setSection} id="merchStock" title="📦 Merch Inventory (blank garments left)">
+        <MerchStockAdmin adminKey={adminKey} />
+      </Section>
+
       <Section openId={section} setOpenId={setSection} id="merch" title="👕 Merch Page">
         <div className="grid sm:grid-cols-2 gap-3">
           <IF label="Page Title"    value={m.pageTitle}    onChange={setM("pageTitle")    as (v:string)=>void} ph="Official Merchandise" />

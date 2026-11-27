@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { saveContact } from "@/lib/contacts";
+import { getMerchStock, shortfall, takeStock } from "@/lib/merch-stock";
 import { validateVoucher, redeemVoucher } from "@/lib/vouchers";
 
 const SQ_BASE =
@@ -37,6 +38,17 @@ export async function POST(req: NextRequest) {
       .reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
 
     // ── Server-side voucher validation — a voucher discounts the subtotal and waives the 3% fee ──
+    // Hoodies carry a garment color: make sure that color and size are still in stock before charging.
+    const stockLines = (cart as Array<{ color?: unknown; size?: unknown; qty?: unknown }>)
+      .filter(i => typeof i.color === "string" && i.color)
+      .map(i => ({ color: String(i.color), size: String(i.size || ""), qty: Math.max(0, Math.floor(Number(i.qty) || 0)) }));
+    if (stockLines.length) {
+      try {
+        const short = shortfall(await getMerchStock(), stockLines);
+        if (short) return NextResponse.json({ success: false, error: `Sorry, the ${short} is not available any more. Please remove it from your cart.` }, { status: 409 });
+      } catch { /* if stock can't be read, do not block the order */ }
+    }
+
     let total = clientTotal;
     let voucherApplied = false;
     if (voucherCode && subtotal > 0) {
@@ -85,6 +97,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Redeem voucher after a successful (or fully-covered) order ──────────
+    if (stockLines.length) {
+      try { await takeStock(stockLines); } catch (e) { console.error("Stock update failed:", e); }
+    }
     if (voucherCode && voucherApplied) {
       try { await redeemVoucher(voucherCode); } catch { /* non-fatal */ }
     }

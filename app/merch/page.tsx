@@ -35,7 +35,11 @@ const CATS  = [
   { key:"short-sleeve", label:"Short Sleeves" },
 ];
 
-interface CartItem { productId:string; name:string; price:number; size:string; qty:number; imageUrl:string; }
+interface CartItem { productId:string; name:string; price:number; size:string; qty:number; imageUrl:string; color?:string; colorLabel?:string; }
+interface StockRow { id:string; label:string; counts:Record<string,number> }
+// Hoodies are sold from blank-garment inventory (color + size). Other items are not tracked.
+const HOODIE_SIZES = ["YS","YM","YL","AXS","AS","AM","AL","AXL","A2XL","A3XL"];
+const colorName = (label:string) => label.replace(/\s*hoodies?\s*$/i, "").trim() || label;
 type Step = "browse" | "contact" | "pay" | "done";
 
 // ── Square card style ─────────────────────────────────────────────────────────────────────
@@ -74,6 +78,8 @@ export default function MerchPage() {
   const [paymentId,    setPaymentId]    = useState("");
   const [retryCount,   setRetryCount]   = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<AppliedVoucher | null>(null);
+  const [stock, setStock] = useState<StockRow[] | null>(null);
+  const [colors, setColors] = useState<Record<string,string>>({});
 
   // Load products from CMS
   useEffect(() => {
@@ -84,6 +90,26 @@ export default function MerchPage() {
       })
       .catch(() => {});
   }, []);
+
+  async function loadStock() {
+    try {
+      const r = await fetch("/api/merch-stock", { cache: "no-store" });
+      const d = await r.json();
+      setStock(Array.isArray(d?.rows) ? d.rows : null);
+    } catch { /* keep going without stock tracking */ }
+  }
+  useEffect(() => { loadStock(); }, []);
+
+  const hoodieRows = (stock ?? []).filter(r => /hood/i.test(r.label));
+  const isTracked = (p: MerchProduct) => p.cat === "hoodie" && hoodieRows.length > 0;
+  // How many of this color + size are still free after what is already in the cart.
+  const leftOf = (rowId:string, size:string) => {
+    const row = hoodieRows.find(r => r.id === rowId);
+    const inCart = cart.filter(i => i.color === rowId && i.size === size).reduce((n,i) => n + i.qty, 0);
+    return Math.max(0, (row?.counts[size] || 0) - inCart);
+  };
+  const colorLeft = (rowId:string) => HOODIE_SIZES.reduce((n, sz) => n + leftOf(rowId, sz), 0);
+  const sizeLeftAny = (size:string) => hoodieRows.reduce((n, r) => n + leftOf(r.id, size), 0);
 
   const cardRef = useRef<any>(null);
 
@@ -169,16 +195,22 @@ export default function MerchPage() {
   // ── Cart helpers ─────────────────────────────────────────────────
   function addToCart(p: MerchProduct) {
     const size = sizes[p.id];
-    if (!size) { setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
+    const tracked = isTracked(p);
+    const color = tracked ? colors[p.id] : undefined;
+    if (tracked && (!color || color === "__REQUIRED__")) { setColors(c => ({ ...c, [p.id]: "__REQUIRED__" })); if (!size) setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
+    if (!size || size === "__REQUIRED__") { setSizes(s => ({ ...s, [p.id]: "__REQUIRED__" })); return; }
+    if (tracked && color && leftOf(color, size) <= 0) return;
+    const colorLabel = tracked && color ? colorName(hoodieRows.find(r => r.id === color)?.label || "") : undefined;
     setCart(prev => {
-      const ex = prev.find(i => i.productId === p.id && i.size === size);
-      if (ex) return prev.map(i => i.productId===p.id && i.size===size ? {...i, qty:i.qty+1} : i);
-      return [...prev, { productId:p.id, name:p.name, price:p.price, size, qty:1, imageUrl:p.imageUrl }];
+      const ex = prev.find(i => i.productId === p.id && i.size === size && i.color === color);
+      if (ex) return prev.map(i => (i.productId===p.id && i.size===size && i.color===color) ? {...i, qty:i.qty+1} : i);
+      return [...prev, { productId:p.id, name:p.name, price:p.price, size, qty:1, imageUrl:p.imageUrl, color, colorLabel }];
     });
   }
 
-  function updateQty(productId:string, size:string, delta:number) {
-    setCart(prev => prev.map(i => i.productId===productId && i.size===size ? {...i, qty:i.qty+delta} : i).filter(i=>i.qty>0));
+  function updateQty(productId:string, size:string, color:string|undefined, delta:number) {
+    if (delta > 0 && color && leftOf(color, size) <= 0) return;
+    setCart(prev => prev.map(i => i.productId===productId && i.size===size && i.color===color ? {...i, qty:i.qty+delta} : i).filter(i=>i.qty>0));
   }
 
   function handleContactNext(e: React.FormEvent) {
@@ -205,14 +237,14 @@ export default function MerchPage() {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           sourceId, total,
-          cart: cart.map(i => ({ name:i.name, size:i.size, qty:i.qty, price:i.price })),
+          cart: cart.map(i => ({ name: i.colorLabel ? `${i.name} (${i.colorLabel})` : i.name, size:i.size, qty:i.qty, price:i.price, color:i.color })),
           contact: { name, email, phone, notes, athlete, team },
           voucherCode: appliedVoucher?.code ?? null,
         }),
       });
       const data = await res.json();
       if (data.success) { setPaymentId(data.paymentId ?? ""); setStep("done"); }
-      else setPaymentError(data.error || "Payment failed. Please try again.");
+      else { setPaymentError(data.error || "Payment failed. Please try again."); loadStock(); }
     } catch { setPaymentError("Network error. Please check your connection and try again."); }
     setPaying(false);
   }
@@ -301,6 +333,11 @@ export default function MerchPage() {
                   {filtered.map((p, i) => {
                     const sel = sizes[p.id];
                     const req = sel === "__REQUIRED__";
+                    const tracked = isTracked(p);
+                    const selColor = tracked ? colors[p.id] : undefined;
+                    const colorReq = selColor === "__REQUIRED__";
+                    const allGone = tracked && hoodieRows.every(r => colorLeft(r.id) <= 0);
+                    const comboGone = tracked && !!selColor && !colorReq && !!sel && sel !== "__REQUIRED__" && leftOf(selColor, sel) <= 0;
                     return (
                       <motion.div key={p.id} layout
                         initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.95}}
@@ -312,24 +349,53 @@ export default function MerchPage() {
                         <div className="p-3 flex flex-col gap-2 flex-1">
                           <div className="text-white font-bold text-xs leading-snug line-clamp-2">{p.name}</div>
                           <div className="text-blue-400 font-black text-base">${p.price}</div>
+                          {tracked && (
+                            <div>
+                              <div className={`text-[10px] font-semibold mb-1.5 ${colorReq ? "text-red-400" : "text-gray-500 uppercase tracking-wider"}`}>
+                                {colorReq ? "⚠ Please select a hoodie color" : "Hoodie color"}
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {hoodieRows.map(r => {
+                                  const gone = colorLeft(r.id) <= 0;
+                                  return (
+                                    <button key={r.id} disabled={gone} title={gone ? "Not available" : colorName(r.label)}
+                                      onClick={() => {
+                                        setColors(c => ({...c,[p.id]:r.id}));
+                                        if (sel && sel !== "__REQUIRED__" && leftOf(r.id, sel) <= 0) setSizes(s => { const n = {...s}; delete n[p.id]; return n; });
+                                      }}
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                                        gone ? "border-white/10 text-gray-600 line-through cursor-not-allowed"
+                                          : selColor === r.id ? "bg-blue-600 border-blue-500 text-white"
+                                          : "border-white/20 text-gray-400 hover:border-blue-400 hover:text-white"
+                                      }`}>{colorName(r.label)}{gone ? " (not available)" : ""}</button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                           <div>
                             <div className={`text-[10px] font-semibold mb-1.5 ${req ? "text-red-400" : "text-gray-500 uppercase tracking-wider"}`}>
                               {req ? "⚠ Please select a size" : "Size"}
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              {SIZES.map(sz => (
-                                <button key={sz} onClick={() => setSizes(s => ({...s,[p.id]:sz}))}
-                                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
-                                    sel === sz && sz !== "__REQUIRED__"
-                                      ? "bg-blue-600 border-blue-500 text-white"
-                                      : "border-white/20 text-gray-400 hover:border-blue-400 hover:text-white"
-                                  }`}>{sz}</button>
-                              ))}
+                              {(tracked ? HOODIE_SIZES : SIZES).map(sz => {
+                                const gone = tracked && (selColor && selColor !== "__REQUIRED__" ? leftOf(selColor, sz) <= 0 : sizeLeftAny(sz) <= 0);
+                                return (
+                                  <button key={sz} disabled={gone} title={gone ? "Not available" : sz} onClick={() => setSizes(s => ({...s,[p.id]:sz}))}
+                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                                      gone ? "border-white/10 text-gray-600 line-through cursor-not-allowed"
+                                        : sel === sz && sz !== "__REQUIRED__"
+                                        ? "bg-blue-600 border-blue-500 text-white"
+                                        : "border-white/20 text-gray-400 hover:border-blue-400 hover:text-white"
+                                    }`}>{sz}</button>
+                                );
+                              })}
                             </div>
+                            {(allGone || comboGone) && <div className="text-red-400 text-[11px] font-bold mt-1.5">Not available</div>}
                           </div>
-                          <button onClick={() => addToCart(p)}
-                            className="mt-auto w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-1.5">
-                            <ShoppingCart className="w-3.5 h-3.5" /> Add to Cart
+                          <button onClick={() => addToCart(p)} disabled={allGone || comboGone}
+                            className="mt-auto w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-1.5">
+                            <ShoppingCart className="w-3.5 h-3.5" /> {allGone || comboGone ? "Not available" : "Add to Cart"}
                           </button>
                         </div>
                       </motion.div>
@@ -357,20 +423,20 @@ export default function MerchPage() {
                   ) : (
                     <div className="divide-y divide-white/5">
                       {cart.map(item => (
-                        <div key={`${item.productId}__${item.size}`} className="px-4 py-3 flex items-start gap-3">
+                        <div key={`${item.productId}__${item.size}__${item.color || ""}`} className="px-4 py-3 flex items-start gap-3">
                           <div className="w-12 h-12 rounded-lg bg-white/90 flex-shrink-0 overflow-hidden">
                             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain p-1" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-white text-xs font-semibold leading-tight line-clamp-2">{item.name}</div>
-                            <div className="text-gray-500 text-[10px] mt-0.5">Size: <span className="text-blue-400 font-bold">{item.size}</span></div>
+                            <div className="text-gray-500 text-[10px] mt-0.5">{item.colorLabel ? <>Color: <span className="text-blue-400 font-bold">{item.colorLabel}</span> &middot; </> : null}Size: <span className="text-blue-400 font-bold">{item.size}</span></div>
                             <div className="flex items-center gap-2 mt-1.5">
-                              <button onClick={() => updateQty(item.productId,item.size,-1)}
+                              <button onClick={() => updateQty(item.productId,item.size,item.color,-1)}
                                 className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
                                 {item.qty===1 ? <Trash2 className="w-3 h-3 text-red-400"/> : <Minus className="w-3 h-3 text-gray-400"/>}
                               </button>
                               <span className="text-white font-bold text-sm w-4 text-center">{item.qty}</span>
-                              <button onClick={() => updateQty(item.productId,item.size,1)}
+                              <button onClick={() => updateQty(item.productId,item.size,item.color,1)}
                                 className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
                                 <Plus className="w-3 h-3 text-gray-400"/>
                               </button>

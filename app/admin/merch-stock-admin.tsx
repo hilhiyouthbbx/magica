@@ -49,7 +49,7 @@ export function MerchStockAdmin({ adminKey }: { adminKey: string }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-gray-400 text-sm">Blank garments left, by color and size. Any design can go on any garment, so this is counted by garment, not by design. This is for your records and does not change what customers can order.</p>
+      <p className="text-gray-400 text-sm">Blank garments left, by color and size. Any design can go on any garment, so this is counted by garment, not by design. On the merch page, a hoodie color or size that reaches zero shows "Not available," and each hoodie order lowers these counts automatically.</p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[820px]">
           <thead>
@@ -89,7 +89,7 @@ export function MerchStockAdmin({ adminKey }: { adminKey: string }) {
         {note && <span className={`text-sm ${note.bad ? "text-red-400" : "text-emerald-400"}`}>{note.t}</span>}
         {updatedAt && !dirty && <span className="text-gray-500 text-xs">Last saved {new Date(updatedAt).toLocaleString("en-US")}</span>}
       </div>
-      <p className="text-gray-500 text-xs">A blank box means none left. Counts only change when you edit them here.</p>
+      <p className="text-gray-500 text-xs">A blank box means none left. Counts go down when a hoodie is bought, and you can change them here any time.</p>
     </div>
   );
 }

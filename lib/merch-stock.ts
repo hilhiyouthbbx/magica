@@ -58,6 +58,43 @@ export async function saveMerchStock(s: MerchStock): Promise<void> {
   fs.writeFileSync(FILE, JSON.stringify(s, null, 2));
 }
 
+export interface StockLine { color: string; size: string; qty: number }
+
+function aggregate(lines: StockLine[]): StockLine[] {
+  const m = new Map<string, StockLine>();
+  lines.forEach(l => {
+    if (!l.color || !l.size || l.qty <= 0) return;
+    const k = `${l.color}|${l.size}`;
+    const e = m.get(k) || { color: l.color, size: l.size, qty: 0 };
+    e.qty += l.qty;
+    m.set(k, e);
+  });
+  return [...m.values()];
+}
+
+/** Returns a plain-words description of the first line the stock can't cover, or null if everything is in stock. */
+export function shortfall(stock: MerchStock, lines: StockLine[]): string | null {
+  for (const l of aggregate(lines)) {
+    const row = stock.rows.find(r => r.id === l.color);
+    if (!row) continue;
+    if ((row.counts[l.size] || 0) < l.qty) return `${row.label.replace(/\s*hoodies?\s*$/i, "").trim() || row.label} hoodie in size ${l.size}`;
+  }
+  return null;
+}
+
+/** Lowers the counts for a paid order (never below zero). */
+export async function takeStock(lines: StockLine[]): Promise<void> {
+  const s = await getMerchStock();
+  const rows = s.rows.map(r => ({ ...r, counts: { ...r.counts } }));
+  aggregate(lines).forEach(l => {
+    const row = rows.find(r => r.id === l.color);
+    if (!row) return;
+    const left = Math.max(0, (row.counts[l.size] || 0) - l.qty);
+    if (left > 0) row.counts[l.size] = left; else delete row.counts[l.size];
+  });
+  await saveMerchStock({ rows, updatedAt: new Date().toISOString() });
+}
+
 /** Keeps only sane values: known sizes, whole numbers 0-9999, short labels. */
 export function cleanStock(input: unknown): MerchStock | null {
   const rows = (input as { rows?: unknown })?.rows;

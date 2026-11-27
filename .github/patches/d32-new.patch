@@ -1,0 +1,71 @@
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index 0bbce92..0df1b19 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -1755 +1755 @@ function PagesTab({ adminKey }: { adminKey: string }) {
+-                  <div className="text-gray-500 text-xs">${prod.price} · {prod.cat}</div>
++                  <div className="text-gray-500 text-xs">${prod.price} &middot; {prod.cat}{prod.addedAt ? ` - added ${prod.addedAt}` : ""}</div>
+@@ -1757,0 +1758,3 @@ function PagesTab({ adminKey }: { adminKey: string }) {
++                  <label className="flex items-center gap-1 text-[11px] text-gray-300 cursor-pointer mr-1" title="Show the NEW badge and include in the New button">
++                    <input type="checkbox" checked={!!prod.isNew} onChange={e => setContent(p => p ? {...p, merch:{...p.merch, products: p.merch.products.map((x, j) => j === i ? {...x, isNew: e.target.checked, addedAt: e.target.checked && !x.addedAt ? new Date().toISOString().slice(0, 10) : x.addedAt} : x)}} : p)} /> New
++                  </label>
+@@ -1767 +1770 @@ function PagesTab({ adminKey }: { adminKey: string }) {
+-          <button onClick={() => setEditMerchProd({ id:"", name:"", price:20, cat:"hoodie", imageUrl:"" })}
++          <button onClick={() => setEditMerchProd({ id:"", name:"", price:20, cat:"hoodie", imageUrl:"", isNew:true, addedAt:new Date().toISOString().slice(0, 10) })}
+@@ -2094,0 +2098,10 @@ function PagesTab({ adminKey }: { adminKey: string }) {
++            <div className="grid grid-cols-2 gap-3 items-end">
++              <div>
++                <label className="block text-gray-400 text-xs font-semibold mb-1">Date added</label>
++                <input type="date" value={editMerchProd.addedAt || ""} onChange={e => setEditMerchProd(p => p ? {...p, addedAt:e.target.value} : p)}
++                  className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-blue-500" />
++              </div>
++              <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer pb-2.5">
++                <input type="checkbox" checked={!!editMerchProd.isNew} onChange={e => setEditMerchProd(p => p ? {...p, isNew:e.target.checked} : p)} /> Mark as NEW
++              </label>
++            </div>
+diff --git a/app/merch/page.tsx b/app/merch/page.tsx
+index b3e6f9f..9cb8c74 100644
+--- a/app/merch/page.tsx
++++ b/app/merch/page.tsx
+@@ -32,0 +33 @@ const CATS  = [
++  { key:"new",          label:"New" },
+@@ -62,0 +64 @@ export default function MerchPage() {
++  const [sortNew, setSortNew] = useState(false);
+@@ -116 +118,14 @@ export default function MerchPage() {
+-  const filtered  = useMemo(() => cat === "all" ? products : products.filter(p => p.cat === cat), [cat, products]);
++  const filtered  = useMemo(() => {
++    let list = cat === "all" ? products : cat === "new" ? products.filter(p => p.isNew) : products.filter(p => p.cat === cat);
++    if (sortNew) {
++      // Newest first by date added; products without a date keep their order after the dated ones.
++      list = list.map((p, i) => ({ p, i })).sort((a, b) => {
++        const da = a.p.addedAt || "", db = b.p.addedAt || "";
++        if (da && db) return db.localeCompare(da) || a.i - b.i;
++        if (da) return -1;
++        if (db) return 1;
++        return a.i - b.i;
++      }).map(x => x.p);
++    }
++    return list;
++  }, [cat, products, sortNew]);
+@@ -328,0 +344,8 @@ export default function MerchPage() {
++                <button onClick={() => setSortNew(v => !v)} aria-pressed={sortNew}
++                  className={`ml-auto px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
++                    sortNew
++                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30"
++                      : "glass border border-white/15 text-gray-400 hover:text-white hover:border-white/30"
++                  }`}>
++                  Sort: {sortNew ? "Newest first" : "Featured"}
++                </button>
+@@ -329,0 +353 @@ export default function MerchPage() {
++              {cat === "new" && filtered.length === 0 && <p className="text-gray-400 text-sm mb-6">No new items right now. Check back soon!</p>}
+@@ -346 +370,2 @@ export default function MerchPage() {
+-                        <div className="bg-white/95 aspect-square p-3 flex items-center justify-center">
++                        <div className="relative bg-white/95 aspect-square p-3 flex items-center justify-center">
++                          {p.isNew && <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black tracking-wider">NEW</span>}
+diff --git a/lib/content.ts b/lib/content.ts
+index 47dd67f..7e72383 100644
+--- a/lib/content.ts
++++ b/lib/content.ts
+@@ -76,0 +77,2 @@ export interface MerchProduct {
++  addedAt?: string;  // YYYY-MM-DD, used to sort "newest first"
++  isNew?:   boolean; // shows the NEW badge and appears under the New button

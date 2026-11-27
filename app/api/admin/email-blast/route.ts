@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { getContacts, type Contact } from "@/lib/contacts";
 import { sanitizeEmailHtml, plainToEmailHtml, escapeHtml, htmlIsEmpty } from "@/lib/email-html";
+import { getEmailTheme, type EmailTheme } from "@/lib/email-themes";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ function checkAuth(req: NextRequest) {
 
 /** Wraps already-sanitized, already-styled message HTML (see lib/email-html.ts) in the branded email
  *  template, replacing {{name}} with the recipient's first name. */
-function blastHtml(subject: string, contentHtml: string, firstName?: string, extra?: { player?: string; amount?: string }): string {
+function blastHtml(subject: string, contentHtml: string, firstName?: string, extra?: { player?: string; amount?: string }, theme?: EmailTheme): string {
+  const th = theme ?? getEmailTheme("standard");
+  const festive = th.id !== "standard";
   // {{name}} = parent's first name. {{player}} / {{amount}} = player name(s) and amount on the contact's registration(s).
   const paragraphs = contentHtml
     .replace(/\{\{name\}\}/gi, () => escapeHtml(firstName || "there"))
@@ -25,12 +28,13 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
 
   return `
 <!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="color-scheme" content="light"/><meta name="supported-color-schemes" content="light"/></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f9fafb;">
+<body style="margin:0;padding:0;background:${th.pageBg};font-family:system-ui,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${th.pageBg};">
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
+        ${festive ? `<tr><td bgcolor="${th.stripe}" height="8" style="background-color:${th.stripe};font-size:0;line-height:0;height:8px;">&nbsp;</td></tr>` : ""}
         <tr>
-          <td bgcolor="#1e3a8a" style="background-color:#1e3a8a;padding:24px 32px;">
+          <td bgcolor="${th.headerBg}" style="background-color:${th.headerBg};padding:24px 32px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
               <td style="padding-right:16px;vertical-align:middle;">
                 <img src="https://www.hilhiyouthbbx.com/spartan-head-white.png" alt="Hilhi Spartans" width="60" height="63" style="display:block;border:0;" />
@@ -41,13 +45,15 @@ function blastHtml(subject: string, contentHtml: string, firstName?: string, ext
             </tr></table>
           </td>
         </tr>
+        ${festive ? `<tr><td align="center" bgcolor="${th.bannerBg}" style="background-color:${th.bannerBg};padding:16px 24px;text-align:center;"><span style="display:inline-block;color:${th.bannerFg} !important;font-size:22px;font-weight:800;line-height:1.3;font-family:system-ui,sans-serif;">${th.banner}</span><br/><span style="display:inline-block;font-size:20px;letter-spacing:4px;line-height:1.6;">${th.strip}</span></td></tr>` : ""}
         <tr>
           <td style="padding:28px 32px;">
             ${paragraphs}
           </td>
         </tr>
+        ${festive && th.closing ? `<tr><td align="center" style="padding:0 32px 26px;text-align:center;"><span style="display:inline-block;color:${th.accent};font-size:16px;font-weight:700;line-height:1.5;font-family:system-ui,sans-serif;">${th.closing}</span></td></tr>` : ""}
         <tr>
-          <td bgcolor="#f8fafc" style="background-color:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;">
+          <td bgcolor="${th.footerBg}" style="background-color:${th.footerBg};padding:20px 32px;border-top:1px solid #e5e7eb;">
             <p style="margin:0;font-size:12px;color:#9ca3af;">
               Hilhi Youth Basketball · Hillsboro, Oregon<br/>
               Questions? Email us at <a href="mailto:info@hilhiyouthbbx.com" style="color:#2563eb;">info@hilhiyouthbbx.com</a>
@@ -72,6 +78,8 @@ interface BlastBody {
   search?: string;
   /** Explicit contact IDs to send to — if provided, overrides source/search filtering entirely. */
   contactIds?: string[];
+  /** Seasonal look (id from lib/email-themes.ts). Omitted / unknown = the classic blue email. */
+  theme?: string;
   /** If true, sends only ONE email — to testEmail — using the same template, no real contacts touched. */
   testEmail?: string;
 }
@@ -133,6 +141,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Subject and message are required." }, { status: 400 });
   }
 
+  const theme = getEmailTheme(body.theme);
+  // A festive email starts its subject with the theme's emoji so it stands out in the inbox.
+  const subjectLine = theme.id !== "standard" && !body.subject.trim().startsWith(theme.icon) ? `${theme.icon} ${body.subject.trim()}` : body.subject.trim();
+
   const transporter = nodemailer.createTransport({
     host:   smtpHost,
     port:   Number(process.env.SMTP_PORT || 587),
@@ -156,9 +168,9 @@ export async function POST(req: NextRequest) {
         transporter.sendMail({
           from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
           to:      addr,
-          subject: `[TEST] ${body.subject}`,
+          subject: `[TEST] ${subjectLine}`,
           replyTo: REPLY_TO,
-          html:    blastHtml(body.subject, contentHtml, "Coach", { player: "Sample Player", amount: "$310.00" }),
+          html:    blastHtml(body.subject, contentHtml, "Coach", { player: "Sample Player", amount: "$310.00" }, theme),
         })
       ));
       return NextResponse.json({ ok: true, sent: testAddrs.length, test: true });
@@ -201,9 +213,9 @@ export async function POST(req: NextRequest) {
         await transporter.sendMail({
           from:    `"Hilhi Youth Basketball" <${smtpUser}>`,
           to:      contact.email,
-          subject: body.subject,
+          subject: subjectLine,
           replyTo: REPLY_TO,
-          html:    blastHtml(body.subject, contentHtml, firstName, { player: joinNames(players), amount: total > 0 ? "$" + total.toFixed(2) : "" }),
+          html:    blastHtml(body.subject, contentHtml, firstName, { player: joinNames(players), amount: total > 0 ? "$" + total.toFixed(2) : "" }, theme),
         });
         sent++;
       } catch (e) {

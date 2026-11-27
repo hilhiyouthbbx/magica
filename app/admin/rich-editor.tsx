@@ -23,6 +23,16 @@ export function isHtmlEmpty(html: string): boolean {
   return html.replace(/<[^>]*>/g, "").replace(/&nbsp;|\s/g, "") === "";
 }
 
+const TEXT_COLORS: [string, string][] = [["Red", "#dc2626"], ["Orange", "#ea580c"], ["Green", "#16a34a"], ["Blue", "#2563eb"], ["Purple", "#7c3aed"], ["Black", "#111827"]];
+
+// Pasted text color, kept only when it is readable on a white email.
+function pastedColor(css: string): string {
+  const m = /rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/.exec(css || "");
+  if (!m) return "";
+  const lum = (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) / 255;
+  return lum > 0.85 ? "" : `rgb(${m[1]}, ${m[2]}, ${m[3]})`;
+}
+
 const BLOCKS = new Set(["P", "DIV", "UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "TABLE", "TR"]);
 const SKIP = new Set(["SCRIPT", "STYLE", "META", "TITLE", "LINK", "HEAD", "XML"]);
 
@@ -74,6 +84,8 @@ function cleanPaste(html: string): string {
     if (isUnder) c = `<u>${c}</u>`;
     if (isItalic) c = `<em>${c}</em>`;
     if (isBold) c = `<strong>${c}</strong>`;
+    const pc = pastedColor(el.style?.color || "");
+    if (pc) c = `<span style="color:${pc}">${c}</span>`;
     return c;
   };
 
@@ -114,6 +126,13 @@ export function RichEditor({ value, onChange, placeholder }: { value: string; on
     emit();
   }
 
+  function setColor(hex: string) {
+    ref.current?.focus();
+    try { document.execCommand("styleWithCSS", false, "true"); } catch { /* ignore */ }
+    document.execCommand("foreColor", false, hex);
+    emit();
+  }
+
   function addLink() {
     const sel = window.getSelection();
     const saved = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
@@ -140,6 +159,14 @@ export function RichEditor({ value, onChange, placeholder }: { value: string; on
         <ToolButton label="Bold" title="Bold (Ctrl+B)" onClick={() => exec("bold")}><span className="font-black">B</span></ToolButton>
         <ToolButton label="Italic" title="Italic (Ctrl+I)" onClick={() => exec("italic")}><span className="italic font-serif">I</span></ToolButton>
         <ToolButton label="Underline" title="Underline (Ctrl+U)" onClick={() => exec("underline")}><span className="underline">U</span></ToolButton>
+        <div className="flex items-center gap-1 px-2 h-8 rounded-lg bg-white/10" title="Select some words in the message, then click a color">
+          <span className="text-gray-300 text-xs mr-1">Color</span>
+          {TEXT_COLORS.map(([n, hex]) => (
+            <button key={hex} type="button" aria-label={`${n} text`} title={`${n} text (select words first)`}
+              onMouseDown={e => e.preventDefault()} onClick={() => setColor(hex)}
+              className="w-5 h-5 rounded-full border-2 border-white/60 hover:scale-110 transition-transform" style={{ background: hex }} />
+          ))}
+        </div>
         <ToolButton label="Bullet list" title="Bulleted list" onClick={() => exec("insertUnorderedList")}>• List</ToolButton>
         <ToolButton label="Numbered list" title="Numbered list" onClick={() => exec("insertOrderedList")}>1. List</ToolButton>
         <ToolButton label="Link" title="Add a link to the selected text" onClick={addLink}>🔗 Link</ToolButton>

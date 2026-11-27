@@ -636,6 +636,7 @@ import { ConcessionsAdmin } from "./concessions-admin";
 import { MerchStockAdmin } from "./merch-stock-admin";
 import { saleActive } from "@/lib/merch-sale";
 import { RichEditor, plainToHtml, isHtmlEmpty } from "./rich-editor";
+import { EMAIL_THEMES, getEmailTheme } from "@/lib/email-themes";
 import { AiWriter } from "./ai-writer";
 
 // VouchersTab — Create and manage discount promo codes
@@ -2269,20 +2270,24 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
     if (typeof window === "undefined") return "";
     try { return plainToHtml(JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}").message || ""); } catch { return ""; }
   });
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "standard";
+    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}").theme || "standard"; } catch { return "standard"; }
+  });
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     // Don't overwrite the saved draft with the initial empty values on first mount.
     if (!subject.trim() && isHtmlEmpty(message)) return;
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, message }));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ subject, message, theme }));
     setDraftSavedAt(Date.now());
-  }, [subject, message]);
+  }, [subject, message, theme]);
 
   function clearDraft() {
     if (!confirm("Clear the saved draft? This can't be undone.")) return;
     localStorage.removeItem(DRAFT_KEY);
-    setSubject(""); setMessage(""); setDraftSavedAt(null);
+    setSubject(""); setMessage(""); setTheme("standard"); setDraftSavedAt(null);
   }
 
   const [testEmail, setTestEmail] = useState("");
@@ -2317,7 +2322,7 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
       const res = await fetch(`/api/admin/email-blast?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, messageHtml: message, testEmail: testEmail.trim() }),
+        body: JSON.stringify({ subject, messageHtml: message, testEmail: testEmail.trim(), theme }),
       });
       const data = await res.json();
       if (data.ok) setTestResult(`✓ ${data.sent} individual test email${data.sent !== 1 ? "s" : ""} sent (each address gets its own separate email).`);
@@ -2336,7 +2341,7 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
       const res = await fetch(`/api/admin/email-blast?key=${adminKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, messageHtml: message, contactIds: uniqueRecipients.map(c => c.id) }),
+        body: JSON.stringify({ subject, messageHtml: message, contactIds: uniqueRecipients.map(c => c.id), theme }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -2418,6 +2423,31 @@ function EmailBlastModal({ adminKey, allContacts, initialSource, onClose }: {
               </div>
               <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. 2026-2027 Boys Tryouts Are Back!"
                 className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white font-bold placeholder-gray-600 placeholder:font-normal text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-gray-400 text-xs font-semibold mb-1.5">Email look</label>
+              <div className="flex flex-wrap gap-1.5">
+                {EMAIL_THEMES.map(t => (
+                  <button key={t.id} type="button" onClick={() => setTheme(t.id)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${theme === t.id ? "bg-blue-600 border-blue-400 text-white" : "border-white/15 text-gray-300 hover:border-blue-400 hover:text-white"}`}>
+                    {t.icon} {t.label}
+                  </button>
+                ))}
+              </div>
+              {(() => { const t = getEmailTheme(theme); return (
+                <div className="mt-2 rounded-xl overflow-hidden border border-white/15" style={{ background: t.pageBg }}>
+                  {t.id !== "standard" && <div style={{ background: t.stripe, height: 6 }} />}
+                  <div style={{ background: t.headerBg }} className="px-4 py-2.5 text-white font-extrabold text-sm">Hilhi Youth Basketball</div>
+                  {t.id !== "standard" && (
+                    <div style={{ background: t.bannerBg, color: t.bannerFg }} className="px-3 py-2 text-center">
+                      <div className="font-extrabold text-sm">{t.banner}</div>
+                      <div className="text-sm tracking-widest">{t.strip}</div>
+                    </div>
+                  )}
+                  <div className="bg-white px-4 py-3 text-gray-500 text-xs">Your message goes here{t.id !== "standard" && t.icon ? ` \u00B7 subject starts with ${t.icon}` : ""}</div>
+                  {t.id !== "standard" && <div className="bg-white px-3 pb-3 text-center text-xs font-bold" style={{ color: t.accent }}>{t.closing}</div>}
+                </div>
+              ); })()}
             </div>
             <AiWriter adminKey={adminKey} subject={subject} message={message} setSubject={setSubject} setMessage={setMessage} />
             <div>

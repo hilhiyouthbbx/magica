@@ -14,6 +14,27 @@ const A_STYLE  = "color:#2563eb;text-decoration:underline;";
 
 type Entry = { src: string; open: string; close: string };
 
+const NAMED_COLORS: Record<string, string> = {
+  red: "#dc2626", orange: "#ea580c", green: "#16a34a", blue: "#2563eb", purple: "#7c3aed",
+  black: "#111827", navy: "#1e3a8a", maroon: "#991b1b", teal: "#0f766e", pink: "#db2777", brown: "#92400e", gray: "#6b7280", grey: "#6b7280",
+};
+
+/** Turns a CSS color (#hex, rgb(), or a basic name) into #rrggbb. Returns null for anything else,
+ *  and for colors too light to read on the white email body. */
+export function parseTextColor(raw: string): string | null {
+  const v = raw.trim().toLowerCase().replace(/\s*!important$/, "");
+  let r = -1, g = -1, b = -1;
+  let m = /^#([0-9a-f]{3})$/.exec(v);
+  if (m) { r = parseInt(m[1][0] + m[1][0], 16); g = parseInt(m[1][1] + m[1][1], 16); b = parseInt(m[1][2] + m[1][2], 16); }
+  else if ((m = /^#([0-9a-f]{6})$/.exec(v))) { r = parseInt(m[1].slice(0, 2), 16); g = parseInt(m[1].slice(2, 4), 16); b = parseInt(m[1].slice(4, 6), 16); }
+  else if ((m = /^rgba?\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})/.exec(v))) { r = +m[1]; g = +m[2]; b = +m[3]; }
+  else if (NAMED_COLORS[v]) return NAMED_COLORS[v];
+  if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) return null;
+  if ((0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.85) return null;
+  const hx = (n: number) => n.toString(16).padStart(2, "0");
+  return "#" + hx(r) + hx(g) + hx(b);
+}
+
 function weightIsBold(style: string): boolean | null {
   const m = /font-weight\s*:\s*([a-z0-9]+)/i.exec(style);
   if (!m) return null;
@@ -162,8 +183,11 @@ export function sanitizeEmailHtml(input: string): string {
         const ital = /font-style\s*:\s*italic/i.test(st);
         const und  = /text-decoration[^;]*underline/i.test(st);
         // represent a span as up to three nested real tags under one stack entry
-        const opens = (bold ? "<strong>" : "") + (ital ? "<em>" : "") + (und ? "<u>" : "");
-        const closes = (und ? "</u>" : "") + (ital ? "</em>" : "") + (bold ? "</strong>" : "");
+        const cm = /(?:^|[;\s])color\s*:\s*([^;]+)/i.exec(st);
+        const fa = /\bcolor\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
+        const col = tag === "font" && fa ? parseTextColor(fa[1] ?? fa[2] ?? fa[3] ?? "") : (cm ? parseTextColor(cm[1]) : null);
+        const opens = (col ? `<span style="color:${col};">` : "") + (bold ? "<strong>" : "") + (ital ? "<em>" : "") + (und ? "<u>" : "");
+        const closes = (und ? "</u>" : "") + (ital ? "</em>" : "") + (bold ? "</strong>" : "") + (col ? "</span>" : "");
         if (opens) {
           ensureContainer();
           stack.push({ src: tag, open: opens, close: closes });
